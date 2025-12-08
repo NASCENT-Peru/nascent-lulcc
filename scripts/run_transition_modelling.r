@@ -111,18 +111,22 @@ tryCatch(
   }
 )
 
-# Source utils.r
-cat("Sourcing ../src/utils.r...\n")
-tryCatch(
-  {
-    source("../src/utils.r")
-    cat("utils.r sourced successfully.\n\n")
-  },
-  error = function(e) {
-    cat(sprintf("ERROR sourcing utils.r: %s\n", e$message))
-    quit(status = 1)
-  }
-)
+# Source utils.r (optional, may not exist)
+utils_path <- "../src/utils.r"
+if (file.exists(utils_path)) {
+  cat("Sourcing ../src/utils.r...\n")
+  tryCatch(
+    {
+      source(utils_path)
+      cat("utils.r sourced successfully.\n\n")
+    },
+    error = function(e) {
+      cat(sprintf("WARNING sourcing utils.r: %s\n", e$message))
+    }
+  )
+} else {
+  cat("utils.r not found (skipping)\n\n")
+}
 
 # Source transition modeling functions
 cat("Sourcing ../src/transition_modelling.r...\n")
@@ -194,7 +198,14 @@ summary_file <- file.path(
   sprintf("run_summary_%s.txt", Sys.getenv("SLURM_JOB_ID", unset = "local"))
 )
 
-ensure_dir(dirname(summary_file))
+# Create directory if ensure_dir function is available, otherwise use dir.create
+if (exists("ensure_dir", mode = "function")) {
+  ensure_dir(dirname(summary_file))
+} else {
+  if (!dir.exists(dirname(summary_file))) {
+    dir.create(dirname(summary_file), recursive = TRUE, showWarnings = FALSE)
+  }
+}
 
 sink(summary_file)
 cat(sprintf("Job ID: %s\n", Sys.getenv("SLURM_JOB_ID", unset = "local")))

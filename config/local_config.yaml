@@ -2,7 +2,7 @@
 environment: "local"
 
 # Base paths
-data_basepath: "C:/Users/bblack/data/nascent-lulcc"
+data_basepath: "E:/NASCENT-LULCC"
 historic_lulc_basepath: "lulc"
 
 # Main directories (relative to data_basepath)
