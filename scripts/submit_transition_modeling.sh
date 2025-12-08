@@ -58,10 +58,10 @@ echo
 # ----------------------------------------------------------
 # 5) Run transition modeling pipeline
 # ----------------------------------------------------------
-R_SCRIPT="$SLURM_SUBMIT_DIR/run_transition_modelling.r"
+R_SCRIPT="$SLURM_SUBMIT_DIR/scripts/run_transition_modelling.r"
 
 if [ ! -f "$R_SCRIPT" ]; then
-    echo "ERROR: run_transition_modelling.r not found in job directory"
+    echo "ERROR: run_transition_modelling.r not found in scripts directory"
     exit 1
 fi
 
