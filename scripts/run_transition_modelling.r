@@ -99,10 +99,10 @@ for (p in required_pkgs) {
 cat("All required packages loaded successfully.\n\n")
 
 # Source setup script
-cat("Sourcing setup.r...\n")
+cat("Sourcing ../src/setup.r...\n")
 tryCatch(
   {
-    source("setup.r")
+    source("../src/setup.r")
     cat("setup.r sourced successfully.\n\n")
   },
   error = function(e) {
@@ -112,10 +112,10 @@ tryCatch(
 )
 
 # Source utils.r
-cat("Sourcing utils.r...\n")
+cat("Sourcing ../src/utils.r...\n")
 tryCatch(
   {
-    source("utils.r")
+    source("../src/utils.r")
     cat("utils.r sourced successfully.\n\n")
   },
   error = function(e) {
@@ -125,10 +125,10 @@ tryCatch(
 )
 
 # Source transition modeling functions
-cat("Sourcing transition_modelling.r...\n")
+cat("Sourcing ../src/transition_modelling.r...\n")
 tryCatch(
   {
-    source("transition_modelling.r")
+    source("../src/transition_modelling.r")
     cat("transition_modelling.r sourced successfully.\n\n")
   },
   error = function(e) {
