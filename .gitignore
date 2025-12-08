@@ -22,6 +22,7 @@ preparation
 inst/doc
 /doc/
 /Meta/
+/logs
 
 # ignore potentially large files
 *.csv
