@@ -1,0 +1,30 @@
+name: dist_calc_env
+channels:
+  - conda-forge
+
+dependencies:
+  - r-base=4.3         # oder eine passende 4.3.x–Version
+  - gdal         # (baut dann automatisch mit netcdf/hdf5)
+  - libgdal-hdf5
+  - hdf5
+  - netcdf4
+  - r-collections
+  - r-wrswoR
+  - r-lattice
+  - r-sp
+  - r-raster
+  - r-terra
+  - r-readr
+  - r-ggplot2
+  - r-sf
+  - r-speedglm
+  - r-ranger
+  - r-tuneRanger
+  - r-mgcv
+  - r-ncdf4
+  - r-data.table
+  - r-pryr
+  - r-devtools         # für devtools::install_git()
+  - r-profvis
+  - r-yaml
+

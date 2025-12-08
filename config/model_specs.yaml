@@ -1,0 +1,87 @@
+global:
+  balance_adjustment: true
+  minority_multiplier: 1.5
+  minority_proportion: null
+  num_replicates: 5
+  train_proportion: 0.75
+  cv_folds: 5
+  random_seed: 123
+
+metrics:
+  metrics:
+    - roc_auc
+    - accuracy
+    - precision
+    - recall
+    - f_meas
+    - kap
+    - specificity
+    - sensitivity
+  optimization_metric: roc_auc
+
+models:
+  glm:
+    parameters:
+      penalty:
+        - 0.001
+        - 0.01
+        - 0.1
+        - 1.0
+      mixture:
+        - 0
+        - 0.25
+        - 0.5
+        - 0.75
+        - 1
+  
+  rf:
+    parameters:
+      trees:
+        - 100
+        - 200
+        - 500
+        - 1000
+      min_n:
+        - 1
+        - 5
+        - 10
+        - 20
+      mtry:
+        - 2
+        - 4
+        - 6
+        - 8
+        - 10
+      importance: impurity
+      replace: true
+      sample.fraction: 1.0
+      seed: 123
+  
+  xgboost:
+    parameters:
+      trees:
+        - 50
+        - 100
+        - 200
+        - 500
+      tree_depth:
+        - 3
+        - 4
+        - 6
+        - 8
+        - 10
+      learn_rate:
+        - 0.01
+        - 0.05
+        - 0.1
+        - 0.3
+      min_n:
+        - 1
+        - 5
+        - 10
+        - 20
+      mtry:
+        - 2
+        - 4
+        - 6
+        - 8

@@ -1,0 +1,54 @@
+name: transition_model_env
+channels:
+  - conda-forge
+dependencies:
+  # Core R
+  - r-base=4.3
+  
+  # Spatial libraries (required by arrow and terra for parquet reading)
+  - gdal
+  - libgdal-hdf5
+  - hdf5
+  - proj
+  - geos
+  
+  # Arrow for parquet file handling
+  - r-arrow
+  
+  # Data manipulation (tidyverse core)
+  - r-dplyr
+  - r-purrr
+  - r-tibble
+  - r-readr
+  - r-stringr
+  - r-tidyr
+  - r-tidyselect
+  
+  # Configuration and data formats
+  - r-yaml
+  - r-jsonlite
+  
+  # Parallel processing
+  - r-future
+  - r-furrr
+  
+  # Machine learning and modeling
+  - r-tidymodels
+  - r-ranger       # Random Forest
+  - r-glmnet       # Regularized regression
+  - r-xgboost      # Gradient boosting
+  - r-yardstick    # Model evaluation metrics
+  - r-tune         # Hyperparameter tuning
+  - r-workflows    # Modeling workflows
+  - r-recipes      # Data preprocessing
+  - r-parsnip      # Unified model interface
+  - r-rsample      # Resampling
+  - r-dials        # Tuning parameters
+  
+  # Additional dependencies for model evaluation
+  - r-proc         # ROC curves
+  - r-vip          # Variable importance
+  
+  # Optional: Python for any auxiliary scripts
+  - python
+  - numpy

@@ -1,0 +1,85 @@
+Package: evoland
+Title: Land Use Land Cover Functions
+Version: 0.0.1
+Authors@R: 
+    person(given = "Jan",
+           family = "Hartman",
+           role = c("aut", "cre"),
+           email = "jhartman@ethz.ch")
+Description: Gather land use / land cover related functions inherited from LULCC-CH.
+License: file LICENSE
+Imports:
+    butcher,
+    curl,
+    data.table,
+    dplyr,
+    fs,
+    future,
+    future.apply,
+    future.callr,
+    landscapemetrics,
+    jsonlite,
+    magrittr,
+    openxlsx,
+    parallel,
+    promises,
+    purrr,
+    pxR,
+    profvis,
+    randomForest,
+    raster,
+    readr,
+    readxl,
+    ROCR,
+    RRF,
+    rvest,
+    sf,
+    stringr,
+    terra,
+    tidyr,
+    tidyselect,
+    zip,
+    duckdb,
+    DBI,
+    arrow,
+    tidymodels,
+    ranger,
+    glmnet,
+    xgboost,
+    yardstick
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Suggests: 
+    bezier,
+    corrplot,
+    cowplot,
+    furrr,
+    ggalluvial,
+    ggplot2,
+    ggSankeyGrad,
+    ggthemes,
+    htmlwidgets,
+    knitr,
+    leaflet.extras,
+    networkD3,
+    plotly,
+    png,
+    quarto,
+    rjstat,
+    shiny,
+    shinyjs,
+    testthat (>= 3.0.0),
+    usethis,
+    viridis,
+    xlsx,
+    zen4R
+Remotes:
+    mmyrte/SDMTools,
+    ssp3nc3r/ggSankeyGrad
+Config/testthat/edition: 3
+Depends: 
+    R (>= 4.2)
+LazyData: true
+VignetteBuilder:
+    quarto

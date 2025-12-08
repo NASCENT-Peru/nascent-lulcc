@@ -1,0 +1,31 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+Gdrive_api_auth.json
+
+#specific folders to ignore
+data-raw
+results
+debug_*
+log_*
+data
+preparation
+
+# ignore cached DinamicEGO appimages
+*.AppImage
+
+# ignore compiled ego files
+*.ego
+
+.DS_Store
+inst/doc
+/doc/
+/Meta/
+
+# ignore potentially large files
+*.csv
+*.log
+*.tif
+
+renv*

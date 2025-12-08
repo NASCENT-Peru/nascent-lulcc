@@ -1,0 +1,24 @@
+country:
+  raw_dir: raw/administrative_boundaries/country
+  raw_filename: per_admbnda_adm0_ign_20200714.shp
+  source: https://data.humdata.org/dataset/54fc7f4d-f4c0-4892-91f6-2fe7c1ecf363/resource/63cc642a-2957-4f25-8a17-086c99d275e8/download/per_adm_ign_20200714_shp.zip
+  metadata: ocha_peru_metadata.pdf
+  path: ancillary_spatial_data/prepared/country.shp
+regions:
+  raw_dir: raw/administrative_boundaries/regions
+  raw_filename: per_admbnda_adm1_ign_20200714.shp
+  source: https://data.humdata.org/dataset/54fc7f4d-f4c0-4892-91f6-2fe7c1ecf363/resource/63cc642a-2957-4f25-8a17-086c99d275e8/download/per_adm_ign_20200714_shp.zip
+  metadata: ocha_peru_metadata.pdf
+  path: ancillary_spatial_data/prepared/regions.shp
+provinces:
+  raw_dir: raw/administrative_boundaries/provinces
+  raw_filename: per_admbnda_adm2_ign_20200714.shp
+  source: https://data.humdata.org/dataset/54fc7f4d-f4c0-4892-91f6-2fe7c1ecf363/resource/63cc642a-2957-4f25-8a17-086c99d275e8/download/per_adm_ign_20200714_shp.zip
+  metadata: ocha_peru_metadata.pdf
+  path: ancillary_spatial_data/prepared/provinces.shp
+districts:
+  raw_dir: raw/administrative_boundaries/districts
+  raw_filename: per_admbnda_adm3_ign_20200714.shp
+  source: https://data.humdata.org/dataset/54fc7f4d-f4c0-4892-91f6-2fe7c1ecf363/resource/63cc642a-2957-4f25-8a17-086c99d275e8/download/per_adm_ign_20200714_shp.zip
+  metadata: ocha_peru_metadata.pdf
+  path: ancillary_spatial_data/prepared/districts.shp

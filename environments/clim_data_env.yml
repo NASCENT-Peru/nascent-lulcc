@@ -1,0 +1,21 @@
+# save as env-chelsa.yml, then: conda env create -f env-chelsa.yml
+name: clim_data_env
+channels:
+  - conda-forge
+dependencies:
+  - r-base>=4.3
+  - r-terra
+  - r-stringr
+  - r-dplyr
+  - r-purrr
+  - r-lubridate
+  - r-tibble
+  - gdal>=3.6
+  - proj>=9
+  - geos
+  - netcdf-c
+  - hdf5
+  - libtiff
+  - zlib
+  - curl
+  - sqlite

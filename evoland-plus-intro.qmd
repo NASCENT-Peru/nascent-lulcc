@@ -1,0 +1,172 @@
+---
+title: "An Introduction to `evoland-plus`"
+execute:
+  eval: false
+vignette: >
+  %\VignetteIndexEntry{evoland-plus-intro}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+::: callout-note
+This vignette is based on the original [`LULCC_CH_master.R`](https://github.com/ethzplus/evoland-with-baggage/blob/e2c7819adbcfa1446befef77e7ea5d5e0cb250c0/scripts/lulcc_ch_master.r) script, which had the primary function of calling each of the steps of the modelling pipeline in turn. Almost every step is somewhat expensive to run; hence, the results are always saved to disk. This poses a challenge, as integration tests are unfeasible.
+
+There is cache management in place, but it currently relies on CSV and Excel files that indicate the state of completion of individual modelling steps. This may not be perfectly reliable, so for now, the best approach is that you familiarize yourself with the files under the tools directory.
+:::
+
+This script shows the whole process of LULCC data preparation, statistical modelling and preparing model inputs required by Dinamica EGO. Note: The scripts must be sourced in the order presented in order to work. Adjust the `model_specs` table to:
+
+1.  Control the time periods to be modelled
+2.  Specify the statistical modelling technique
+3.  Indicate whether or not regionalized datasets and models should be created
+
+## Get set up
+
+```{r setup}
+# Install if that hasn't happened yet.
+# remotes::install_github("ethzplus/evoland-with-baggage")
+# or, if you've cloned locally and want to get your hands dirty
+devtools::load_all()
+#library(evoland)
+```
+
+## Download and unpack data
+
+Zenodo currently hosts a single zip file including all the raw data needed for reproducing some [Valpar.CH](https://valpar.ch/) specific models. The data should be available on Zenodo, but you could also just point the function at a local file:
+
+```{r}
+fetch_zenodo_predictors(url = "file:///some/path/evoland-ch-data.zip")
+```
+
+## Prepare LULC data
+
+```{r}
+lulc_data_prep()
+```
+
+## Prepare raster of regions used in analysis
+
+```{r}
+region_prep()
+```
+
+## Prepare ancillary spatial data
+```{r}
+# Set temp directory for terra to another drive
+# because the default is on C: which often has limited space
+terra_temp <- "E:/terra_temp"
+ensure_dir(terra_temp)
+
+terra::terraOptions(
+  memfrac = 0.5, # limit in-memory cache usage
+  tempdir = terra_temp, # directory for temporary files
+  progress = 1,
+  todisk = TRUE
+)
+ancillary_data_prep(
+  refresh_cache = FALSE,
+  terra_temp = terra_temp
+)
+```
+
+## Prepare suitability and accessibility predictors
+
+```{r}
+calibration_predictor_prep(refresh_cache = FALSE)
+```
+
+
+## Prepare parquet files of predictor data
+```{r}
+create_predictor_parquets(refresh_cache = FALSE)
+```
+
+## Identify LULC transitions
+
+```{r}
+transition_identification()
+```
+
+## D- Create transition parquet dataset
+
+```{r}
+transition_dataset_prep()
+```
+
+## E- Predictor variable selection on LULCC transition datasets
+
+```{r}
+transition_feature_selection(
+  config = get_config(),
+  use_regions = isTRUE(config[["regionalization"]]),
+  refresh_cache = FALSE,
+  save_debug = TRUE,
+  debug_dir = file.path(config[["feature_selection_dir"]]),
+  do_collinearity = TRUE, # Whether to perform collinearity filtering
+  do_grrf = TRUE # Whether to perform GRRF feature selection
+)
+```
+
+## F- Statistical modelling of LULCC transition datasets
+
+```{r}
+transition_modelling()
+```
+
+## G- Summarizing model validation results
+
+::: callout-warning
+There was a `source("Transition_model_evaluation.R")` call, but that file that wasn't in the codebase that I took over.
+
+Without having seen it, its name implies that it was run on the comprehensive set of models that are calculated in the previous step. I *did* find a file called `Model_evaluation.R` which I'm committing together with these lines as `R/transition_model_evaluation.r` with the slight adaptation of encapsulating its logic in a function of the same name.
+:::
+
+## Adjust contents of model_specs table to only optimal specifications
+
+```{r}
+lulcc.finalisemodelspecifications()
+```
+
+## H- Re-fitting optimal model specifications on full data
+
+```{r}
+trans_model_finalization()
+```
+
+## I- Prepare data for deterministic transitions (e.g glacier -\> Non-glacier)
+
+```{r}
+deterministic_trans_prep()
+```
+
+## I- Prepare tables of transition rates for scenarios
+
+```{r}
+simulation_trans_tables_prep()
+```
+
+## J- Prepare predictor data for scenarios
+
+```{r}
+simulation_predictor_prep()
+```
+
+## K- Calibrate allocation parameters for Dinamica
+
+```{r}
+calibrate_allocation_parameters()
+```
+
+## L- Prepare scenario specific spatial interventions
+
+```{r}
+spatial_interventions_prep()
+```
+
+## M- Run Dinamica simulations over scenarios
+
+```{r}
+run_evoland_dinamica_sim(
+  work_dir = Sys.getenv("EVOLAND_SIMULATION_DIR", unset = "simulation")
+)
+```
