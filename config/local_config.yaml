@@ -1,0 +1,49 @@
+# Local development configuration
+environment: "local"
+
+# Base paths
+data_basepath: "C:/Users/bblack/data/nascent-lulcc"
+historic_lulc_basepath: "lulc"
+
+# Main directories (relative to data_basepath)
+reg_dir: "regionalization"
+predictors_dir: "predictors"
+results_dir: "results"
+tools_dir: "tools"
+allocation_pars_dir: "allocation_parameters"
+ancillary_spatial_dir: "ancillary_spatial_data"
+
+# Tool file paths (relative to project root or data_basepath)
+LULC_aggregation_path: "lulc_schema.json"
+model_specs_path: "model_specs.yaml"
+param_grid_path: "param-grid.xlsx"
+pred_table_path: "pred_data.yaml"
+predict_param_grid_path: "predict_param_grid.xlsx"
+predict_model_specs_path: "predict_model_specs.csv"
+spat_ints_path: "spatial_interventions.csv"
+viable_transitions_lists: "viable_transitions_lists.rds"
+model_lookup_path: "model_lookup.xlsx"
+glacial_area_change_xlsx: "glacial_area_change.xlsx"
+scenario_area_mods_csv: "simulation_lulc_areas_2060.csv"
+calibration_ctrl_tbl_path: "calibration_control.csv"
+ctrl_tbl_path: "simulation_control.csv"
+ancillary_data_table: "ancillary_data.yaml"
+ref_grid_path: "spatial_reference_grid/ref_grid.tif"
+
+# Derived file paths (relative to data_basepath)
+best_trans_area_tables: "transition_tables/best_area_tables.rds"
+pred_db_path: "predictors/prepared/predictor_database.duckdb"
+bioreg_zip_local: "regionalization/biogeographische_regionen.zip"
+
+# Model configuration
+step_length: 4
+data_periods: ["2010_2014", "2014_2018", "2018_2022"]
+regionalization: true
+inclusion_threshold: 0.5
+scenario_names: ["BAU", "EI-NAT", "EI-CUL", "EI-SOC", "GR-EX"]
+
+# System configuration
+reference_crs: "epsg:2056"
+
+# Remote URLs
+bioreg_zip_remote: "https://data.geo.admin.ch/ch.bafu.biogeographische_regionen/data.zip"
