@@ -1664,17 +1664,27 @@ fit_and_save_best_model <- function(
 
   # Create model specification with best parameters
   if (best_model_name == "glm") {
-    # Extract parameters safely
-    penalty_val <- if (is.null(best_params$penalty)) {
-      0
+    # Extract parameters safely - handle case where no tuning was performed
+    penalty_val <- if (is.null(best_params) || is.null(best_params$penalty)) {
+      # Use default from model config if no tuning was performed
+      if (!is.null(model_config$parameters$penalty)) {
+        as.numeric(model_config$parameters$penalty[[1]])
+      } else {
+        0.01 # Default fallback
+      }
     } else if (is.list(best_params$penalty)) {
       as.numeric(best_params$penalty[[1]])
     } else {
       as.numeric(best_params$penalty)
     }
 
-    mixture_val <- if (is.null(best_params$mixture)) {
-      1
+    mixture_val <- if (is.null(best_params) || is.null(best_params$mixture)) {
+      # Use default from model config if no tuning was performed
+      if (!is.null(model_config$parameters$mixture)) {
+        as.numeric(model_config$parameters$mixture[[1]])
+      } else {
+        1 # Default fallback
+      }
     } else if (is.list(best_params$mixture)) {
       as.numeric(best_params$mixture[[1]])
     } else {
@@ -1688,25 +1698,37 @@ fit_and_save_best_model <- function(
       parsnip::set_engine("glmnet") %>%
       parsnip::set_mode("classification")
   } else if (best_model_name == "rf") {
-    # Extract parameters safely
-    mtry_val <- if (is.null(best_params$mtry)) {
-      NULL
+    # Extract parameters safely - handle NULL best_params
+    mtry_val <- if (is.null(best_params) || is.null(best_params$mtry)) {
+      if (!is.null(model_config$parameters$mtry)) {
+        as.integer(model_config$parameters$mtry)
+      } else {
+        4 # default value
+      }
     } else if (is.list(best_params$mtry)) {
       as.integer(best_params$mtry[[1]])
     } else {
       as.integer(best_params$mtry)
     }
 
-    trees_val <- if (is.null(best_params$trees)) {
-      500
+    trees_val <- if (is.null(best_params) || is.null(best_params$trees)) {
+      if (!is.null(model_config$parameters$trees)) {
+        as.integer(model_config$parameters$trees)
+      } else {
+        500 # default value
+      }
     } else if (is.list(best_params$trees)) {
       as.integer(best_params$trees[[1]])
     } else {
       as.integer(best_params$trees)
     }
 
-    min_n_val <- if (is.null(best_params$min_n)) {
-      5
+    min_n_val <- if (is.null(best_params) || is.null(best_params$min_n)) {
+      if (!is.null(model_config$parameters$min_n)) {
+        as.integer(model_config$parameters$min_n)
+      } else {
+        5 # default value
+      }
     } else if (is.list(best_params$min_n)) {
       as.integer(best_params$min_n[[1]])
     } else {
@@ -1741,41 +1763,65 @@ fit_and_save_best_model <- function(
       ) %>%
       parsnip::set_mode("classification")
   } else if (best_model_name == "xgboost") {
-    # Extract parameters safely
-    mtry_val <- if (is.null(best_params$mtry)) {
-      NULL
+    # Extract parameters safely - handle NULL best_params
+    mtry_val <- if (is.null(best_params) || is.null(best_params$mtry)) {
+      if (!is.null(model_config$parameters$mtry)) {
+        as.integer(model_config$parameters$mtry)
+      } else {
+        4 # default value
+      }
     } else if (is.list(best_params$mtry)) {
       as.integer(best_params$mtry[[1]])
     } else {
       as.integer(best_params$mtry)
     }
 
-    trees_val <- if (is.null(best_params$trees)) {
-      100
+    trees_val <- if (is.null(best_params) || is.null(best_params$trees)) {
+      if (!is.null(model_config$parameters$trees)) {
+        as.integer(model_config$parameters$trees)
+      } else {
+        100 # default value
+      }
     } else if (is.list(best_params$trees)) {
       as.integer(best_params$trees[[1]])
     } else {
       as.integer(best_params$trees)
     }
 
-    min_n_val <- if (is.null(best_params$min_n)) {
-      5
+    min_n_val <- if (is.null(best_params) || is.null(best_params$min_n)) {
+      if (!is.null(model_config$parameters$min_n)) {
+        as.integer(model_config$parameters$min_n)
+      } else {
+        5 # default value
+      }
     } else if (is.list(best_params$min_n)) {
       as.integer(best_params$min_n[[1]])
     } else {
       as.integer(best_params$min_n)
     }
 
-    tree_depth_val <- if (is.null(best_params$tree_depth)) {
-      6
+    tree_depth_val <- if (
+      is.null(best_params) || is.null(best_params$tree_depth)
+    ) {
+      if (!is.null(model_config$parameters$tree_depth)) {
+        as.integer(model_config$parameters$tree_depth)
+      } else {
+        6 # default value
+      }
     } else if (is.list(best_params$tree_depth)) {
       as.integer(best_params$tree_depth[[1]])
     } else {
       as.integer(best_params$tree_depth)
     }
 
-    learn_rate_val <- if (is.null(best_params$learn_rate)) {
-      0.3
+    learn_rate_val <- if (
+      is.null(best_params) || is.null(best_params$learn_rate)
+    ) {
+      if (!is.null(model_config$parameters$learn_rate)) {
+        as.numeric(model_config$parameters$learn_rate)
+      } else {
+        0.1 # default value
+      }
     } else if (is.list(best_params$learn_rate)) {
       as.numeric(best_params$learn_rate[[1]])
     } else {
