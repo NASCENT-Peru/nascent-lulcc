@@ -1642,7 +1642,22 @@ fit_and_save_best_model <- function(
     log_file
   )
 
+  # Check data size and memory
+  data_size_mb <- object.size(full_data_clean) / 1024^2
+  log_msg(sprintf("  Full dataset size: %.1f MB", data_size_mb), log_file)
+
+  # Check response distribution
+  response_table <- table(full_data_clean$response)
+  log_msg(
+    sprintf(
+      "  Final response distribution: %s",
+      paste(names(response_table), "=", response_table, collapse = ", ")
+    ),
+    log_file
+  )
+
   # Create recipe (same preprocessing as during tuning)
+  log_msg("  Creating recipe for preprocessing", log_file)
   recipe_obj <- recipes::recipe(response ~ ., data = full_data_clean) %>%
     recipes::step_normalize(recipes::all_numeric_predictors()) %>%
     recipes::step_zv(recipes::all_predictors())
@@ -1780,21 +1795,61 @@ fit_and_save_best_model <- function(
     base::stop("Unknown model type: ", best_model_name)
   }
 
-  # Create and fit workflow
-  final_workflow <- workflows::workflow() %>%
+  # Create workflow
+  log_msg("  Creating workflow with recipe and model specification", log_file)
+  workflow_obj <- workflows::workflow() %>%
     workflows::add_recipe(recipe_obj) %>%
-    workflows::add_model(model_spec) %>%
-    parsnip::fit(data = full_data_clean)
+    workflows::add_model(model_spec)
+
+  # Fit workflow with error handling
+  log_msg(
+    sprintf("  Fitting workflow to %d observations...", nrow(full_data_clean)),
+    log_file
+  )
+  start_time <- Sys.time()
+
+  final_workflow <- tryCatch(
+    {
+      parsnip::fit(workflow_obj, data = full_data_clean)
+    },
+    error = function(e) {
+      log_msg(
+        sprintf("  ERROR fitting final workflow: %s", e$message),
+        log_file
+      )
+      stop("Failed to fit final model: ", e$message)
+    }
+  )
+
+  end_time <- Sys.time()
+  elapsed <- difftime(end_time, start_time, units = "secs")
+  log_msg(
+    sprintf(
+      "  Workflow fitted successfully in %.2f seconds",
+      as.numeric(elapsed)
+    ),
+    log_file
+  )
 
   # Create output directory if needed
   output_dir <- base::dirname(output_path)
   if (!base::dir.exists(output_dir)) {
+    log_msg(sprintf("  Creating output directory: %s", output_dir), log_file)
     base::dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   }
 
   # Save workflow
-  base::saveRDS(final_workflow, output_path)
-  log_msg(base::sprintf("Saved final model to: %s", output_path), log_file)
+  log_msg(sprintf("  Saving model to: %s", output_path), log_file)
+  tryCatch(
+    {
+      base::saveRDS(final_workflow, output_path)
+      log_msg(sprintf("Saved final model to: %s", output_path), log_file)
+    },
+    error = function(e) {
+      log_msg(sprintf("  ERROR saving model: %s", e$message), log_file)
+      stop("Failed to save model: ", e$message)
+    }
+  )
 
   # Return metadata about saved model
   return(base::list(
