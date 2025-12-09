@@ -1,6 +1,6 @@
 #' Region Preparation: region_prep
 #'
-#' Preparing Rasters of regions in Peru used for regionalized modeling of land use
+#' Preparing Rasters of regions in Peru used for regionalized modelling of land use
 #' and land cover transitions
 #'
 #' @author Ben Black

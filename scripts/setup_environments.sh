@@ -1,13 +1,13 @@
 #!/bin/bash
 # setup_environments.sh
-# Script to create conda environments for LULCC modeling pipeline
+# Script to create conda environments for LULCC modelling pipeline
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 ENVS_DIR="$PROJECT_ROOT/environments"
 
 echo "========================================="
-echo "Setting up LULCC Modeling Environments"
+echo "Setting up LULCC modelling Environments"
 echo "========================================="
 echo "Environments directory: $ENVS_DIR"
 echo
@@ -59,7 +59,7 @@ else
     exit 1
 fi
 
-# Create transition modeling environment
+# Create transition modelling environment
 if [ -f "$ENVS_DIR/transition_model_env.yml" ]; then
     create_env "$ENVS_DIR/transition_model_env.yml" "transition_model_env"
 else

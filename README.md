@@ -1,6 +1,6 @@
 ﻿# nascent-lulcc
 
-Land Use/Land Cover Change (LULCC) modeling project for nascent transitions.
+Land Use/Land Cover Change (LULCC) modelling project for nascent transitions.
 
 ## Directory Structure
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env Rscript
 # run_transition_modelling.r
-# Run transition modeling pipeline. Assumes environment activated and R from that env is used.
+# Run transition modelling pipeline. Assumes environment activated and R from that env is used.
 
 # Capture start time
 start_time <- Sys.time()
 
 cat("\n========================================\n")
-cat("Starting Transition Modeling Pipeline\n")
+cat("Starting Transition modelling Pipeline\n")
 cat("========================================\n\n")
 
 # Diagnostics: show R used and library paths
@@ -29,7 +29,7 @@ install_if_missing <- function(pkg) {
   }
 }
 
-# Install key modeling packages if missing
+# Install key modelling packages if missing
 install_if_missing("tidymodels")
 install_if_missing("ranger")
 install_if_missing("glmnet")
@@ -162,7 +162,7 @@ if (!utils_found) {
   cat("utils.r not found in any expected location (skipping)\n\n")
 }
 
-# Source transition modeling functions
+# Source transition modelling functions
 transition_paths <- c(
   "../src/transition_modelling.r",
   "src/transition_modelling.r",
@@ -221,8 +221,8 @@ cat(sprintf(
 cat(sprintf("  Model dir: %s\n", config[["transition_model_dir"]]))
 cat(sprintf("  Eval dir: %s\n\n", config[["transition_model_eval_dir"]]))
 
-# Run transition modeling pipeline
-cat("Starting transition modeling...\n\n")
+# Run transition modelling pipeline
+cat("Starting transition modelling...\n\n")
 tryCatch(
   {
     transition_modelling(
@@ -236,7 +236,7 @@ tryCatch(
     )
   },
   error = function(e) {
-    cat(sprintf("\n\nERROR in transition modeling: %s\n", e$message))
+    cat(sprintf("\n\nERROR in transition modelling: %s\n", e$message))
     cat("Traceback:\n")
     traceback()
     quit(status = 1)

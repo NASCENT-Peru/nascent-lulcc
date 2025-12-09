@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # run_data_preparation.r
-# Run complete data preparation pipeline for LULCC modeling
+# Run complete data preparation pipeline for LULCC modelling
 
 # Capture start time
 start_time <- Sys.time()

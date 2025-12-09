@@ -6,7 +6,7 @@
 # library(dplyr)
 # library(yardstick)
 
-#' Transition Modeling for Land Use Land Cover Change
+#' Transition modelling for Land Use Land Cover Change
 #' @param config A list containing configuration parameters
 #' @param refresh_cache Logical, whether to refresh cached datasets
 #' @param model_dir Directory to save trained models
@@ -16,7 +16,7 @@
 #' @param periods_to_process Character vector of time periods to process
 #' @return None. Saves model evaluation summary to eval_dir.
 #' @details
-#' This function orchestrates the transition modeling process for specified time periods.
+#' This function orchestrates the transition modelling process for specified time periods.
 #' It reads model specifications, processes each period sequentially to manage memory usage,
 #' and saves the combined evaluation results.
 #' @export
@@ -293,7 +293,7 @@ perform_transition_modelling <- function(
 #' 2. Retrieves selected predictor names from feature selection summary
 #' 3. Loads predictor data for the specified predictors and region
 #' 4. Calls `multi_spec_trans_modelling()` to fit and evaluate multiple model specifications
-#' 5. Returns the results from the modeling process
+#' 5. Returns the results from the modelling process
 #' @export
 model_single_transition <- function(
   trans_name,
@@ -314,7 +314,7 @@ model_single_transition <- function(
 ) {
   log_msg(
     sprintf(
-      "Modeling transition: %s | Region: %s\n",
+      "modelling transition: %s | Region: %s\n",
       trans_name,
       ifelse(is.null(region), "National extent", region)
     ),

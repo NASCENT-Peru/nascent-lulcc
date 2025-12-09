@@ -1,22 +1,22 @@
-# HPC Pipeline Setup for LULCC Modeling
+# HPC Pipeline Setup for LULCC modelling
 
-This directory contains scripts and environments for running the Land Use Land Cover Change (LULCC) modeling pipeline on HPC systems using Slurm.
+This directory contains scripts and environments for running the Land Use Land Cover Change (LULCC) modelling pipeline on HPC systems using Slurm.
 
 ## Files Overview
 
 ### Environment Files (`../envs/`)
 - `feat_select_env.yaml` - Environment for feature selection (includes RRF, arrow, etc.)
-- `transition_model_env.yml` - Environment for transition modeling (includes tidymodels, ranger, xgboost, etc.)
+- `transition_model_env.yml` - Environment for transition modelling (includes tidymodels, ranger, xgboost, etc.)
 - `dist_calc_env.yml` - Environment for distance calculations (if needed)
 - `clim_data_env.yml` - Environment for climate data processing (if needed)
 
 ### Pipeline Scripts
 - `setup_environments.sh` - Creates all conda environments
 - `submit_feature_selection.sh` - Slurm job for feature selection
-- `submit_transition_modeling.sh` - Slurm job for transition modeling  
+- `submit_transition_modelling.sh` - Slurm job for transition modelling  
 - `master_pipeline.sh` - Runs the complete pipeline sequentially
 - `run_feature_selection.r` - R script for feature selection pipeline
-- `run_transition_modelling.r` - R script for transition modeling pipeline
+- `run_transition_modelling.r` - R script for transition modelling pipeline
 
 ## Usage
 
@@ -32,7 +32,7 @@ This will create environments at `/cluster/scratch/bblack/micromamba/envs/` (adj
 
 ### 2. Running the Complete Pipeline
 
-To run both feature selection and transition modeling sequentially:
+To run both feature selection and transition modelling sequentially:
 ```bash
 cd inst/
 ./master_pipeline.sh
@@ -41,7 +41,7 @@ cd inst/
 This will:
 - Submit feature selection job
 - Wait for it to complete
-- Submit transition modeling job (depends on feature selection)
+- Submit transition modelling job (depends on feature selection)
 - Wait for it to complete
 - Generate a summary report
 
@@ -53,10 +53,10 @@ cd inst/
 sbatch submit_feature_selection.sh
 ```
 
-#### Transition Modeling Only
+#### Transition modelling Only
 ```bash
 cd inst/
-sbatch submit_transition_modeling.sh
+sbatch submit_transition_modelling.sh
 ```
 
 ### 4. Monitoring Jobs
@@ -85,7 +85,7 @@ tail -f logs/trans-model-JOBID.out
 - **Time**: 72 hours
 - **Environment**: `feat_select_env`
 
-### Transition Modeling  
+### Transition modelling  
 - **CPUs**: 8 cores
 - **Memory**: 16GB per CPU (128GB total)
 - **Time**: 72 hours
@@ -141,6 +141,6 @@ All output is captured in timestamped log files:
 ## Notes
 
 - The scripts assume a specific HPC setup with micromamba. Adjust paths as needed for your system.
-- The transition modeling job depends on feature selection completing successfully.
+- The transition modelling job depends on feature selection completing successfully.
 - All intermediate results are saved to disk to allow for resuming if needed.
 - The pipeline uses parallel processing within jobs (controlled by `--cpus-per-task`).

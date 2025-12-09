@@ -1,13 +1,13 @@
 #!/bin/bash
 # master_pipeline.sh
-# Master script to run the complete LULCC modeling pipeline
+# Master script to run the complete LULCC modelling pipeline
 
 # Set script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 echo "========================================="
-echo "LULCC Modeling Master Pipeline"
+echo "LULCC modelling Master Pipeline"
 echo "========================================="
 echo "Script directory: $SCRIPT_DIR"
 echo "Project root: $PROJECT_ROOT"
@@ -114,22 +114,22 @@ fi
 echo "Feature selection job submitted with ID: $fs_job_id"
 check_job_status $fs_job_id "feature selection"
 
-# Step 3: Transition Modeling (depends on feature selection)
+# Step 3: Transition modelling (depends on feature selection)
 echo
 echo "========================================="
-echo "Step 3: Transition Modeling"
+echo "Step 3: Transition modelling"
 echo "========================================="
 
-model_job_id=$(sbatch --dependency=afterok:$fs_job_id --parsable "$SCRIPT_DIR/submit_transition_modeling.sh")
+model_job_id=$(sbatch --dependency=afterok:$fs_job_id --parsable "$SCRIPT_DIR/submit_transition_modelling.sh")
 if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to submit transition modeling job"
+    echo "ERROR: Failed to submit transition modelling job"
     exit 1
 fi
 
-echo "Transition modeling job submitted with ID: $model_job_id"
-check_job_status $model_job_id "transition modeling"
+echo "Transition modelling job submitted with ID: $model_job_id"
+check_job_status $model_job_id "transition modelling"
 
-# Step 4: Model Finalization (depends on transition modeling)
+# Step 4: Model Finalization (depends on transition modelling)
 echo
 echo "========================================="
 echo "Step 4: Model Finalization"
@@ -202,7 +202,7 @@ echo
 # Generate comprehensive summary report
 summary_file="$PROJECT_ROOT/logs/complete_pipeline_summary_$(date +%Y%m%d_%H%M%S).txt"
 {
-    echo "Complete LULCC Modeling Pipeline Summary"
+    echo "Complete LULCC modelling Pipeline Summary"
     echo "========================================"
     echo "Started: $start_time"
     echo "Ended: $end_time"
@@ -210,7 +210,7 @@ summary_file="$PROJECT_ROOT/logs/complete_pipeline_summary_$(date +%Y%m%d_%H%M%S
     echo "Job IDs:"
     echo "  Data Preparation: $data_prep_job_id"
     echo "  Feature Selection: $fs_job_id"
-    echo "  Transition Modeling: $model_job_id"
+    echo "  Transition modelling: $model_job_id"
     echo "  Model Finalization: $model_final_job_id"
     echo "  Scenario Preparation: $scenario_prep_job_id"
     echo "  Simulation Setup: $sim_setup_job_id"
@@ -219,7 +219,7 @@ summary_file="$PROJECT_ROOT/logs/complete_pipeline_summary_$(date +%Y%m%d_%H%M%S
     echo "Log files:"
     echo "  Data Preparation: logs/data-prep-$data_prep_job_id.{out,err}"
     echo "  Feature Selection: logs/feat-select-$fs_job_id.{out,err}"
-    echo "  Transition Modeling: logs/trans-model-$model_job_id.{out,err}"
+    echo "  Transition modelling: logs/trans-model-$model_job_id.{out,err}"
     echo "  Model Finalization: logs/model-final-$model_final_job_id.{out,err}"
     echo "  Scenario Preparation: logs/scenario-prep-$scenario_prep_job_id.{out,err}"
     echo "  Simulation Setup: logs/sim-setup-$sim_setup_job_id.{out,err}"
@@ -228,7 +228,7 @@ summary_file="$PROJECT_ROOT/logs/complete_pipeline_summary_$(date +%Y%m%d_%H%M%S
     echo "Pipeline stages:"
     echo "  1. Data Preparation: LULC data, regions, ancillary data, predictors, transitions"
     echo "  2. Feature Selection: Predictor variable selection with GRRF"
-    echo "  3. Transition Modeling: Statistical modeling of LULC transitions"
+    echo "  3. Transition modelling: Statistical modelling of LULC transitions"
     echo "  4. Model Finalization: Evaluation, specification selection, final training"
     echo "  5. Scenario Preparation: Transition tables and predictor data for scenarios"
     echo "  6. Simulation Setup: Calibration parameters and spatial interventions"

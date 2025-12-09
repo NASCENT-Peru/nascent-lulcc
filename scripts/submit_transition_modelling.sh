@@ -56,7 +56,7 @@ echo "✓ Using Rscript at: $RSCRIPT_BIN"
 echo
 
 # ----------------------------------------------------------
-# 5) Run transition modeling pipeline
+# 5) Run transition modelling pipeline
 # ----------------------------------------------------------
 R_SCRIPT="$SLURM_SUBMIT_DIR/scripts/run_transition_modelling.r"
 
@@ -65,7 +65,7 @@ if [ ! -f "$R_SCRIPT" ]; then
     exit 1
 fi
 
-echo "✓ Running transition modeling pipeline: $R_SCRIPT"
+echo "✓ Running transition modelling pipeline: $R_SCRIPT"
 "$RSCRIPT_BIN" --vanilla "$R_SCRIPT"
 EXIT_CODE=$?
 

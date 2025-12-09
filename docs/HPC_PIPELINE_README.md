@@ -1,6 +1,6 @@
-# LULCC Modeling Pipeline - HPC Environment
+# LULCC modelling Pipeline - HPC Environment
 
-This document describes the complete LULCC (Land Use Land Cover Change) modeling pipeline that has been updated for HPC (High Performance Computing) environments.
+This document describes the complete LULCC (Land Use Land Cover Change) modelling pipeline that has been updated for HPC (High Performance Computing) environments.
 
 ## Overview
 
@@ -10,7 +10,7 @@ The pipeline consists of 7 main stages that process land use data, build statist
 
 ### 1. Data Preparation (`submit_data_preparation.sh`)
 **Runtime:** ~2-4 hours  
-**Purpose:** Prepares all input data for modeling
+**Purpose:** Prepares all input data for modelling
 **Steps:**
 - LULC data preparation (`lulc_data_prep()`)
 - Region preparation (`region_prep()`)
@@ -28,7 +28,7 @@ The pipeline consists of 7 main stages that process land use data, build statist
 - Guided Regularized Random Forest (GRRF) feature selection
 - Results saved for each transition type
 
-### 3. Transition Modeling (`submit_transition_modeling.sh`)
+### 3. Transition modelling (`submit_transition_modelling.sh`)
 **Runtime:** ~12-24 hours  
 **Purpose:** Builds statistical models for land use transitions
 **Steps:**
@@ -49,7 +49,7 @@ The pipeline consists of 7 main stages that process land use data, build statist
 **Runtime:** ~4-8 hours  
 **Purpose:** Prepares data for scenario simulations
 **Steps:**
-- Transition rate tables (`simulation_trans_tables_prep()`)
+- Transition rate tables (`simulation_trans_rates_prep()`)
 - Predictor data for scenarios (`simulation_predictor_prep()`)
 
 ### 6. Simulation Setup (`submit_simulation_setup.sh`)
@@ -90,7 +90,7 @@ cd /path/to/nascent-lulcc/scripts
 Available stages:
 - `data-prep`
 - `feature-selection`
-- `transition-modeling`
+- `transition-modelling`
 - `model-finalization`
 - `scenario-prep`
 - `simulation-setup`
@@ -127,7 +127,7 @@ The pipeline uses different conda environments for different stages:
    - File: `environments/feat_select_env.yml`
    - Contains: R, arrow, terra, tidyverse, RRF, etc.
 
-2. **transition_model_env** - Used for modeling, finalization, simulation setup
+2. **transition_model_env** - Used for modelling, finalization, simulation setup
    - File: `environments/transition_model_env.yml`
    - Contains: R, tidymodels, ranger, xgboost, glmnet, etc.
 
@@ -228,7 +228,7 @@ Adjust these based on your dataset size and HPC system:
 
 The pipeline reads configuration from YAML files in the `config/` directory. Key settings include:
 - Data paths and directories
-- Modeling parameters  
+- modelling parameters  
 - Scenario specifications
 - Output locations
 
