@@ -142,6 +142,17 @@ perform_transition_modelling <- function(
     )
   )
 
+  # Order by increasing number of observations for quick testing
+  fs_summary <- fs_summary %>%
+    dplyr::arrange(n_observations)
+
+  message(sprintf(
+    "Loaded feature selection summary with %d transition/region combinations, ordered by n_observations (%d to %d)",
+    nrow(fs_summary),
+    min(fs_summary$n_observations),
+    max(fs_summary$n_observations)
+  ))
+
   # Parquet file paths
   transitions_pq_path <- file.path(
     config[["trans_pre_pred_filter_dir"]],
@@ -400,11 +411,11 @@ model_single_transition <- function(
     log_file = log_file
   )
 
-  # save the result object as rds
-  saveRDS(
-    results,
-    file = "test_results.rds"
-  )
+  # # save the result object as rds
+  # saveRDS(
+  #   results,
+  #   file = "test_results.rds"
+  # )
 
   # Fit best model to full dataset and save
   region_suffix <- ifelse(
