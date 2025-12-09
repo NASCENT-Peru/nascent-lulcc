@@ -589,6 +589,52 @@ multi_spec_trans_modelling <- function(
       ),
       log_file
     )
+
+    # Remove rows with missing values in predictors (keep response column)
+    predictor_cols <- names(transition_data)[
+      names(transition_data) != "response"
+    ]
+    rows_before <- nrow(transition_data)
+    transition_data <- transition_data[
+      complete.cases(transition_data[predictor_cols]),
+    ]
+    rows_after <- nrow(transition_data)
+
+    log_msg(
+      sprintf(
+        "  Removed %d rows with missing values (%d -> %d rows, %.1f%% remaining)",
+        rows_before - rows_after,
+        rows_before,
+        rows_after,
+        100 * rows_after / rows_before
+      ),
+      log_file
+    )
+
+    # Check if we still have enough data and both classes
+    response_table_after <- table(transition_data$response)
+    if (nrow(transition_data) < 100) {
+      stop(sprintf(
+        "Too few observations remaining after removing missing values: %d",
+        nrow(transition_data)
+      ))
+    }
+    if (length(response_table_after) < 2) {
+      stop("Only one response class remaining after removing missing values")
+    }
+
+    log_msg(
+      sprintf(
+        "  After removing missing values - Response table: %s",
+        paste(
+          names(response_table_after),
+          "=",
+          response_table_after,
+          collapse = ", "
+        )
+      ),
+      log_file
+    )
   } else {
     log_msg("  No missing values detected", log_file)
   }
