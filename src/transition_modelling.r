@@ -807,9 +807,9 @@ balance_data <- function(
       log_file
     )
     # Strategy 1: Downsample majority to minority_multiplier * minority_size
-    total_size <- minority_size * (1 + minority_multiplier)
     n_minority <- minority_size
-    n_majority <- minority_size * minority_multiplier
+    n_majority <- as.integer(round(minority_size * minority_multiplier))
+    total_size <- n_minority + n_majority
   } else if (!is.null(minority_proportion)) {
     log_msg(
       sprintf(
@@ -823,7 +823,7 @@ balance_data <- function(
     # If we keep all minority: total_size = minority_size / minority_proportion
     total_size <- ceiling(minority_size / minority_proportion)
     n_minority <- minority_size
-    n_majority <- total_size - n_minority
+    n_majority <- as.integer(total_size - n_minority)
   } else {
     log_msg(" Error: No balancing parameters specified", log_file)
     stop("Must specify either minority_multiplier or minority_proportion")
@@ -1628,8 +1628,22 @@ fit_and_save_best_model <- function(
 
   log_msg("Fitting final model to full dataset", log_file)
 
+  # Remove missing values from full dataset (same as in multi_spec_trans_modelling)
+  predictor_cols <- names(full_data)[names(full_data) != "response"]
+  full_data_clean <- full_data[complete.cases(full_data[predictor_cols]), ]
+
+  log_msg(
+    sprintf(
+      "  Removed %d rows with missing values from full dataset (%d -> %d rows)",
+      nrow(full_data) - nrow(full_data_clean),
+      nrow(full_data),
+      nrow(full_data_clean)
+    ),
+    log_file
+  )
+
   # Create recipe (same preprocessing as during tuning)
-  recipe_obj <- recipes::recipe(response ~ ., data = full_data) %>%
+  recipe_obj <- recipes::recipe(response ~ ., data = full_data_clean) %>%
     recipes::step_normalize(recipes::all_numeric_predictors()) %>%
     recipes::step_zv(recipes::all_predictors())
 
@@ -1770,7 +1784,7 @@ fit_and_save_best_model <- function(
   final_workflow <- workflows::workflow() %>%
     workflows::add_recipe(recipe_obj) %>%
     workflows::add_model(model_spec) %>%
-    parsnip::fit(data = full_data)
+    parsnip::fit(data = full_data_clean)
 
   # Create output directory if needed
   output_dir <- base::dirname(output_path)
