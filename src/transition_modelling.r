@@ -471,7 +471,7 @@ model_single_transition <- function(
 
   log_msg(
     sprintf(
-      "  %d predictors selected by feature selection (n_transitions=%d, n_observations=%d)\n",
+      "  %d predictors selected by feature selection (n_transitions=%d, n_observations=%d after downsampling)\n",
       length(pred_names),
       fs_row$n_transitions[1],
       fs_row$n_observations[1]
@@ -635,6 +635,9 @@ multi_spec_trans_modelling <- function(
       ),
       log_file
     )
+
+    # Force garbage collection after missing value removal
+    gc(verbose = FALSE)
   } else {
     log_msg("  No missing values detected", log_file)
   }
@@ -1375,7 +1378,7 @@ create_metric_set <- function(metrics_config) {
   }
 
   metric_functions <- base::list(
-    yardstick::roc_auc(event_level = "second"),
+    roc_auc = yardstick::roc_auc(event_level = "second"),
     accuracy = yardstick::accuracy,
     precision = yardstick::precision,
     recall = yardstick::recall,
