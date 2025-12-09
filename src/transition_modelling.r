@@ -142,12 +142,31 @@ perform_transition_modelling <- function(
     )
   )
 
-  # Order by increasing number of observations for quick testing
+  # Filter out transitions that failed feature selection
+  fs_summary_all <- fs_summary
   fs_summary <- fs_summary %>%
+    dplyr::filter(
+      !is.na(selected_predictors) &
+        selected_predictors != "" &
+        nchar(trimws(selected_predictors)) > 0
+    ) %>%
+    # Order by increasing number of observations for quick testing
     dplyr::arrange(n_observations)
 
   message(sprintf(
-    "Loaded feature selection summary with %d transition/region combinations, ordered by n_observations (%d to %d)",
+    "Loaded feature selection summary: %d total combinations, %d passed feature selection",
+    nrow(fs_summary_all),
+    nrow(fs_summary)
+  ))
+
+  if (nrow(fs_summary) == 0) {
+    stop(
+      "No transitions passed feature selection. Check feature selection results."
+    )
+  }
+
+  message(sprintf(
+    "Processing %d successful transitions, ordered by n_observations (%d to %d)",
     nrow(fs_summary),
     min(fs_summary$n_observations),
     max(fs_summary$n_observations)
@@ -259,20 +278,50 @@ perform_transition_modelling <- function(
       log_msg("Arrow datasets opened successfully\n", log_file)
 
       # --- Run the actual model ---
-      model_single_transition(
-        trans_name = trans_name,
-        refresh_cache = refresh_cache,
-        region = region,
-        use_regions = use_regions,
-        ds_transitions = ds_transitions,
-        ds_static = ds_static,
-        ds_dynamic = ds_dynamic,
-        period = period,
-        config = config,
-        model_dir = model_dir,
-        eval_dir = eval_dir,
-        log_file = log_file,
-        fs_summary = fs_summary
+      tryCatch(
+        {
+          model_single_transition(
+            trans_name = trans_name,
+            refresh_cache = refresh_cache,
+            region = region,
+            use_regions = use_regions,
+            ds_transitions = ds_transitions,
+            ds_static = ds_static,
+            ds_dynamic = ds_dynamic,
+            period = period,
+            config = config,
+            model_dir = model_dir,
+            eval_dir = eval_dir,
+            log_file = log_file,
+            fs_summary = fs_summary
+          )
+        },
+        error = function(e) {
+          error_msg <- sprintf(
+            "ERROR in transition modelling for %s-%s: %s",
+            trans_name,
+            region,
+            e$message
+          )
+          log_msg(error_msg, log_file)
+          log_msg(
+            sprintf(
+              "Full error traceback: %s",
+              paste(traceback(), collapse = "\n")
+            ),
+            log_file
+          )
+
+          # Return error result instead of stopping
+          list(
+            transition = trans_name,
+            region = region,
+            status = "error",
+            error_message = e$message,
+            cv_metrics = NULL,
+            test_metrics = NULL
+          )
+        }
       )
     },
     .options = furrr::furrr_options(seed = TRUE)
@@ -321,7 +370,7 @@ model_single_transition <- function(
   save_debug = FALSE,
   log_file = NULL,
   fs_summary,
-  model_specs_path = config[["model_model_specs_path"]]
+  model_specs_path = config[["model_specs_path"]]
 ) {
   log_msg(
     sprintf(
@@ -362,21 +411,70 @@ model_single_transition <- function(
   )
 
   # get predictor names from feature selection summary
-  pred_names <- fs_summary %>%
+  fs_row <- fs_summary %>%
     dplyr::filter(
       transition == trans_name,
       region == ifelse(is.null(region), "National extent", region)
-    ) %>%
-    dplyr::pull(selected_predictors) %>%
+    )
+
+  if (nrow(fs_row) == 0) {
+    error_msg <- sprintf(
+      "No feature selection results found for %s in region %s",
+      trans_name,
+      region
+    )
+    log_msg(error_msg, log_file)
+    return(list(
+      transition = trans_name,
+      region = region,
+      status = "error",
+      error_message = error_msg,
+      cv_metrics = NULL,
+      test_metrics = NULL
+    ))
+  }
+
+  selected_preds_string <- fs_row$selected_predictors[1]
+
+  # Check if feature selection failed (empty or NA selected predictors)
+  if (
+    is.na(selected_preds_string) ||
+      selected_preds_string == "" ||
+      nchar(trimws(selected_preds_string)) == 0
+  ) {
+    error_msg <- sprintf(
+      "Feature selection failed for %s-%s: no predictors selected (n_transitions=%d, n_observations=%d)",
+      trans_name,
+      region,
+      fs_row$n_transitions[1],
+      fs_row$n_observations[1]
+    )
+    log_msg(error_msg, log_file)
+    return(list(
+      transition = trans_name,
+      region = region,
+      status = "skipped_no_predictors",
+      error_message = error_msg,
+      cv_metrics = NULL,
+      test_metrics = NULL,
+      n_transitions = fs_row$n_transitions[1],
+      n_observations = fs_row$n_observations[1]
+    ))
+  }
+
+  pred_names <- selected_preds_string %>%
     # split string to vector
     strsplit(split = ";") %>%
     # remove white space
     lapply(trimws) %>%
     unlist()
+
   log_msg(
     sprintf(
-      "  %d predictors selected by feature selection\n",
-      length(pred_names)
+      "  %d predictors selected by feature selection (n_transitions=%d, n_observations=%d)\n",
+      length(pred_names),
+      fs_row$n_transitions[1],
+      fs_row$n_observations[1]
     ),
     log_file
   )
@@ -452,8 +550,55 @@ multi_spec_trans_modelling <- function(
   model_specs <- yaml::yaml.load_file(model_specs_path)
   log_msg("Loaded model specifications", log_file)
 
+  # Validate transition data
+  log_msg(
+    sprintf(
+      "  Data shape: %d rows x %d columns",
+      nrow(transition_data),
+      ncol(transition_data)
+    ),
+    log_file
+  )
+  log_msg(
+    sprintf(
+      "  Response levels: %s",
+      paste(levels(transition_data$response), collapse = ", ")
+    ),
+    log_file
+  )
+  log_msg(
+    sprintf(
+      "  Response table: %s",
+      paste(
+        names(table(transition_data$response)),
+        "=",
+        table(transition_data$response),
+        collapse = ", "
+      )
+    ),
+    log_file
+  )
+
+  # Check for any missing values
+  na_counts <- sapply(transition_data, function(x) sum(is.na(x)))
+  if (any(na_counts > 0)) {
+    log_msg(
+      sprintf(
+        "  Missing values detected in: %s",
+        paste(names(na_counts)[na_counts > 0], collapse = ", ")
+      ),
+      log_file
+    )
+  } else {
+    log_msg("  No missing values detected", log_file)
+  }
+
   # Set global seed if provided
-  seed <- model_specs$global$random_seed %||% NULL
+  seed <- if (is.null(model_specs$global$random_seed)) {
+    NULL
+  } else {
+    model_specs$global$random_seed
+  }
   if (!is.null(seed)) {
     set.seed(seed)
   }
@@ -507,7 +652,11 @@ multi_spec_trans_modelling <- function(
     log_msg("  Splitting data into training and testing sets", log_file)
     data_split <- rsample::initial_split(
       data_balanced,
-      prop = model_specs$global$train_proportion %||% 0.75,
+      prop = if (is.null(model_specs$global$train_proportion)) {
+        0.75
+      } else {
+        model_specs$global$train_proportion
+      },
       strata = response
     )
     train_data <- rsample::training(data_split)
@@ -518,7 +667,11 @@ multi_spec_trans_modelling <- function(
     log_msg("  Creating cross-validation folds", log_file)
     cv_folds <- rsample::vfold_cv(
       train_data,
-      v = model_specs$global$cv_folds %||% 5,
+      v = if (is.null(model_specs$global$cv_folds)) {
+        5
+      } else {
+        model_specs$global$cv_folds
+      },
       strata = response
     )
 
@@ -710,7 +863,11 @@ fit_model_with_tuning <- function(
       base::unique()
 
     # Get optimization metric and ensure it's a character string
-    opt_metric <- metrics_config$optimization_metric %||% "roc_auc"
+    opt_metric <- if (is.null(metrics_config$optimization_metric)) {
+      "roc_auc"
+    } else {
+      metrics_config$optimization_metric
+    }
     if (base::is.list(opt_metric)) {
       opt_metric <- base::unlist(opt_metric)[[1]]
     }
@@ -895,8 +1052,12 @@ create_model_spec <- function(
 
       # Build engine args list
       engine_args <- base::list(
-        importance = params$importance %||% "impurity",
-        replace = params$replace %||% TRUE
+        importance = if (is.null(params$importance)) {
+          "impurity"
+        } else {
+          params$importance
+        },
+        replace = if (is.null(params$replace)) TRUE else params$replace
       )
 
       # Only add sample.fraction if it's being tuned or has a non-default value
@@ -1011,13 +1172,21 @@ tune_model <- function(
   # Log best results
   best_result <- tune::show_best(
     tune_results,
-    metric = metrics_config$optimization_metric %||% "roc_auc",
+    metric = if (is.null(metrics_config$optimization_metric)) {
+      "roc_auc"
+    } else {
+      metrics_config$optimization_metric
+    },
     n = 1
   )
   log_msg(
     base::sprintf(
       "Best %s: %.4f",
-      metrics_config$optimization_metric %||% "roc_auc",
+      if (is.null(metrics_config$optimization_metric)) {
+        "roc_auc"
+      } else {
+        metrics_config$optimization_metric
+      },
       best_result$mean[1]
     ),
     log_file
@@ -1148,8 +1317,11 @@ create_tuning_grid <- function(
 #' in the configuration. If no metrics are specified, a default set is used.
 #' @export
 create_metric_set <- function(metrics_config) {
-  metric_names <- metrics_config$metrics %||%
+  metric_names <- if (is.null(metrics_config$metrics)) {
     base::c("roc_auc", "accuracy", "precision", "recall", "f_meas")
+  } else {
+    metrics_config$metrics
+  }
 
   # Ensure metric_names is a character vector (YAML sometimes creates lists)
   if (base::is.list(metric_names)) {
@@ -1282,7 +1454,11 @@ fit_and_save_best_model <- function(
   log_file = NULL
 ) {
   # Get optimization metric from model specs
-  opt_metric <- results$model_specs$metrics$optimization_metric %||% "roc_auc"
+  opt_metric <- if (is.null(results$model_specs$metrics$optimization_metric)) {
+    "roc_auc"
+  } else {
+    results$model_specs$metrics$optimization_metric
+  }
   if (base::is.list(opt_metric)) {
     opt_metric <- base::unlist(opt_metric)[[1]]
   }
@@ -1377,9 +1553,23 @@ fit_and_save_best_model <- function(
     ) %>%
       parsnip::set_engine(
         "ranger",
-        importance = model_config$parameters$importance %||% "impurity",
-        replace = model_config$parameters$replace %||% TRUE,
-        sample.fraction = model_config$parameters$sample.fraction %||% 1.0,
+        importance = if (is.null(model_config$parameters$importance)) {
+          "impurity"
+        } else {
+          model_config$parameters$importance
+        },
+        replace = if (is.null(model_config$parameters$replace)) {
+          TRUE
+        } else {
+          model_config$parameters$replace
+        },
+        sample.fraction = if (
+          is.null(model_config$parameters$sample.fraction)
+        ) {
+          1.0
+        } else {
+          model_config$parameters$sample.fraction
+        },
         seed = model_config$parameters$seed
       ) %>%
       parsnip::set_mode("classification")
