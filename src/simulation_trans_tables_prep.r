@@ -24,7 +24,7 @@
 #' @author Ben Black
 #' @export
 
-simulation_trans_tables_prep <- function(config = get_config()) {
+simulation_trans_rates_prep <- function(config = get_config()) {
   #### A- Preparation ####
   LULC_years <-
     gsub(
@@ -126,10 +126,15 @@ simulation_trans_tables_prep <- function(config = get_config()) {
 
     # exclude any rows with NAs in the 2009_2018 columns as these are transitions
     # that are not modelled in the future
-    trans_rate_table <- trans_rate_table[!is.na(trans_rate_table[[Final_period_col]]), ]
+    trans_rate_table <- trans_rate_table[
+      !is.na(trans_rate_table[[Final_period_col]]),
+    ]
 
     # calculate average net transition rate over historical period
-    trans_rate_table$Rate <- rowMeans(trans_rate_table[Period_cols], na.rm = TRUE)
+    trans_rate_table$Rate <- rowMeans(
+      trans_rate_table[Period_cols],
+      na.rm = TRUE
+    )
 
     # extrapolating rates for future time steps
     # rename period columns to single date to create an interval variable
@@ -392,7 +397,8 @@ simulation_trans_tables_prep <- function(config = get_config()) {
 
   # duplicate table to capture net changes in LULC classes
   LULC_net_change <- LULC_proj_area[,
-    colnames(LULC_proj_area) != round(max(LULC_years) / step_length) * step_length
+    colnames(LULC_proj_area) !=
+      round(max(LULC_years) / step_length) * step_length
   ]
 
   # outer loop over simulation years
@@ -404,7 +410,10 @@ simulation_trans_tables_prep <- function(config = get_config()) {
     for (x in seq_len(nrow(MS_extrap_trans_rates))) {
       Current_initial_class <- MS_extrap_trans_rates[x, "Initial_class"]
 
-      Trans_areal_increase[[x, calc_year]] <- (MS_extrap_trans_rates[x, calc_year] *
+      Trans_areal_increase[[x, calc_year]] <- (MS_extrap_trans_rates[
+        x,
+        calc_year
+      ] *
         LULC_proj_area[
           LULC_proj_area$LULC_class == Current_initial_class,
           prev_year
@@ -430,7 +439,10 @@ simulation_trans_tables_prep <- function(config = get_config()) {
         (gain - loss)
 
       # calculating cumulative LULC areal change
-      LULC_proj_area[LULC_proj_area$LULC_class == LULC_class, calc_year] <- (LULC_proj_area[
+      LULC_proj_area[
+        LULC_proj_area$LULC_class == LULC_class,
+        calc_year
+      ] <- (LULC_proj_area[
         LULC_proj_area$LULC_class == LULC_class,
         prev_year
       ] +
@@ -465,7 +477,9 @@ simulation_trans_tables_prep <- function(config = get_config()) {
   Scenario_area_mods <- readr::read_csv(config[["scenario_area_mods_csv"]])
 
   # Load table of glacial change area per time step under different scenarios
-  Glacial_area_change <- readxl::read_excel(config[["glacial_area_change_xlsx"]])
+  Glacial_area_change <- readxl::read_excel(config[[
+    "glacial_area_change_xlsx"
+  ]])
 
   # the values of glacial area in the scenario area_mods currently come from
   # the expert evaluation process and need to be replaced with the modelled values
@@ -519,7 +533,9 @@ simulation_trans_tables_prep <- function(config = get_config()) {
   # create a list of tables to capture modified LULC areas under each scenario
   Mod_LULC_areas <- LULC_proj_area
   Mod_LULC_areas[as.character(Sim_time_steps)] <- NA_real_
-  Mod_area_tables <- lapply(Scenario_area_mods$Scenario, function(x) Mod_LULC_areas)
+  Mod_area_tables <- lapply(Scenario_area_mods$Scenario, function(x) {
+    Mod_LULC_areas
+  })
   names(Mod_area_tables) <- unique(Scenario_area_mods$Scenario)
 
   # the glacier area from 2020 currently comes from the AS data replace this
@@ -578,7 +594,9 @@ simulation_trans_tables_prep <- function(config = get_config()) {
   # Create tables to capture modified transition areal increases
   Mod_trans_areas <- Trans_areal_increase
   Mod_trans_areas[paste(Sim_time_steps)] <- NA_real_
-  Mod_trans_area_tables <- lapply(Scenario_area_mods$Scenario, function(x) Mod_trans_areas)
+  Mod_trans_area_tables <- lapply(Scenario_area_mods$Scenario, function(x) {
+    Mod_trans_areas
+  })
   names(Mod_trans_area_tables) <- unique(Scenario_area_mods$Scenario)
   rm(Mod_trans_areas)
 
@@ -595,7 +613,9 @@ simulation_trans_tables_prep <- function(config = get_config()) {
       ))
   ]
   Mod_trans_rates[as.character(Sim_time_steps)] <- NA_real_
-  Mod_trans_rate_tables <- lapply(Scenario_area_mods$Scenario, \(x) Mod_trans_rates)
+  Mod_trans_rate_tables <- lapply(Scenario_area_mods$Scenario, \(x) {
+    Mod_trans_rates
+  })
   names(Mod_trans_rate_tables) <- unique(Scenario_area_mods$Scenario)
   rm(Mod_trans_rates)
 
@@ -729,9 +749,13 @@ simulation_trans_tables_prep <- function(config = get_config()) {
         Perc_loss <- Ref_loss_area / (Ref_gain_area + Ref_loss_area) * 100
 
         # outputs to list for testing
-        Perc_gain_losses[[Scenario]][[calc_year]][[lulc_class]][["Perc_gain"]] <-
+        Perc_gain_losses[[Scenario]][[calc_year]][[lulc_class]][[
+          "Perc_gain"
+        ]] <-
           Perc_gain
-        Perc_gain_losses[[Scenario]][[calc_year]][[lulc_class]][["Perc_loss"]] <-
+        Perc_gain_losses[[Scenario]][[calc_year]][[lulc_class]][[
+          "Perc_loss"
+        ]] <-
           Perc_loss
 
         if (net_change[names(net_change) == lulc_class] > 0) {
@@ -793,7 +817,8 @@ simulation_trans_tables_prep <- function(config = get_config()) {
           # inner loop over transitions for gaining class
           for (trans in seq_len(nrow(Gain_trans))) {
             # calculate relative contribution of transition to overall gains
-            trans_contrib <- Gain_trans[trans, calc_year] / sum(Gain_trans[, calc_year])
+            trans_contrib <- Gain_trans[trans, calc_year] /
+              sum(Gain_trans[, calc_year])
 
             # calculate area of transition as proportion of required Gain_area according
             # to % contribution
@@ -801,14 +826,16 @@ simulation_trans_tables_prep <- function(config = get_config()) {
 
             # add this value to what else might have been calculated previously in the loop
             updated_gain_area <- Trans_gains_calc_year[
-              Trans_gains_calc_year$Trans_name == Gain_trans[trans, "Trans_name"],
+              Trans_gains_calc_year$Trans_name ==
+                Gain_trans[trans, "Trans_name"],
               calc_year
             ] +
               trans_area
 
             # add to table
             Trans_gains_calc_year[
-              Trans_gains_calc_year$Trans_name == Gain_trans[trans, "Trans_name"],
+              Trans_gains_calc_year$Trans_name ==
+                Gain_trans[trans, "Trans_name"],
               calc_year
             ] <- updated_gain_area
           } # close loop over gains
@@ -816,27 +843,32 @@ simulation_trans_tables_prep <- function(config = get_config()) {
 
         # decrease areal losses across transitions to distribute total required Loss_area
         # subset trans areal increases to shrinking transitions
-        Loss_trans <- Trans_areal_increase[Trans_areal_increase$Initial_class == lulc_class, ]
+        Loss_trans <- Trans_areal_increase[
+          Trans_areal_increase$Initial_class == lulc_class,
+        ]
 
         if (nrow(Loss_trans) > 0 && Loss_area != 0) {
           # inner loop over transitions for shrinking class
           for (trans in seq_len(nrow(Loss_trans))) {
             # calculate contribution of trans
-            trans_contrib <- Loss_trans[trans, calc_year] / sum(Loss_trans[, calc_year])
+            trans_contrib <- Loss_trans[trans, calc_year] /
+              sum(Loss_trans[, calc_year])
 
             # calculate area of trans as proportion of step_change according to % contribution
             trans_area <- trans_contrib * Loss_area
 
             # add this value to what else might have been calculated previously in the loop
             updated_loss_area <- Trans_losses_calc_year[
-              Trans_losses_calc_year$Trans_name == Loss_trans[trans, "Trans_name"],
+              Trans_losses_calc_year$Trans_name ==
+                Loss_trans[trans, "Trans_name"],
               calc_year
             ] +
               trans_area
 
             # add to the absolute value to the table
             Trans_losses_calc_year[
-              Trans_losses_calc_year$Trans_name == Loss_trans[trans, "Trans_name"],
+              Trans_losses_calc_year$Trans_name ==
+                Loss_trans[trans, "Trans_name"],
               calc_year
             ] <- updated_loss_area
           } # close loop over losses
@@ -857,13 +889,16 @@ simulation_trans_tables_prep <- function(config = get_config()) {
       # these losses by increasing the gaining transitions.
 
       # add to table ensuring no negative values
-      Mod_trans_area_tables[[Scenario]][, calc_year] <- sapply(Final_trans_areas, function(A) {
-        if (A >= 0) {
-          A
-        } else {
-          0
+      Mod_trans_area_tables[[Scenario]][, calc_year] <- sapply(
+        Final_trans_areas,
+        function(A) {
+          if (A >= 0) {
+            A
+          } else {
+            0
+          }
         }
-      })
+      )
     } # close loop over time steps
   } # Close loop over scenarios
 
@@ -902,7 +937,9 @@ simulation_trans_tables_prep <- function(config = get_config()) {
   # reduce results to only total mismatch perc
   # TODO this clearly isn't called for a side effect. remove interactive usage.
   sapply(Threshold_iterations, function(x) {
-    sapply(x$Mismatch_checks[[num_reps]], function(y) y[["Total_mismatch_perc"]])
+    sapply(x$Mismatch_checks[[num_reps]], function(y) {
+      y[["Total_mismatch_perc"]]
+    })
   })
 
   # collate values of total mismatch perc across all threshold values, repetitions and scenarios
@@ -940,7 +977,9 @@ simulation_trans_tables_prep <- function(config = get_config()) {
     unique(Improvement_results$Scenario),
     function(x) {
       # seperate results for scenario
-      Scenario_results <- Improvement_results[Improvement_results$Scenario == x, ]
+      Scenario_results <- Improvement_results[
+        Improvement_results$Scenario == x,
+      ]
 
       # identify result with minimum value of mismatch %
       return(Scenario_results[which.min(Scenario_results$min_mismatch_perc), ])
@@ -1030,7 +1069,10 @@ simulation_trans_tables_prep <- function(config = get_config()) {
         ])
 
         # calculating cumulative LULC areal change
-        Scenario_class_areas[Scenario_class_areas$LULC_class == LULC_class, calc_year] <-
+        Scenario_class_areas[
+          Scenario_class_areas$LULC_class == LULC_class,
+          calc_year
+        ] <-
           Scenario_class_areas[
             Scenario_class_areas$LULC_class == LULC_class,
             prev_year
@@ -1055,7 +1097,10 @@ simulation_trans_tables_prep <- function(config = get_config()) {
       # inner loop over transitions
       for (trans in seq_len(nrow(Best_trans_area_tables[[Scenario]]))) {
         # vector Initial class of transitions
-        Initial_class <- Best_trans_area_tables[[Scenario]][trans, "Initial_class"]
+        Initial_class <- Best_trans_area_tables[[Scenario]][
+          trans,
+          "Initial_class"
+        ]
 
         # seperate modified class area table
         Class_areas <- Proj_class_area_tables[[Scenario]][

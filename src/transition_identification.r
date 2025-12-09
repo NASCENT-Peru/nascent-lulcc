@@ -180,13 +180,13 @@ transition_identification <- function(
   ### =========================================================================
 
   # Single-step transitions over time
-  trans_tables_bound_ss <- data.table::rbindlist(
+  trans_rates_bound_ss <- data.table::rbindlist(
     viable_trans_by_period_ss,
     idcol = "Period"
   )
-  trans_tables_bound_ss$Trans_ID <- NULL
+  trans_rates_bound_ss$Trans_ID <- NULL
   trans_table_time_ss <- tidyr::pivot_wider(
-    trans_tables_bound_ss,
+    trans_rates_bound_ss,
     names_from = "Period",
     values_from = "Rate"
   )
@@ -279,13 +279,13 @@ transition_identification <- function(
   )
 
   # Merge multi-step transitions over time
-  trans_tables_bound_ms <- data.table::rbindlist(
+  trans_rates_bound_ms <- data.table::rbindlist(
     viable_trans_by_period_ms,
     idcol = "Period"
   )
-  trans_tables_bound_ms$Trans_ID <- NULL
+  trans_rates_bound_ms$Trans_ID <- NULL
   trans_table_time_ms <- tidyr::pivot_wider(
-    trans_tables_bound_ms,
+    trans_rates_bound_ms,
     names_from = "Period",
     values_from = "Rate"
   )

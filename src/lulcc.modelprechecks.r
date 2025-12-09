@@ -150,7 +150,7 @@ lulcc.modelprechecks <- function(config = get_config()) {
   # Check 2:
   # loop over the files checking that they include the same From/To class values
   # as the viable trans list
-  Trans_tables_correct <- sapply(
+  trans_rates_correct <- sapply(
     Scenario_transition_matrix_files,
     function(trans_table_path) {
       # extract numeric
@@ -189,13 +189,13 @@ lulcc.modelprechecks <- function(config = get_config()) {
       identical(viable_trans_list$From_To, trans_table_from_to)
     }
   )
-  if (all(Trans_tables_correct == FALSE)) {
+  if (all(trans_rates_correct == FALSE)) {
     model_pre_checks <- c(
       model_pre_checks,
       list(list(
         check = "incorrect_transition_rates",
         message = "Transition tables do not match the transitions to be modelled, see result for details",
-        result = Trans_tables_correct
+        result = trans_rates_correct
       ))
     )
   }

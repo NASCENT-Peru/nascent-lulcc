@@ -90,7 +90,7 @@ cat(sprintf("Working directory set to: %s\n", getwd()))
 src_files <- c(
   "src/setup.r",
   "src/utils.r",
-  "src/simulation_trans_tables_prep.r",
+  "src/simulation_trans_rates_prep.r",
   "src/simulation_predictor_prep.r"
 )
 
@@ -127,7 +127,7 @@ cat("Configuration loaded successfully.\n\n")
 steps <- list(
   list(
     name = "Simulation Transition Tables Preparation",
-    func = function() simulation_trans_tables_prep(config = config)
+    func = function() simulation_trans_rates_prep(config = config)
   ),
   list(
     name = "Simulation Predictor Data Preparation",

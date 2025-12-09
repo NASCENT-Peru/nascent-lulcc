@@ -285,12 +285,12 @@ build_full_config <- function(yaml_config) {
     trans_rate_table_dir = build_path(
       base_path,
       "transition_rates",
-      "prepared_trans_tables"
+      "prepared_trans_rates"
     ),
     trans_rates_raw_dir = build_path(
       base_path,
       "transition_rates",
-      "raw_trans_tables"
+      "raw_trans_rates"
     ),
     trans_rate_extrapol_dir = build_path(
       base_path,
