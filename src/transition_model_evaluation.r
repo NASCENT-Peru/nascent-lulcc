@@ -17,19 +17,24 @@ transition_model_evaluation <- function(config = get_config()) {
   models_completed <- model_specs[model_specs$Modelling_completed == "Y", ]
 
   # subset to only those for 2009-2018
-  models_completed <- models_completed[models_completed$Data_period_name == "Period_2009_2018", ]
+  models_completed <- models_completed[
+    models_completed$Data_period_name == "Period_2009_2018",
+  ]
 
   # split into named list
-  model_list <- lapply(split(models_completed, seq_len(nrow(models_completed))), as.list)
+  model_list <- lapply(
+    split(models_completed, seq_len(nrow(models_completed))),
+    as.list
+  )
   names(model_list) <- models_completed$Detail_model_tag
 
   # Base folder path for loading model eval results
-  eval_results_base_folder <- "Results/Model_evaluation"
+  eval_results_base_folder <- "outputs/Model_evaluation"
 
-  dir.create("Results/Model_evaluation/Evaluation_summaries")
+  dir.create("outputs/Model_evaluation/Evaluation_summaries")
 
   # base folder path to save evaluation summary results
-  Summary_results_folder <- "Results/Model_evaluation/Evaluation_summaries"
+  Summary_results_folder <- "outputs/Model_evaluation/Evaluation_summaries"
 
   # Model time period to be evaluated
   Data_period_name <- config[["data_periods"]]
@@ -48,17 +53,31 @@ transition_model_evaluation <- function(config = get_config()) {
     # expand eval results base folder path for test data results
     if (model$balance_adjustment == "downsampled") {
       Eval_results_folder_specific_test <- paste0(
-        eval_results_base_folder, "/",
-        toupper(model$Model_type), "_model_evaluation", "/",
-        Model_spec, "/",
-        model$Data_period_name, "_", model$Model_type, "_model_eval"
+        eval_results_base_folder,
+        "/",
+        toupper(model$Model_type),
+        "_model_evaluation",
+        "/",
+        Model_spec,
+        "/",
+        model$Data_period_name,
+        "_",
+        model$Model_type,
+        "_model_eval"
       )
     } else if (model$balance_adjustment == "non_adjusted") {
       Eval_results_folder_specific_test <- paste0(
-        eval_results_base_folder, "/",
-        toupper(model$Model_type), "_model_evaluation_non_adjusted", "/",
-        Model_spec, "/",
-        model$Data_period_name, "_", model$Model_type, "_model_eval"
+        eval_results_base_folder,
+        "/",
+        toupper(model$Model_type),
+        "_model_evaluation_non_adjusted",
+        "/",
+        Model_spec,
+        "/",
+        model$Data_period_name,
+        "_",
+        model$Model_type,
+        "_model_eval"
       )
     }
 
@@ -67,31 +86,53 @@ transition_model_evaluation <- function(config = get_config()) {
     # expand eval results base folder path for test data results
     if (model$balance_adjustment == "downsampled") {
       Eval_results_folder_specific_test <- paste0(
-        eval_results_base_folder, "/",
-        toupper(model$Model_type), "_model_evaluation", "/",
-        Model_spec, "/",
-        model$Data_period_name, "_", model$Model_type, "_model_eval"
+        eval_results_base_folder,
+        "/",
+        toupper(model$Model_type),
+        "_model_evaluation",
+        "/",
+        Model_spec,
+        "/",
+        model$Data_period_name,
+        "_",
+        model$Model_type,
+        "_model_eval"
       )
     } else if (model$balance_adjustment == "non_adjusted") {
       Eval_results_folder_specific_test <- paste0(
-        eval_results_base_folder, "/",
-        toupper(model$Model_type), "_model_evaluation_non_adjusted", "/",
-        Model_spec, "/",
-        model$Data_period_name, "_", model$Model_type, "_model_eval"
+        eval_results_base_folder,
+        "/",
+        toupper(model$Model_type),
+        "_model_evaluation_non_adjusted",
+        "/",
+        Model_spec,
+        "/",
+        model$Data_period_name,
+        "_",
+        model$Model_type,
+        "_model_eval"
       )
     }
 
     # load eval results for test data
     model_eval_results_test <- lapply(
-      list.files(Eval_results_folder_specific_test, full.names = TRUE, recursive = TRUE),
+      list.files(
+        Eval_results_folder_specific_test,
+        full.names = TRUE,
+        recursive = TRUE
+      ),
       readRDS
     )
     names(model_eval_results_test) <- c(
       lapply(
-        strsplit(list.files(
-          Eval_results_folder_specific_test,
-          full.names = FALSE, recursive = TRUE
-        ), split = "/"),
+        strsplit(
+          list.files(
+            Eval_results_folder_specific_test,
+            full.names = FALSE,
+            recursive = TRUE
+          ),
+          split = "/"
+        ),
         function(y) stringr::str_replace(y[[2]], ".rds", "")
       )
     )
@@ -100,55 +141,85 @@ transition_model_evaluation <- function(config = get_config()) {
     # combined model eval results)
     Model_eval_table_test <- lulcc.summarisemodelevaluation(
       model_eval_results = model_eval_results_test,
-      summary_metrics = c("AUC", "Score"), plots = FALSE
+      summary_metrics = c("AUC", "Score"),
+      plots = FALSE
     )
 
     # remove model tag from trans_name column
     Model_eval_table_test$trans_name <- sapply(
       Model_eval_table_test$trans_name,
-      function(y) sub(paste(c("_rf-1", "_rf-2", "_rf-3", "_rf-4", "_glm"), collapse = "|"), "", y)
+      function(y) {
+        sub(
+          paste(c("_rf-1", "_rf-2", "_rf-3", "_rf-4", "_glm"), collapse = "|"),
+          "",
+          y
+        )
+      }
     )
 
     # save the table
     saveRDS(
       Model_eval_table_test,
       file = paste0(
-        Summary_results_folder, "/",
-        model$Detail_model_tag, "_eval_table.rds"
+        Summary_results_folder,
+        "/",
+        model$Detail_model_tag,
+        "_eval_table.rds"
       )
     )
-
 
     ### TRAINING###
 
     # expand eval results base folder path for training data results
     if (model$balance_adjustment == "downsampled") {
       Eval_results_folder_specific_training <- paste0(
-        eval_results_base_folder, "/",
-        toupper(model$Model_type), "_model_evaluation", "/",
-        Model_spec, "/",
-        model$Data_period_name, "_", model$Model_type, "_model_eval_training"
+        eval_results_base_folder,
+        "/",
+        toupper(model$Model_type),
+        "_model_evaluation",
+        "/",
+        Model_spec,
+        "/",
+        model$Data_period_name,
+        "_",
+        model$Model_type,
+        "_model_eval_training"
       )
     } else if (model$balance_adjustment == "non_adjusted") {
       Eval_results_folder_specific_training <- paste0(
-        eval_results_base_folder, "/",
-        toupper(model$Model_type), "_model_evaluation_non_adjusted", "/",
-        Model_spec, "/",
-        model$Data_period_name, "_", model$Model_type, "_model_eval_training"
+        eval_results_base_folder,
+        "/",
+        toupper(model$Model_type),
+        "_model_evaluation_non_adjusted",
+        "/",
+        Model_spec,
+        "/",
+        model$Data_period_name,
+        "_",
+        model$Model_type,
+        "_model_eval_training"
       )
     }
 
     # load eval results for training data
     model_eval_results_training <- lapply(
-      list.files(Eval_results_folder_specific_training, full.names = TRUE, recursive = TRUE),
+      list.files(
+        Eval_results_folder_specific_training,
+        full.names = TRUE,
+        recursive = TRUE
+      ),
       readRDS
     )
     names(model_eval_results_training) <- c(
       lapply(
-        strsplit(list.files(
-          Eval_results_folder_specific_training,
-          full.names = FALSE, recursive = TRUE
-        ), split = "/"),
+        strsplit(
+          list.files(
+            Eval_results_folder_specific_training,
+            full.names = FALSE,
+            recursive = TRUE
+          ),
+          split = "/"
+        ),
         function(y) stringr::str_replace(y[[2]], ".rds", "")
       )
     )
@@ -166,7 +237,9 @@ transition_model_evaluation <- function(config = get_config()) {
       Model_eval_table_training$trans_name,
       function(y) {
         sub(
-          paste(c("_rf-1", "_rf-2", "_rf-3", "_rf-4", "_glm"), collapse = "|"), "", y
+          paste(c("_rf-1", "_rf-2", "_rf-3", "_rf-4", "_glm"), collapse = "|"),
+          "",
+          y
         )
       }
     )
@@ -175,12 +248,13 @@ transition_model_evaluation <- function(config = get_config()) {
     saveRDS(
       Model_eval_table_training,
       file = paste0(
-        Summary_results_folder, "/",
-        model$Detail_model_tag, "_training_eval_table.rds"
+        Summary_results_folder,
+        "/",
+        model$Detail_model_tag,
+        "_training_eval_table.rds"
       )
     )
   }) # close lapply
-
 
   ### =========================================================================
   ### D- hypothesis testing for RF hyper parameters
@@ -196,16 +270,20 @@ transition_model_evaluation <- function(config = get_config()) {
     Summary_results_folder,
     pattern = paste0(Data_period_name, "\\.rf_regionalized")
   )
-  Model_summary_paths <- Model_summary_paths[!grepl("training|non_adjusted", Model_summary_paths)]
+  Model_summary_paths <- Model_summary_paths[
+    !grepl("training|non_adjusted", Model_summary_paths)
+  ]
 
   Model_summary_tables <- lapply(
-    Model_summary_paths, readRDS
+    Model_summary_paths,
+    readRDS
   ) # remove the summaries for the training data and load
   names(Model_summary_tables) <- sapply(
     names(Model_summary_paths),
     function(x) {
       paste0(
-        stringr::str_split(x, "\\.")[[1]][[1]], "_",
+        stringr::str_split(x, "\\.")[[1]][[1]],
+        "_",
         stringr::str_split(x, "\\.")[[1]][[2]]
       )
     }
@@ -227,17 +305,19 @@ transition_model_evaluation <- function(config = get_config()) {
       saveRDS(
         Model_stats_comparison,
         file = paste0(
-          "Results/Model_tuning/RF_hyper_param_comparison", "/",
-          model_summary_name, "_num_tree_comparison_results"
+          "outputs/Model_tuning/RF_hyper_param_comparison",
+          "/",
+          model_summary_name,
+          "_num_tree_comparison_results"
         )
       )
 
       return(Model_stats_comparison)
     },
     model_summary = Model_summary_tables,
-    model_summary_name = names(Model_summary_tables), SIMPLIFY = FALSE
+    model_summary_name = names(Model_summary_tables),
+    SIMPLIFY = FALSE
   )
-
 
   ### =========================================================================
   ### E- Determining downsampling bounds
@@ -246,19 +326,23 @@ transition_model_evaluation <- function(config = get_config()) {
   # load model summaries
   Model_summary_paths <- list.files(
     Summary_results_folder,
-    pattern = paste0(Data_period_name, "\\.rf_regionalized"), full.names = TRUE
+    pattern = paste0(Data_period_name, "\\.rf_regionalized"),
+    full.names = TRUE
   )
   names(Model_summary_paths) <- list.files(
     Summary_results_folder,
     pattern = paste0(Data_period_name, "\\.rf_regionalized")
   )
-  Model_summary_paths <- Model_summary_paths[!grepl("training", Model_summary_paths)]
+  Model_summary_paths <- Model_summary_paths[
+    !grepl("training", Model_summary_paths)
+  ]
 
   Model_summary_tables <- lapply(Model_summary_paths, readRDS)
 
   # filter to only rf 3 results
   Model_summary_tables <- lapply(
-    Model_summary_tables, function(x) x[x$model == "3"]
+    Model_summary_tables,
+    function(x) x[x$model == "3"]
   )
   # rename
   names(Model_summary_tables) <- sapply(
@@ -320,14 +404,20 @@ transition_model_evaluation <- function(config = get_config()) {
   # performing statistical testing
   Comparative_results_analysis_high_imbalance <- lapply(
     Comparative_results[2],
-    function(x) lulcc.analysedownsampling(Comparative_table = x, summary_metrics = eval_metrics)
+    function(x) {
+      lulcc.analysedownsampling(
+        Comparative_table = x,
+        summary_metrics = eval_metrics
+      )
+    }
   )
 
   saveRDS(
     Comparative_results_analysis_high_imbalance,
     paste0(
-      "Results/Model_tuning/Down_sampling/",
-      Data_period_name, "_comparative_results_analysis_high_imbalance"
+      "outputs/Model_tuning/Down_sampling/",
+      Data_period_name,
+      "_comparative_results_analysis_high_imbalance"
     )
   )
 

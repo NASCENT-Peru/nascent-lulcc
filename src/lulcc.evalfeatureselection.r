@@ -112,7 +112,7 @@ lulcc.evalfeatureselection <- function(
   saveRDS(
     Feature_selection_summaries,
     file = paste0(
-      "Results/Model_tuning/Covariate_selection/Cov_selection_summaries/",
+      "outputs/Model_tuning/Covariate_selection/Cov_selection_summaries/",
       data_period_name,
       "_",
       Dataset_scale,
@@ -202,12 +202,12 @@ lulcc.evalfeatureselection <- function(
     ) +
     coord_flip()
 
-  dir.create("Results/Figures/Covariate_selection", recursive = TRUE)
+  dir.create("outputs/Figures/Covariate_selection", recursive = TRUE)
 
   ggsave(
     plot = FS_predictor_frequency_bar_chart,
     filename = paste0(
-      "Results/Figures/Covariate_selection/",
+      "outputs/Figures/Covariate_selection/",
       data_period_name,
       "_bar_plot_frq_cov_occurence"
     ),

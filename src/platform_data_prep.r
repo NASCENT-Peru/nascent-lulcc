@@ -7,23 +7,25 @@ platform_data_prep <- function() {
   library(viridis)
 
   # Dir of Finaliyed LULC maps
-  Final_map_dir <- "Results/Finalised_LULC_maps"
+  Final_map_dir <- "outputs/Finalised_LULC_maps"
 
   # Dir for saving output
-  PA_maps_dir <- "Results/PA_maps_temp"
+  PA_maps_dir <- "outputs/PA_maps_temp"
   dir.create(PA_maps_dir)
 
   # Dir for analysis results
-  Analysis_dir <- "Results/Map_analysis"
+  Analysis_dir <- "outputs/Map_analysis"
   dir.create(Analysis_dir)
 
   # Dir for sankey tables and diagrams
-  Sankey_dir <- "Results/Sankey_tables_diagrams"
+  Sankey_dir <- "outputs/Sankey_tables_diagrams"
   dir.create(Sankey_dir)
 
   # Load control table
   Simulation_control <- read.csv(ctrl_tbl_path)
-  Simulation_control <- Simulation_control[Simulation_control$completed.string == "Y", ]
+  Simulation_control <- Simulation_control[
+    Simulation_control$completed.string == "Y",
+  ]
 
   # get unique values of Simulation ID
   Sim_IDs <- unique(Simulation_control$simulation_id.string)
@@ -54,7 +56,11 @@ platform_data_prep <- function() {
   ### =========================================================================
 
   # Get the 2020 and 2055 i.e. existing PA map paths for each scenario
-  PA_map_paths <- list.files("data/Spat_prob_perturb_layers/Protected_areas/Future_PAs", full.names = TRUE, pattern = paste0(c("2020", "2055"), collapse = "|"))
+  PA_map_paths <- list.files(
+    "data/Spat_prob_perturb_layers/Protected_areas/Future_PAs",
+    full.names = TRUE,
+    pattern = paste0(c("2020", "2055"), collapse = "|")
+  )
 
   # loop over scenario names and combine the rasters for each
   for (i in scenario_names[2:4]) {
@@ -82,7 +88,11 @@ platform_data_prep <- function() {
     Multi_lyr[Multi_lyr == 6] <- 1
     freq(Multi_lyr)
     # save
-    writeRaster(Multi_lyr, file = paste0(PA_maps_dir, "/", i, "_PAs.tif"), overwrite = TRUE)
+    writeRaster(
+      Multi_lyr,
+      file = paste0(PA_maps_dir, "/", i, "_PAs.tif"),
+      overwrite = TRUE
+    )
   }
 
   # Plot maps for each scenario
@@ -95,7 +105,10 @@ platform_data_prep <- function() {
   ### =========================================================================
 
   # subset LULC paths to only 2020 and 2060
-  Start_end_LULC <- LULC_paths[grepl(paste0(c(scenario_start, scenario_end), collapse = "|"), LULC_paths)]
+  Start_end_LULC <- LULC_paths[grepl(
+    paste0(c(scenario_start, scenario_end), collapse = "|"),
+    LULC_paths
+  )]
 
   # loop over the scenarios
   # Scenario_crosstabs_SE <- as.data.frame(rbindlist(lapply(scenario_names, function(x){
@@ -130,7 +143,13 @@ platform_data_prep <- function() {
   # }), idcol = "Scenario"))
 
   # save result
-  saveRDS(Scenario_crosstabs_SE, file = paste0(Sankey_dir, "/Scenario_crosstabulations_start_end_timepoints.rds"))
+  saveRDS(
+    Scenario_crosstabs_SE,
+    file = paste0(
+      Sankey_dir,
+      "/Scenario_crosstabulations_start_end_timepoints.rds"
+    )
+  )
 
   # Loop over scenarios creating sankey plots and saving tables
   lapply(scenario_names, function(x) {
@@ -154,7 +173,11 @@ platform_data_prep <- function() {
 
     # identify unique classes and name with a unique number to seperate from the 'to' classes
     unique_from <- as.character(unique(dat$LULC_from))
-    names(unique_from) <- seq(from = 100, by = 1, length.out = length(unique_from))
+    names(unique_from) <- seq(
+      from = 100,
+      by = 1,
+      length.out = length(unique_from)
+    )
 
     unique_to <- as.character(unique(dat$LULC_to))
     names(unique_to) <- seq(from = 200, by = 1, length.out = length(unique_to))
@@ -204,7 +227,7 @@ platform_data_prep <- function() {
       link = list(
         source = dat$source,
         target = dat$target,
-        value =  dat$ncell # possible to change value if desired
+        value = dat$ncell # possible to change value if desired
       )
     )
 
@@ -273,7 +296,10 @@ platform_data_prep <- function() {
   # }), idcol = "Scenario"))
 
   # save result
-  saveRDS(Scenario_crosstabs_all, file = paste0(Sankey_dir, "/Scenario_crosstabulations_all_timepoints.rds"))
+  saveRDS(
+    Scenario_crosstabs_all,
+    file = paste0(Sankey_dir, "/Scenario_crosstabulations_all_timepoints.rds")
+  )
 
   # Loop over scenarios producing seperate sankey plots
   Scenario_plots <- lapply(scenario_names, function(x) {
@@ -287,7 +313,11 @@ platform_data_prep <- function() {
     dat$LULC_from <- sapply(1:nrow(dat), function(i) {
       LULC <- dat$From[i]
       year <- dat$years[i]
-      paste0(year, "_", subset_agg[subset_agg$Aggregated_ID == LULC, "Aggregated_class"])
+      paste0(
+        year,
+        "_",
+        subset_agg[subset_agg$Aggregated_ID == LULC, "Aggregated_class"]
+      )
     })
 
     # The year in the 'to' tags has to go to the subsequent time step in order for
@@ -301,9 +331,17 @@ platform_data_prep <- function() {
       # next tag
       if (match(year, time_tags) < length(time_tags)) {
         subseq_year <- time_tags[[(match(year, time_tags) + 1)]]
-        col_val <- paste0(subseq_year, "_", subset_agg[subset_agg$Aggregated_ID == LULC, "Aggregated_class"])
+        col_val <- paste0(
+          subseq_year,
+          "_",
+          subset_agg[subset_agg$Aggregated_ID == LULC, "Aggregated_class"]
+        )
       } else {
-        col_val <- paste0(year, "_", subset_agg[subset_agg$Aggregated_ID == LULC, "Aggregated_class"])
+        col_val <- paste0(
+          year,
+          "_",
+          subset_agg[subset_agg$Aggregated_ID == LULC, "Aggregated_class"]
+        )
       }
       return(col_val)
     })
@@ -341,7 +379,9 @@ platform_data_prep <- function() {
     })
 
     # change names of nodes to clean them up
-    nodes$clean_name <- sapply(nodes$name, function(y) na.omit(str_match(y, subset_agg$Aggregated_class)))
+    nodes$clean_name <- sapply(nodes$name, function(y) {
+      na.omit(str_match(y, subset_agg$Aggregated_class))
+    })
 
     # add  columns for colours
 
@@ -359,11 +399,17 @@ platform_data_prep <- function() {
       "Glacier" = "#E8ECFB"
     )
 
-    nodes$colour <- sapply(nodes$clean_name, function(y) paste(pal[names(pal)[names(pal) == y]]))
+    nodes$colour <- sapply(nodes$clean_name, function(y) {
+      paste(pal[names(pal)[names(pal) == y]])
+    })
 
     # add x and Y positions
     x_pos <- seq.int(from = 0.1, by = 0.1, length.out = length(Time_steps))
-    y_pos <- seq.int(from = 0.1, by = 0.1, length.out = length(unique(nodes$clean_name)))
+    y_pos <- seq.int(
+      from = 0.1,
+      by = 0.1,
+      length.out = length(unique(nodes$clean_name))
+    )
 
     names(time_tags) <- x_pos[1:length(time_tags)]
     nodes$x <- sapply(nodes$name, function(y) {
@@ -377,7 +423,11 @@ platform_data_prep <- function() {
     })
 
     # get position of 1st instance of each unique value in column
-    unique_index <- sapply(split(seq_along(nodes$clean_name), nodes$clean_name), "[[", 1)
+    unique_index <- sapply(
+      split(seq_along(nodes$clean_name), nodes$clean_name),
+      "[[",
+      1
+    )
 
     # change non-1st instances to blank
     nodes[-(unique_index), "clean_name"] <- ""
@@ -415,7 +465,7 @@ platform_data_prep <- function() {
       link = list(
         source = dat$source,
         target = dat$target,
-        value =  dat$ncell # possible to change value if desired
+        value = dat$ncell # possible to change value if desired
       )
     ) %>%
       #   add_annotations(
@@ -453,24 +503,55 @@ platform_data_prep <- function() {
   # add domains to plotly plots
   # https://stackoverflow.com/questions/73496559/preventing-plots-from-overlapping-in-r
 
-  Scenario_plots[[1]] <- style(Scenario_plots[[1]], domain = list(x = c(0, 0.5), y = c(0.6, 1)))
-  Scenario_plots[[2]] <- style(Scenario_plots[[2]], domain = list(x = c(0.5, 1), y = c(0.6, 1)))
-  Scenario_plots[[3]] <- style(Scenario_plots[[3]], domain = list(x = c(0, 0.5), y = c(0, 0.4)))
-  Scenario_plots[[4]] <- style(Scenario_plots[[4]], domain = list(x = c(0.5, 1), y = c(0, 0.4)))
+  Scenario_plots[[1]] <- style(
+    Scenario_plots[[1]],
+    domain = list(x = c(0, 0.5), y = c(0.6, 1))
+  )
+  Scenario_plots[[2]] <- style(
+    Scenario_plots[[2]],
+    domain = list(x = c(0.5, 1), y = c(0.6, 1))
+  )
+  Scenario_plots[[3]] <- style(
+    Scenario_plots[[3]],
+    domain = list(x = c(0, 0.5), y = c(0, 0.4))
+  )
+  Scenario_plots[[4]] <- style(
+    Scenario_plots[[4]],
+    domain = list(x = c(0.5, 1), y = c(0, 0.4))
+  )
 
-  Scenario_plots[[1]] <- style(Scenario_plots[[1]], domain = list(x = c(0, 1), y = c(0.6, 8)))
-  Scenario_plots[[2]] <- style(Scenario_plots[[2]], domain = list(x = c(0, 1), y = c(0.4, 0.6)))
-  Scenario_plots[[3]] <- style(Scenario_plots[[3]], domain = list(x = c(0, 1), y = c(0.2, 0.4)))
-  Scenario_plots[[4]] <- style(Scenario_plots[[4]], domain = list(x = c(0, 1), y = c(0, 0.2)))
+  Scenario_plots[[1]] <- style(
+    Scenario_plots[[1]],
+    domain = list(x = c(0, 1), y = c(0.6, 8))
+  )
+  Scenario_plots[[2]] <- style(
+    Scenario_plots[[2]],
+    domain = list(x = c(0, 1), y = c(0.4, 0.6))
+  )
+  Scenario_plots[[3]] <- style(
+    Scenario_plots[[3]],
+    domain = list(x = c(0, 1), y = c(0.2, 0.4))
+  )
+  Scenario_plots[[4]] <- style(
+    Scenario_plots[[4]],
+    domain = list(x = c(0, 1), y = c(0, 0.2))
+  )
 
-  subplot(Scenario_plots[[1]], Scenario_plots[[2]], Scenario_plots[[3]], Scenario_plots[[4]],
+  subplot(
+    Scenario_plots[[1]],
+    Scenario_plots[[2]],
+    Scenario_plots[[3]],
+    Scenario_plots[[4]],
     margin = 0.5
   )
 
-  subplot(Scenario_plots[[3]], Scenario_plots[[4]],
-    margin = 0.5
-  )
+  subplot(Scenario_plots[[3]], Scenario_plots[[4]], margin = 0.5)
 
   # combine plot_ly plots for each scenario
-  subplot(Scenario_plots, nrows = length(Scenario_plots), shareX = FALSE, shareY = FALSE)
+  subplot(
+    Scenario_plots,
+    nrows = length(Scenario_plots),
+    shareX = FALSE,
+    shareY = FALSE
+  )
 }

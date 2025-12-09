@@ -161,7 +161,7 @@ build_full_config <- function(yaml_config) {
       yaml_config$predictors_dir,
       "prepared"
     ),
-    results_dir = build_path(base_path, yaml_config$results_dir),
+    outputs_dir = build_path(base_path, yaml_config$outputs_dir),
     tools_dir = build_path(base_path, yaml_config$tools_dir),
     allocation_pars_dir = build_path(
       base_path,
@@ -315,24 +315,24 @@ build_full_config <- function(yaml_config) {
     # Model directories
     feature_selection_dir = build_path(
       base_path,
-      yaml_config$results_dir,
+      yaml_config$outputs_dir,
       "feature_selection"
     ),
     transition_model_dir = build_path(base_path, "transition_models"),
     transition_model_eval_dir = build_path(
       base_path,
-      yaml_config$results_dir,
+      yaml_config$outputs_dir,
       "transition_model_eval"
     ),
     prediction_models_dir = build_path(
       base_path,
-      yaml_config$results_dir,
+      yaml_config$outputs_dir,
       "transition_models",
       "prediction_models"
     ),
     validation_dir = build_path(
       base_path,
-      yaml_config$results_dir,
+      yaml_config$outputs_dir,
       "validation"
     ),
     spat_prob_perturb_path = build_path(base_path, "spat_prob_perturb"),
@@ -377,7 +377,7 @@ create_directory_structure <- function(config, create_dirs = TRUE) {
     config$predictors_raw_dir,
     config$predictors_intermediate_dir,
     config$predictors_prepped_dir,
-    config$results_dir,
+    config$outputs_dir,
     config$tools_dir,
     config$allocation_pars_dir,
     config$rasterized_lulc_dir,

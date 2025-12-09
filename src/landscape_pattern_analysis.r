@@ -8,25 +8,99 @@
 landscape_pattern_analysis <- function() {
   # vector other required packages
   packs <- c(
-    "data.table", "raster", "tidyverse", "SDMTools", "doParallel",
-    "sf", "tiff", "igraph", "readr", "foreach", "testthat",
-    "sjmisc", "tictoc", "parallel", "terra", "pbapply", "rgdal",
-    "rgeos", "bfsMaps", "rjstat", "future.apply", "future", "stringr",
-    "stringi", "readxl", "rlist", "rstatix", "openxlsx", "pxR", "zen4R",
-    "rvest", "viridis", "sp", "jsonlite", "httr", "xlsx", "callr",
-    "gdata", "landscapemetrics", "randomForest", "RRF", "future.callr",
-    "ghibli", "ggpattern", "butcher", "ROCR", "ecospat", "caret", "Dinamica",
-    "gridExtra", "extrafont", "ggpubr", "ggstatsplot", "PMCMRplus", "reshape2",
-    "ggsignif", "ggthemes", "ggside", "gridtext", "grid", "slackr",
-    "landscapemetrics", "plotly", "networkD3", "ggalluvial", "ggthemes", "patchwork",
-    "extrafont", "tmap", "leaflet", "leaflet.extras", "leaflet.extras2",
-    "rcartocolor", "htmlwidgets", "leaflet.opacity", "leaflet.providers",
-    "leafem", "mapview", "webshot2", "magick", "png", "ggpubr", "extrafont", "tools", "grid", "ghibli"
+    "data.table",
+    "raster",
+    "tidyverse",
+    "SDMTools",
+    "doParallel",
+    "sf",
+    "tiff",
+    "igraph",
+    "readr",
+    "foreach",
+    "testthat",
+    "sjmisc",
+    "tictoc",
+    "parallel",
+    "terra",
+    "pbapply",
+    "rgdal",
+    "rgeos",
+    "bfsMaps",
+    "rjstat",
+    "future.apply",
+    "future",
+    "stringr",
+    "stringi",
+    "readxl",
+    "rlist",
+    "rstatix",
+    "openxlsx",
+    "pxR",
+    "zen4R",
+    "rvest",
+    "viridis",
+    "sp",
+    "jsonlite",
+    "httr",
+    "xlsx",
+    "callr",
+    "gdata",
+    "landscapemetrics",
+    "randomForest",
+    "RRF",
+    "future.callr",
+    "ghibli",
+    "ggpattern",
+    "butcher",
+    "ROCR",
+    "ecospat",
+    "caret",
+    "Dinamica",
+    "gridExtra",
+    "extrafont",
+    "ggpubr",
+    "ggstatsplot",
+    "PMCMRplus",
+    "reshape2",
+    "ggsignif",
+    "ggthemes",
+    "ggside",
+    "gridtext",
+    "grid",
+    "slackr",
+    "landscapemetrics",
+    "plotly",
+    "networkD3",
+    "ggalluvial",
+    "ggthemes",
+    "patchwork",
+    "extrafont",
+    "tmap",
+    "leaflet",
+    "leaflet.extras",
+    "leaflet.extras2",
+    "rcartocolor",
+    "htmlwidgets",
+    "leaflet.opacity",
+    "leaflet.providers",
+    "leafem",
+    "mapview",
+    "webshot2",
+    "magick",
+    "png",
+    "ggpubr",
+    "extrafont",
+    "tools",
+    "grid",
+    "ghibli"
   )
 
   # install new packages
   new.packs <- packs[!(packs %in% installed.packages()[, "Package"])]
-  if (length(new.packs)) install.packages(new.packs)
+  if (length(new.packs)) {
+    install.packages(new.packs)
+  }
 
   # Load required packages
   invisible(lapply(packs, require, character.only = TRUE))
@@ -40,18 +114,20 @@ landscape_pattern_analysis <- function() {
   # global env
 
   # Dir of finalized maps
-  Final_map_dir <- "Results/Finalised_LULC_maps"
+  Final_map_dir <- "outputs/Finalised_LULC_maps"
 
   # crs for maps
   ProjCH <- "+proj=somerc +init=epsg:2056"
 
   # Dir for analysis results
-  LSM_dir <- "Results/Landscape_pattern_analysis"
+  LSM_dir <- "outputs/Landscape_pattern_analysis"
   dir.create(LSM_dir)
 
   # Load control table
   Simulation_control <- read.csv(ctrl_tbl_path)
-  Simulation_control <- Simulation_control[Simulation_control$completed.string == "Y", ]
+  Simulation_control <- Simulation_control[
+    Simulation_control$completed.string == "Y",
+  ]
 
   # get unique values of Simulation ID
   Sim_IDs <- unique(Simulation_control$simulation_id.string)
@@ -83,7 +159,8 @@ landscape_pattern_analysis <- function() {
   ### =========================================================================
 
   # get file paths of end of simulation rasters
-  Final_raster_paths <- list.files("Results/Dinamica_simulated_lulc",
+  Final_raster_paths <- list.files(
+    "outputs/Dinamica_simulated_lulc",
     full.names = TRUE,
     recursive = TRUE,
     pattern = paste(scenario_end)
@@ -109,19 +186,28 @@ landscape_pattern_analysis <- function() {
   LULC_agg_scheme <- readxl::read_excel(LULC_aggregation_path)
 
   Rast_freq$LULC_name <- sapply(Rast_freq$value, function(x) {
-    unique(LULC_agg_scheme[LULC_agg_scheme$Aggregated_ID == x, "Class_abbreviation"])
+    unique(LULC_agg_scheme[
+      LULC_agg_scheme$Aggregated_ID == x,
+      "Class_abbreviation"
+    ])
   })
 
   # convert cell counts to %'s
   Total_area <- sum(Rast_freq$BAU)
 
   LULC_percs <- Rast_freq
-  LULC_percs[, scenario_names] <- apply(LULC_percs[, scenario_names], c(1, 2), function(x) {
-    (x / Total_area) * 100
-  })
+  LULC_percs[, scenario_names] <- apply(
+    LULC_percs[, scenario_names],
+    c(1, 2),
+    function(x) {
+      (x / Total_area) * 100
+    }
+  )
 
   # check expected glacier amount in 2060
-  Glacier_index <- readRDS("Data/Glacial_change/Scenario_indices/GR_EX_glacial_change.rds")
+  Glacier_index <- readRDS(
+    "Data/Glacial_change/Scenario_indices/GR_EX_glacial_change.rds"
+  )
   Glacier_ncells_2060 <- length(which(Glacier_index[["2060"]] == 1))
 
   ### =========================================================================
@@ -129,9 +215,18 @@ landscape_pattern_analysis <- function() {
   ### =========================================================================
 
   # identify relevant landscape metrics at class and landscape level
-  class_metrics <- list_lsm(level = "class", type = c("aggregation metric", "complexity metric"))
-  lscape_metrics <- list_lsm(level = "landscape", type = c("aggregation metric", "complexity metric"))
-  lscape_metrics <- lscape_metrics[lscape_metrics$type == "aggregation metric" | lscape_metrics$metric == "contag", ]
+  class_metrics <- list_lsm(
+    level = "class",
+    type = c("aggregation metric", "complexity metric")
+  )
+  lscape_metrics <- list_lsm(
+    level = "landscape",
+    type = c("aggregation metric", "complexity metric")
+  )
+  lscape_metrics <- lscape_metrics[
+    lscape_metrics$type == "aggregation metric" |
+      lscape_metrics$metric == "contag",
+  ]
 
   # Create DF with info on desired metrics at both class and landscape level
   All_lsms <- rbind(class_metrics, lscape_metrics)
@@ -180,7 +275,8 @@ landscape_pattern_analysis <- function() {
     LULC_rast <- rast(LULC_path)
 
     # calculate metrics
-    Layer_res <- as.data.frame(calculate_lsm(LULC_rast,
+    Layer_res <- as.data.frame(calculate_lsm(
+      LULC_rast,
       what = All_lsms[, "Function_name"],
       directions = 8,
       neighbourhood = 8
@@ -207,9 +303,13 @@ landscape_pattern_analysis <- function() {
   LULC_agg <- readxl::read_xlsx("tools/LULC_class_aggregation.xlsx")
 
   # Add column for clean LULC class name
-  LSM_res$LULC <- as.character(sapply(LSM_res$class, function(x) {
-    unlist(unique(LULC_agg[LULC_agg$Aggregated_ID == x, "Aggregated_class"]))
-  }, simplify = TRUE))
+  LSM_res$LULC <- as.character(sapply(
+    LSM_res$class,
+    function(x) {
+      unlist(unique(LULC_agg[LULC_agg$Aggregated_ID == x, "Aggregated_class"]))
+    },
+    simplify = TRUE
+  ))
 
   # save table for use in publication visualisations
   saveRDS(LSM_res, file.path(LSM_dir, "Simulated_LULC_LSMs_results.rds"))
@@ -223,11 +323,16 @@ landscape_pattern_analysis <- function() {
   Norm_scenarios <- scenario_names[2:4]
 
   # subset LSMs
-  Subset_lsms <- All_lsms[All_lsms$metric %in% c("cohesion", "contag", "enn_mn", "mesh", "np", "pd"), ]
+  Subset_lsms <- All_lsms[
+    All_lsms$metric %in% c("cohesion", "contag", "enn_mn", "mesh", "np", "pd"),
+  ]
   metrics <- as.character(unlist(Subset_lsms[, "function_name"]))
 
   # list paths of all PA rasters
-  All_PA_paths <- list.files("data/Spat_prob_perturb_layers/Protected_areas/Future_PAs", full.names = TRUE)
+  All_PA_paths <- list.files(
+    "data/Spat_prob_perturb_layers/Protected_areas/Future_PAs",
+    full.names = TRUE
+  )
 
   # upper loop over the start and end date
   LSM_PAs <- lapply(paste(c(scenario_start, scenario_end)), function(x) {
@@ -267,7 +372,8 @@ landscape_pattern_analysis <- function() {
       PA_stack <- raster::mask(CH_stack, Scen_PA)
 
       # calculate landscape metrics
-      Layer_res <- as.data.frame(calculate_lsm(PA_stack,
+      Layer_res <- as.data.frame(calculate_lsm(
+        PA_stack,
         what = metrics,
         directions = 8,
         neighbourhood = 8
@@ -282,7 +388,11 @@ landscape_pattern_analysis <- function() {
     plan(sequential)
 
     names(Scenario_results) <- Norm_scenarios
-    Scenario_results_bound <- as.data.frame(rbindlist(Scenario_results, idcol = "PA_scenario", fill = TRUE))
+    Scenario_results_bound <- as.data.frame(rbindlist(
+      Scenario_results,
+      idcol = "PA_scenario",
+      fill = TRUE
+    ))
 
     return(Scenario_results_bound)
   }) # close outer loop over time steps
@@ -298,70 +408,105 @@ landscape_pattern_analysis <- function() {
   LULC_agg <- readxl::read_xlsx("tools/LULC_class_aggregation.xlsx")
 
   # Add column for clean LULC class name
-  LSM_PAs$LULC <- as.character(sapply(LSM_PAs$class, function(x) {
-    unlist(unique(LULC_agg[LULC_agg$Aggregated_ID == x, "Aggregated_class"]))
-  }, simplify = TRUE))
+  LSM_PAs$LULC <- as.character(sapply(
+    LSM_PAs$class,
+    function(x) {
+      unlist(unique(LULC_agg[LULC_agg$Aggregated_ID == x, "Aggregated_class"]))
+    },
+    simplify = TRUE
+  ))
 
   # save table for use in publication visualisations
   saveRDS(LSM_PAs, file.path(LSM_dir, "Simulated_LULC_LSMs_PAs_results.rds"))
   LSM_PAs <- readRDS(file.path(LSM_dir, "Simulated_LULC_LSMs_PAs_results.rds"))
-
 
   ### =========================================================================
   ### c- Visualisation of landscape level metrics
   ### =========================================================================
 
   # Testing: Plot landscape level metric results across time points/scenarios
-  lscape_plots <- lapply(unlist(unique(LSM_res[LSM_res$level == "landscape", "metric"])), function(metric_name) {
-    Metric_plot <- LSM_res[LSM_res$level == "landscape" & LSM_res$metric == metric_name & LSM_res$Year != "2020", ] |> ggplot() +
-      geom_line(aes(x = Year, y = value, group = Scenario, colour = Scenario), alpha = 0.7, size = 1) +
-      geom_point(aes(x = Year, y = value, group = Scenario, colour = Scenario), alpha = 0.7, size = 2) +
-      labs(
-        y = unlist(All_lsms[All_lsms$metric == metric_name, "units"]),
-        x = "Simulation year",
-        colour = "Scenario",
-        # title = All_lsms[All_lsms$metric == metric_name, "metric_clean_name"]
-      ) +
-      theme(
-        text = element_text(family = "Times New Roman"),
-        plot.title = element_text(size = rel(1.1), hjust = -0.45),
-        axis.line = element_line(1),
-        panel.background = element_blank(),
-        axis.text = element_text(colour = "black"),
-        axis.text.x = element_text(size = 7),
-        legend.title = element_text(size = 8, face = "bold"), # change legend title font size
-        legend.text = element_text(size = 8), # change legend text font size
-        legend.key = element_rect(fill = "white", colour = "white"),
-        legend.title.align = 0.5,
-        legend.position = "bottom"
-      ) +
-      scale_colour_ghibli_d("MononokeMedium")
+  lscape_plots <- lapply(
+    unlist(unique(LSM_res[LSM_res$level == "landscape", "metric"])),
+    function(metric_name) {
+      Metric_plot <- LSM_res[
+        LSM_res$level == "landscape" &
+          LSM_res$metric == metric_name &
+          LSM_res$Year != "2020",
+      ] |>
+        ggplot() +
+        geom_line(
+          aes(x = Year, y = value, group = Scenario, colour = Scenario),
+          alpha = 0.7,
+          size = 1
+        ) +
+        geom_point(
+          aes(x = Year, y = value, group = Scenario, colour = Scenario),
+          alpha = 0.7,
+          size = 2
+        ) +
+        labs(
+          y = unlist(All_lsms[All_lsms$metric == metric_name, "units"]),
+          x = "Simulation year",
+          colour = "Scenario",
+          # title = All_lsms[All_lsms$metric == metric_name, "metric_clean_name"]
+        ) +
+        theme(
+          text = element_text(family = "Times New Roman"),
+          plot.title = element_text(size = rel(1.1), hjust = -0.45),
+          axis.line = element_line(1),
+          panel.background = element_blank(),
+          axis.text = element_text(colour = "black"),
+          axis.text.x = element_text(size = 7),
+          legend.title = element_text(size = 8, face = "bold"), # change legend title font size
+          legend.text = element_text(size = 8), # change legend text font size
+          legend.key = element_rect(fill = "white", colour = "white"),
+          legend.title.align = 0.5,
+          legend.position = "bottom"
+        ) +
+        scale_colour_ghibli_d("MononokeMedium")
 
-    ggsave(
-      plot = Metric_plot,
-      filename = file.path(
-        LSM_dir,
-        paste0("landscape_", metric_name, "_plot.tif")
-      ),
-      device = "tiff",
-      dpi = 300,
-      width = 15,
-      height = 15,
-      units = "cm"
-    )
-    return(Metric_plot)
-  })
-  names(lscape_plots) <- unlist(unique(LSM_res[LSM_res$level == "landscape", "metric"]))
+      ggsave(
+        plot = Metric_plot,
+        filename = file.path(
+          LSM_dir,
+          paste0("landscape_", metric_name, "_plot.tif")
+        ),
+        device = "tiff",
+        dpi = 300,
+        width = 15,
+        height = 15,
+        units = "cm"
+      )
+      return(Metric_plot)
+    }
+  )
+  names(lscape_plots) <- unlist(unique(LSM_res[
+    LSM_res$level == "landscape",
+    "metric"
+  ]))
 
   # combining plots with patchwork
   # Define common x axis label
-  gg_axis <- cowplot::get_plot_component(ggplot() +
-    labs(x = "Simulation year"), "xlab-b")
+  gg_axis <- cowplot::get_plot_component(
+    ggplot() +
+      labs(x = "Simulation year"),
+    "xlab-b"
+  )
 
   # Metric_plots <- (wrap_plots(lscape_plots, nrow =3) & theme(legend.position = "right") & labs(x = NULL, title = NULL)) + plot_annotation(tag_levels = list(c('A.', 'B.', 'C.')))
-  Metric_plots <- (lscape_plots[[1]] / lscape_plots[[2]] / lscape_plots[[3]] + lscape_plots[[4]] + lscape_plots[[5]] + lscape_plots[[6]] & theme(legend.position = "right") & labs(x = NULL, title = NULL)) + plot_layout(ncol = 2, nrow = 3)
+  Metric_plots <- (lscape_plots[[1]] /
+    lscape_plots[[2]] /
+    lscape_plots[[3]] +
+    lscape_plots[[4]] +
+    lscape_plots[[5]] +
+    lscape_plots[[6]] &
+    theme(legend.position = "right") &
+    labs(x = NULL, title = NULL)) +
+    plot_layout(ncol = 2, nrow = 3)
   Metric_plus_axis <- Metric_plots / gg_axis
-  lscape_metrics_combined <- Metric_plus_axis + plot_layout(heights = unit(c(8, 8, 8, 1), c("cm")), guides = "collect") + plot_annotation(tag_levels = list(c("A.", "B.", "C.", "D.", "E.", "F."))) &
+  lscape_metrics_combined <- Metric_plus_axis +
+    plot_layout(heights = unit(c(8, 8, 8, 1), c("cm")), guides = "collect") +
+    plot_annotation(tag_levels = list(c("A.", "B.", "C.", "D.", "E.", "F."))) &
     theme(axis.title.y = element_text(size = 6)) &
     theme(plot.tag = element_text(size = 6, face = "bold"))
 
@@ -397,39 +542,50 @@ landscape_pattern_analysis <- function() {
     "Lake" = "#5566AA"
   )
 
+  class_plots <- lapply(
+    unlist(unique(LSM_res[LSM_res$level == "class", "metric"])),
+    function(metric_name) {
+      Metric_plot <- LSM_res[
+        LSM_res$level == "class" &
+          LSM_res$metric == metric_name &
+          LSM_res$Year == "2060" &
+          LSM_res$LULC != "Glacier",
+      ] |>
+        ggplot() +
+        geom_point(
+          aes(x = Scenario, y = value, colour = LULC),
+          alpha = 0.7,
+          size = 2
+        ) +
+        labs(
+          y = unlist(All_lsms[All_lsms$metric == metric_name, "units"]),
+          x = "Scenario",
+          colour = "LULC class",
+          # title = All_lsms[All_lsms$Metric_abb == metric_name, "Metric_clean_name"]
+        ) +
+        theme(
+          text = element_text(family = "Times New Roman"),
+          plot.title = element_text(size = rel(1.1), hjust = -0.45),
+          axis.line = element_line(1),
+          panel.background = element_blank(),
+          axis.text = element_text(colour = "black"),
+          axis.text.x = element_text(size = 7),
+          legend.title = element_text(size = 8, face = "bold"), # change legend title font size
+          legend.text = element_text(size = 8), # change legend text font size
+          legend.key = element_rect(fill = "white", colour = "white"),
+          legend.title.align = 0.5,
+          legend.position = "right"
+        ) +
+        scale_colour_manual(name = "LULC class", values = unlist(pal))
 
-  class_plots <- lapply(unlist(unique(LSM_res[LSM_res$level == "class", "metric"])), function(metric_name) {
-    Metric_plot <- LSM_res[LSM_res$level == "class" & LSM_res$metric == metric_name & LSM_res$Year == "2060" & LSM_res$LULC != "Glacier", ] |> ggplot() +
-      geom_point(aes(x = Scenario, y = value, colour = LULC), alpha = 0.7, size = 2) +
-      labs(
-        y = unlist(All_lsms[All_lsms$metric == metric_name, "units"]),
-        x = "Scenario",
-        colour = "LULC class",
-        # title = All_lsms[All_lsms$Metric_abb == metric_name, "Metric_clean_name"]
-      ) +
-      theme(
-        text = element_text(family = "Times New Roman"),
-        plot.title = element_text(size = rel(1.1), hjust = -0.45),
-        axis.line = element_line(1),
-        panel.background = element_blank(),
-        axis.text = element_text(colour = "black"),
-        axis.text.x = element_text(size = 7),
-        legend.title = element_text(size = 8, face = "bold"), # change legend title font size
-        legend.text = element_text(size = 8), # change legend text font size
-        legend.key = element_rect(fill = "white", colour = "white"),
-        legend.title.align = 0.5,
-        legend.position = "right"
-      ) +
-      scale_colour_manual(name = "LULC class", values = unlist(pal))
-
-
-    ggsave(
-      plot = Metric_plot,
-      filename = paste0(LSM_dir, "/class_", metric_name, "_plot.tif"),
-      device = "tiff",
-      dpi = 300
-    )
-    # ,  width = 17, height = 17, units = "cm"
-    return(Metric_plot)
-  })
+      ggsave(
+        plot = Metric_plot,
+        filename = paste0(LSM_dir, "/class_", metric_name, "_plot.tif"),
+        device = "tiff",
+        dpi = 300
+      )
+      # ,  width = 17, height = 17, units = "cm"
+      return(Metric_plot)
+    }
+  )
 }

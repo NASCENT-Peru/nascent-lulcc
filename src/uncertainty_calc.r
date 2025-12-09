@@ -14,14 +14,38 @@ uncertainty_calc <- function() {
 
   # Install packages if they are not already installed
   packs <- c(
-    "data.table", "stringi", "stringr", "rlist", # Data management and processing
-    "randomForest", "RRF", "butcher", # Core modelling
-    "ROCR", "ecospat", "caret", "foreach", "doMC", "data.table", "raster", "tidyverse",
-    "testthat", "sjmisc", "tictoc", "lulcc", "pbapply", "stringr", "readr", "openxlsx", "readxl", "future", "future.apply"
+    "data.table",
+    "stringi",
+    "stringr",
+    "rlist", # Data management and processing
+    "randomForest",
+    "RRF",
+    "butcher", # Core modelling
+    "ROCR",
+    "ecospat",
+    "caret",
+    "foreach",
+    "doMC",
+    "data.table",
+    "raster",
+    "tidyverse",
+    "testthat",
+    "sjmisc",
+    "tictoc",
+    "lulcc",
+    "pbapply",
+    "stringr",
+    "readr",
+    "openxlsx",
+    "readxl",
+    "future",
+    "future.apply"
   ) # Model evaluation
 
   new.packs <- packs[!(packs %in% installed.packages()[, "Package"])]
-  if (length(new.packs)) install.packages(new.packs)
+  if (length(new.packs)) {
+    install.packages(new.packs)
+  }
 
   # Load required packages
   invisible(lapply(packs, require, character.only = TRUE))
@@ -36,7 +60,9 @@ uncertainty_calc <- function() {
   # manually using the terminal node IDs
 
   # load an exemplar data set
-  exp_data <- readRDS("Data/Transition_datasets/Post_predictor_filtering/Period_2009_2018_filtered_predictors_regionalized")[[1]]
+  exp_data <- readRDS(
+    "Data/Transition_datasets/Post_predictor_filtering/Period_2009_2018_filtered_predictors_regionalized"
+  )[[1]]
 
   # bind independent and dependent variables for train/test split
   exp_data <- cbind(exp_data$trans_result, exp_data$cov_data)
@@ -44,7 +70,11 @@ uncertainty_calc <- function() {
 
   # split into train and test
   exp_data$sid <- 1:nrow(exp_data) # add numeric ID
-  chc <- dplyr::slice_sample(dplyr::group_by(exp_data, transitions_result), prop = 0.7, replace = FALSE)
+  chc <- dplyr::slice_sample(
+    dplyr::group_by(exp_data, transitions_result),
+    prop = 0.7,
+    replace = FALSE
+  )
   train <- exp_data[chc$sid, ]
   test <- exp_data[-chc$sid, ]
   train$sid <- NULL
@@ -88,8 +118,10 @@ uncertainty_calc <- function() {
         # perform Laplace correction and then calculate shannon entropy
         # over both class values
         LPC_probs <- c(
-          (sum(train[train_indices, "transitions_result"] == 0) + 1) / (length(train_indices) + 2),
-          (sum(train[train_indices, "transitions_result"] == 1) + 1) / (length(train_indices) + 2)
+          (sum(train[train_indices, "transitions_result"] == 0) + 1) /
+            (length(train_indices) + 2),
+          (sum(train[train_indices, "transitions_result"] == 1) + 1) /
+            (length(train_indices) + 2)
         )
 
         Shannon_Entropy <- sum(sapply(LPC_probs, function(p) {
@@ -109,15 +141,24 @@ uncertainty_calc <- function() {
   plan(sequential)
 
   # flatten the nested list into a DF
-  Entropy_table <- rbindlist(lapply(Prob_preds_training, function(x) {
-    df <- data.frame(matrix(unlist(x), nrow = length(x), byrow = TRUE), stringsAsFactors = FALSE)
-    names(df) <- c("Prob_0", "Prob_1", "Entropy")
-    df$Node_ID <- names(x)
-    return(df)
-  }), idcol = "Tree_num")
+  Entropy_table <- rbindlist(
+    lapply(Prob_preds_training, function(x) {
+      df <- data.frame(
+        matrix(unlist(x), nrow = length(x), byrow = TRUE),
+        stringsAsFactors = FALSE
+      )
+      names(df) <- c("Prob_0", "Prob_1", "Entropy")
+      df$Node_ID <- names(x)
+      return(df)
+    }),
+    idcol = "Tree_num"
+  )
 
   # save
-  saveRDS(Entropy_table, "E:/LULCC_CH/Scripts/Testing_scripts/Exemplar_entropy_table.rds")
+  saveRDS(
+    Entropy_table,
+    "E:/LULCC_CH/Scripts/Testing_scripts/Exemplar_entropy_table.rds"
+  )
 
   ### =========================================================================
   ### C- Calculating probabilistic predictions/entropy using ranger package
@@ -129,7 +170,9 @@ uncertainty_calc <- function() {
   # to the process above because it means we only need to calculate Entropy.
 
   # load an exemplar data set
-  exp_data <- readRDS("Data/Transition_datasets/Post_predictor_filtering/Period_2009_2018_filtered_predictors_regionalized")[[1]]
+  exp_data <- readRDS(
+    "Data/Transition_datasets/Post_predictor_filtering/Period_2009_2018_filtered_predictors_regionalized"
+  )[[1]]
 
   # bind independent and dependent variables for train/test split
   exp_data <- cbind(exp_data$trans_result, exp_data$cov_data)
@@ -137,7 +180,11 @@ uncertainty_calc <- function() {
 
   # split into train and test
   exp_data$sid <- 1:nrow(exp_data) # add numeric ID
-  chc <- dplyr::slice_sample(dplyr::group_by(exp_data, transitions_result), prop = 0.7, replace = FALSE)
+  chc <- dplyr::slice_sample(
+    dplyr::group_by(exp_data, transitions_result),
+    prop = 0.7,
+    replace = FALSE
+  )
   train <- exp_data[chc$sid, ]
   test <- exp_data[-chc$sid, ]
   train$sid <- NULL
@@ -154,7 +201,6 @@ uncertainty_calc <- function() {
   # TODO: FINISH PREDICTION ON TEST SET, RETURNING TREE WISE PROBABILISTIC
   # PREDICTIONS AND THEN CALCULATE ENTROPY AS ABOVE
 
-
   ### =========================================================================
   ### D- Test calculation of uncertainty using test data: randomForest approach
   ### =========================================================================
@@ -163,7 +209,9 @@ uncertainty_calc <- function() {
   pred_data <- test
 
   # reload the entropy table for the exemplar data
-  Entropy_table <- readRDS("E:/LULCC_CH/Scripts/Testing_scripts/Exemplar_entropy_table.rds")
+  Entropy_table <- readRDS(
+    "E:/LULCC_CH/Scripts/Testing_scripts/Exemplar_entropy_table.rds"
+  )
 
   # run prediction on the data and get the terminal node ID for each instance
   # for each tree in the forest.
@@ -178,57 +226,76 @@ uncertainty_calc <- function() {
   # current version
   # Outer loop over rows of terminal node predictions
   system.time({
-    Uncertainties_calc <- future_lapply(1:nrow(Predict_nodes), function(instance) {
-      # calculate average predicted probability for each class across the models (trees)
-      Instance_records <- rbindlist(lapply(1:ncol(Predict_nodes), function(tree) {
-        Entropy_table[Entropy_table$Node_ID == Predict_nodes[instance, tree] & Entropy_table$Tree_num == tree, ]
-      }))
+    Uncertainties_calc <- future_lapply(
+      1:nrow(Predict_nodes),
+      function(instance) {
+        # calculate average predicted probability for each class across the models (trees)
+        Instance_records <- rbindlist(lapply(
+          1:ncol(Predict_nodes),
+          function(tree) {
+            Entropy_table[
+              Entropy_table$Node_ID == Predict_nodes[instance, tree] &
+                Entropy_table$Tree_num == tree,
+            ]
+          }
+        ))
 
-      # TODO: don't create list from average
-      Average_pred_probs <- list(
-        Average_prob_0_over_trees = sum(Instance_records$Prob_0) / nrow(Instance_records),
-        Average_prob_1_over_trees = sum(Instance_records$Prob_1) / nrow(Instance_records)
-      )
+        # TODO: don't create list from average
+        Average_pred_probs <- list(
+          Average_prob_0_over_trees = sum(Instance_records$Prob_0) /
+            nrow(Instance_records),
+          Average_prob_1_over_trees = sum(Instance_records$Prob_1) /
+            nrow(Instance_records)
+        )
 
-      # TODO: No need to use a loop as the equations is already vectorized
-      # calculate the total uncertainty as the negative sum of the shannon entropies
-      # of the average predicted probabilities for each class
-      Instance_total_unc <- -(sum(sapply(Average_pred_probs, function(p) {
-        Entropy <- p * log10(p)
-        Entropy <- replace(Entropy, is.infinite(Entropy), 0)
-      })))
+        # TODO: No need to use a loop as the equations is already vectorized
+        # calculate the total uncertainty as the negative sum of the shannon entropies
+        # of the average predicted probabilities for each class
+        Instance_total_unc <- -(sum(sapply(Average_pred_probs, function(p) {
+          Entropy <- p * log10(p)
+          Entropy <- replace(Entropy, is.infinite(Entropy), 0)
+        })))
 
-      # calculate aleatoric uncertainty as the average shannon entropy over all models(trees)
-      Instance_aleatoric_unc <- sum(Instance_records$Entropy) / ncol(Predict_nodes)
+        # calculate aleatoric uncertainty as the average shannon entropy over all models(trees)
+        Instance_aleatoric_unc <- sum(Instance_records$Entropy) /
+          ncol(Predict_nodes)
 
-      # Epistemic uncertainty = Total uncertainty - Aleatoric uncertainty
-      Instance_epistemic_unc <- Instance_total_unc - Instance_aleatoric_unc
+        # Epistemic uncertainty = Total uncertainty - Aleatoric uncertainty
+        Instance_epistemic_unc <- Instance_total_unc - Instance_aleatoric_unc
 
-      return(list(
-        Total_unc = Instance_total_unc,
-        Aleatoric_unc = Instance_aleatoric_unc,
-        Epistemic_unc = Instance_epistemic_unc
-      ))
-    }) # close loop over instances
+        return(list(
+          Total_unc = Instance_total_unc,
+          Aleatoric_unc = Instance_aleatoric_unc,
+          Epistemic_unc = Instance_epistemic_unc
+        ))
+      }
+    ) # close loop over instances
   }) # close system.time
   plan(sequential) # close parallel processing
   stop_time <- Sys.time() # stop timer
   stop_time - Start_time # calculate operation time
 
-
   # using a for loop with pre-assignment of vector
   system.time({
     Uncertainties_calc_new <- sapply(1, function(instance) {
       # calculate average predicted probability for each class across the models (trees)
-      Instance_records <- data.frame(matrix(nrow = ncol(Predict_nodes), ncol = 5))
+      Instance_records <- data.frame(matrix(
+        nrow = ncol(Predict_nodes),
+        ncol = 5
+      ))
       for (tree in 1:ncol(Predict_nodes)) {
-        Instance_records[tree, ] <- Entropy_table[Entropy_table$Node_ID == Predict_nodes[instance, tree] & Entropy_table$Tree_num == tree, ]
+        Instance_records[tree, ] <- Entropy_table[
+          Entropy_table$Node_ID == Predict_nodes[instance, tree] &
+            Entropy_table$Tree_num == tree,
+        ]
       }
       colnames(Instance_records) <- colnames(Entropy_table)
 
       Average_pred_probs <- list(
-        Average_prob_0_over_trees = sum(Instance_records$Prob_0) / nrow(Instance_records),
-        Average_prob_1_over_trees = sum(Instance_records$Prob_1) / nrow(Instance_records)
+        Average_prob_0_over_trees = sum(Instance_records$Prob_0) /
+          nrow(Instance_records),
+        Average_prob_1_over_trees = sum(Instance_records$Prob_1) /
+          nrow(Instance_records)
       )
 
       # calculate the total uncertainty as the negative sum of the shannon entropies
@@ -239,7 +306,8 @@ uncertainty_calc <- function() {
       })))
 
       # calculate aleatoric uncertainty as the average shannon entropy over all models(trees)
-      Instance_aleatoric_unc <- sum(Instance_records$Entropy) / ncol(Predict_nodes)
+      Instance_aleatoric_unc <- sum(Instance_records$Entropy) /
+        ncol(Predict_nodes)
 
       # Epistemic uncertainty = Total uncertainty - Aleatoric uncertainty
       Instance_epistemic_unc <- Instance_total_unc - Instance_aleatoric_unc
@@ -290,8 +358,8 @@ uncertainty_calc <- function() {
   # #calculate an example of how many simulated transitions were right and how many wrong
   # #load observed LULC raster
   # Obs_LULC <- raster("E:/LULCC_CH/Data/Historic_LULC/LULC_2018_agg.grd")
-  # Sim_LULC <- raster("E:/LULCC_CH/Results/Dinamica_simulated_LULC/CALIBRATION/v1/simulated_LULC_scenario_CALIBRATION_simID_v1_year_2020.tif")
-  # Sim_LULC_minus_1 <- raster("E:/LULCC_CH/Results/Dinamica_simulated_LULC/CALIBRATION/v1/simulated_LULC_scenario_CALIBRATION_simID_v1_year_2015.tif")
+  # Sim_LULC <- raster("E:/LULCC_CH/outputs/Dinamica_simulated_LULC/CALIBRATION/v1/simulated_LULC_scenario_CALIBRATION_simID_v1_year_2020.tif")
+  # Sim_LULC_minus_1 <- raster("E:/LULCC_CH/outputs/Dinamica_simulated_LULC/CALIBRATION/v1/simulated_LULC_scenario_CALIBRATION_simID_v1_year_2015.tif")
   #
   # Trans <- Sim_LULC != Sim_LULC_minus_1
   # Correct_cells <- Obs_LULC == Sim_LULC

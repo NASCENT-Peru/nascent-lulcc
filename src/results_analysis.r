@@ -6,7 +6,8 @@
 #############################################################################
 results_analysis <- function() {
   # get file paths of end of simulation rasters
-  Final_raster_paths <- list.files("Results/Dinamica_simulated_lulc",
+  Final_raster_paths <- list.files(
+    "outputs/Dinamica_simulated_lulc",
     full.names = TRUE,
     recursive = TRUE,
     pattern = paste(scenario_end)
@@ -17,7 +18,10 @@ results_analysis <- function() {
 
   # load as stack
   Final_lulc_stack <- stack(Final_raster_paths)
-  names(Final_lulc_stack) <- str_match(Final_raster_paths, paste0(scenario_names, collapse = "|"))
+  names(Final_lulc_stack) <- str_match(
+    Final_raster_paths,
+    paste0(scenario_names, collapse = "|")
+  )
 
   # get frequency tables
   Rast_freq <- freq(Final_lulc_stack, merge = TRUE)
@@ -29,18 +33,27 @@ results_analysis <- function() {
   LULC_agg_scheme <- readxl::read_excel(LULC_aggregation_path)
 
   Rast_freq$LULC_name <- sapply(Rast_freq$value, function(x) {
-    unique(LULC_agg_scheme[LULC_agg_scheme$Aggregated_ID == x, "Class_abbreviation"])
+    unique(LULC_agg_scheme[
+      LULC_agg_scheme$Aggregated_ID == x,
+      "Class_abbreviation"
+    ])
   })
 
   # convert cell counts to %'s
   Total_area <- sum(Rast_freq$BAU)
 
   LULC_percs <- Rast_freq
-  LULC_percs[, scenario_names] <- apply(LULC_percs[, scenario_names], c(1, 2), function(x) {
-    (x / Total_area) * 100
-  })
+  LULC_percs[, scenario_names] <- apply(
+    LULC_percs[, scenario_names],
+    c(1, 2),
+    function(x) {
+      (x / Total_area) * 100
+    }
+  )
 
   # check expected glacier amount in 2060
-  Glacier_index <- readRDS("Data/Glacial_change/Scenario_indices/GR_EX_glacial_change.rds")
+  Glacier_index <- readRDS(
+    "Data/Glacial_change/Scenario_indices/GR_EX_glacial_change.rds"
+  )
   Glacier_ncells_2060 <- length(which(Glacier_index[["2060"]] == 1))
 }
