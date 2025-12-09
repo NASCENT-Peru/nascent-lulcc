@@ -23,35 +23,18 @@ models:
   glm:
     parameters:
       penalty:
-        - 0.001
-        - 0.01
-        - 0.1
-        - 1.0
+        - 0.01   # Single stable value for now
       mixture:
-        - 0      # Ridge regression
-        - 0.25   # Mix of ridge and lasso
-        - 0.5    # Balanced elastic net
-        - 0.75   # More lasso-like
-        - 1      # Pure lasso
+        - 1      # Single stable value for now
   
   rf:
     parameters:
       trees:
-        - 100
-        - 200
-        - 500
-        - 1000
+        - 500    # Single stable value
       min_n:
-        - 1
-        - 5
-        - 10
-        - 20
+        - 5      # Single stable value
       mtry:
-        - 2
-        - 4
-        - 6
-        - 8
-        - 10
+        - 4      # Single stable value
       importance: impurity
       replace: true
       sample.fraction: 1.0
@@ -60,28 +43,12 @@ models:
   xgboost:
     parameters:
       trees:
-        - 50
-        - 100
-        - 200
-        - 500
+        - 100    # Single stable value
       tree_depth:
-        - 3
-        - 4
-        - 6
-        - 8
-        - 10
+        - 6      # Single stable value
       learn_rate:
-        - 0.01
-        - 0.05
-        - 0.1
-        - 0.3
+        - 0.1    # Single stable value
       min_n:
-        - 1
-        - 5
-        - 10
-        - 20
+        - 5      # Single stable value
       mtry:
-        - 2
-        - 4
-        - 6
-        - 8
+        - 4      # Single stable value
