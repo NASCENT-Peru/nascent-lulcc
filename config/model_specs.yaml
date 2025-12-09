@@ -23,67 +23,65 @@ models:
   glm:
     parameters:
       penalty:
-        - 0.01    # Single value - no tuning
-        # - 0.001  # Commented out for testing
-        # - 0.1
-        # - 1.0
+        - 0.001
+        - 0.01
+        - 0.1
+        - 1.0
       mixture:
-        - 1       # Single value - no tuning (elastic net = ridge)
-        # - 0
-        # - 0.25
-        # - 0.5
-        # - 0.75
+        - 0      # Ridge regression
+        - 0.25   # Mix of ridge and lasso
+        - 0.5    # Balanced elastic net
+        - 0.75   # More lasso-like
+        - 1      # Pure lasso
   
-  # Comment out RF for now - focus on simpler GLM first
-  # rf:
-  #   parameters:
-  #     trees:
-  #       - 100
-  #       # - 200
-  #       # - 500
-  #       # - 1000
-  #     min_n:
-  #       - 5
-  #       # - 1
-  #       # - 10
-  #       # - 20
-  #     mtry:
-  #       - 4
-  #       # - 2
-  #       # - 6
-  #       # - 8
-  #       # - 10
-  #     importance: impurity
-  #     replace: true
-  #     sample.fraction: 1.0
-  #     seed: 123
+  rf:
+    parameters:
+      trees:
+        - 100
+        - 200
+        - 500
+        - 1000
+      min_n:
+        - 1
+        - 5
+        - 10
+        - 20
+      mtry:
+        - 2
+        - 4
+        - 6
+        - 8
+        - 10
+      importance: impurity
+      replace: true
+      sample.fraction: 1.0
+      seed: 123
   
-  # Comment out XGBoost for now - most complex model
-  # xgboost:
-  #   parameters:
-  #     trees:
-  #       - 100
-  #       # - 50
-  #       # - 200
-  #       # - 500
-  #     tree_depth:
-  #       - 6
-  #       # - 3
-  #       # - 4
-  #       # - 8
-  #       # - 10
-  #     learn_rate:
-  #       - 0.1
-  #       # - 0.01
-  #       # - 0.05
-  #       # - 0.3
-  #     min_n:
-  #       - 5
-  #       # - 1
-  #       # - 10
-  #       # - 20
-  #     mtry:
-  #       - 4
-  #       # - 2
-  #       # - 6
-  #       # - 8
+  xgboost:
+    parameters:
+      trees:
+        - 50
+        - 100
+        - 200
+        - 500
+      tree_depth:
+        - 3
+        - 4
+        - 6
+        - 8
+        - 10
+      learn_rate:
+        - 0.01
+        - 0.05
+        - 0.1
+        - 0.3
+      min_n:
+        - 1
+        - 5
+        - 10
+        - 20
+      mtry:
+        - 2
+        - 4
+        - 6
+        - 8

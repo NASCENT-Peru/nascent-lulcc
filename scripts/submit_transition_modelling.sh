@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=trans-model
 #SBATCH --time=72:00:00
-#SBATCH --cpus-per-task=4
-#SBATCH --mem-per-cpu=32G
+#SBATCH --cpus-per-task=3
+#SBATCH --mem-per-cpu=42G
 #SBATCH --output=logs/trans-model-%j.out
 #SBATCH --error=logs/trans-model-%j.err
 #SBATCH --profile=task
