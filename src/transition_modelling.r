@@ -1838,12 +1838,68 @@ fit_and_save_best_model <- function(
     base::dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   }
 
-  # Save workflow
-  log_msg(sprintf("  Saving model to: %s", output_path), log_file)
+  # Save minimal workflow for prediction
+  log_msg(
+    sprintf("  Preparing minimal model for saving to: %s", output_path),
+    log_file
+  )
+
+  # Create minimal workflow for prediction by extracting only essential components
+  minimal_workflow <- tryCatch(
+    {
+      # Extract the trained recipe from mold (contains preprocessing parameters)
+      # The mold$blueprint$recipe has the actual trained preprocessing steps
+      if (!is.null(final_workflow$pre$mold$blueprint$recipe)) {
+        trained_recipe <- final_workflow$pre$mold$blueprint$recipe
+      } else {
+        trained_recipe <- final_workflow$pre$actions$recipe$recipe
+      }
+
+      # Remove the large template (training data) from recipe if present
+      trained_recipe$template <- NULL
+
+      # Extract the fitted model
+      fitted_model <- final_workflow$fit$fit
+
+      # Create a minimal structure with only what's needed for prediction
+      list(
+        recipe = trained_recipe,
+        model = fitted_model,
+        model_type = best_model_name,
+        response_levels = levels(full_data_clean$response),
+        predictor_names = names(full_data_clean)[
+          names(full_data_clean) != "response"
+        ],
+        # Store essential blueprint info but without the large data
+        blueprint = list(
+          intercept = final_workflow$pre$mold$blueprint$intercept,
+          composition = final_workflow$pre$mold$blueprint$composition,
+          ptypes = final_workflow$pre$mold$blueprint$ptypes
+        ),
+        # Store minimal metadata for reconstruction
+        workflow_class = class(final_workflow),
+        recipe_class = class(trained_recipe),
+        model_class = class(fitted_model)
+      )
+    },
+    error = function(e) {
+      log_msg(
+        sprintf(
+          "  WARNING: Could not create minimal workflow, saving full workflow: %s",
+          e$message
+        ),
+        log_file
+      )
+      final_workflow
+    }
+  )
+
+  log_msg("  Created minimal workflow for efficient storage", log_file)
+
   tryCatch(
     {
-      base::saveRDS(final_workflow, output_path)
-      log_msg(sprintf("Saved final model to: %s", output_path), log_file)
+      base::saveRDS(minimal_workflow, output_path)
+      log_msg(sprintf("Saved minimal model to: %s", output_path), log_file)
     },
     error = function(e) {
       log_msg(sprintf("  ERROR saving model: %s", e$message), log_file)
@@ -1890,15 +1946,109 @@ predict_with_saved_model <- function(model_path, new_data, type = "prob") {
     base::stop("Model file not found: ", model_path)
   }
 
-  workflow_fitted <- base::readRDS(model_path)
+  model_obj <- base::readRDS(model_path)
 
-  # Make predictions
-  if (type == "prob") {
-    predictions <- stats::predict(workflow_fitted, new_data, type = "prob")
-  } else if (type == "class") {
-    predictions <- stats::predict(workflow_fitted, new_data, type = "class")
+  # Check if this is a minimal model or full workflow
+  if (
+    base::is.list(model_obj) &&
+      "recipe" %in% base::names(model_obj) &&
+      "model" %in% base::names(model_obj)
+  ) {
+    # This is a minimal model - reconstruct workflow for prediction
+
+    # Verify predictor columns match
+    if (!base::all(model_obj$predictor_names %in% base::names(new_data))) {
+      missing_predictors <- model_obj$predictor_names[
+        !model_obj$predictor_names %in% base::names(new_data)
+      ]
+      base::stop(
+        "Missing predictor columns in new_data: ",
+        base::paste(missing_predictors, collapse = ", ")
+      )
+    }
+
+    # Select and order predictors to match training
+    new_data_processed <- new_data[, model_obj$predictor_names, drop = FALSE]
+
+    # Apply preprocessing using the saved recipe
+    # The recipe contains the trained preprocessing steps
+    preprocessed_data <- tryCatch(
+      {
+        # Use bake to apply the trained recipe to new data
+        recipes::bake(model_obj$recipe, new_data_processed)
+      },
+      error = function(e) {
+        # If bake fails, try to reconstruct preprocessing manually
+        # This handles cases where the recipe structure is different
+        if (
+          !is.null(model_obj$blueprint) &&
+            model_obj$blueprint$composition == "tibble"
+        ) {
+          # Apply normalization if trained recipe has the parameters
+          processed <- new_data_processed
+          for (i in seq_along(model_obj$recipe$steps)) {
+            step <- model_obj$recipe$steps[[i]]
+            if (
+              "step_normalize" %in%
+                class(step) &&
+                step$trained &&
+                !is.null(step$means)
+            ) {
+              # Apply normalization
+              for (var in names(step$means)) {
+                if (var %in% names(processed)) {
+                  processed[[var]] <- (processed[[var]] - step$means[[var]]) /
+                    step$sds[[var]]
+                }
+              }
+            }
+          }
+          processed
+        } else {
+          base::stop("Error applying preprocessing recipe: ", e$message)
+        }
+      }
+    )
+
+    # Make predictions using the fitted model
+    if (type == "prob") {
+      predictions <- stats::predict(
+        model_obj$model,
+        preprocessed_data,
+        type = "prob"
+      )
+      # Ensure column names match expected format
+      if (base::ncol(predictions) == 2) {
+        base::names(predictions) <- base::paste0(
+          ".pred_",
+          model_obj$response_levels
+        )
+      }
+    } else if (type == "class") {
+      predictions <- stats::predict(
+        model_obj$model,
+        preprocessed_data,
+        type = "class"
+      )
+      # Convert to factor with correct levels
+      predictions <- base::data.frame(
+        .pred_class = base::factor(
+          predictions[[1]],
+          levels = model_obj$response_levels
+        )
+      )
+    } else {
+      base::stop("type must be 'prob' or 'class'")
+    }
   } else {
-    base::stop("type must be 'prob' or 'class'")
+    # This is a full workflow (legacy format)
+    if (type == "prob") {
+      predictions <- stats::predict(model_obj, new_data, type = "prob")
+    } else if (type == "class") {
+      predictions <- stats::predict(model_obj, new_data, type = "class")
+    } else {
+      base::stop("type must be 'prob' or 'class'")
+    }
   }
 
   return(predictions)
