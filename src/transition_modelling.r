@@ -832,9 +832,9 @@ balance_data <- function(
   log_msg(
     sprintf(
       "  Sampling %d minority class, %d majority class (total: %d, ratio: %.2f%%)",
-      n_minority,
-      n_majority,
-      total_size,
+      as.integer(n_minority),
+      as.integer(n_majority),
+      as.integer(total_size),
       100 * n_minority / total_size
     ),
     log_file
@@ -1635,17 +1635,59 @@ fit_and_save_best_model <- function(
 
   # Create model specification with best parameters
   if (best_model_name == "glm") {
+    # Extract parameters safely
+    penalty_val <- if (is.null(best_params$penalty)) {
+      0
+    } else if (is.list(best_params$penalty)) {
+      as.numeric(best_params$penalty[[1]])
+    } else {
+      as.numeric(best_params$penalty)
+    }
+
+    mixture_val <- if (is.null(best_params$mixture)) {
+      1
+    } else if (is.list(best_params$mixture)) {
+      as.numeric(best_params$mixture[[1]])
+    } else {
+      as.numeric(best_params$mixture)
+    }
+
     model_spec <- parsnip::logistic_reg(
-      penalty = best_params$penalty[[1]],
-      mixture = best_params$mixture[[1]]
+      penalty = penalty_val,
+      mixture = mixture_val
     ) %>%
       parsnip::set_engine("glmnet") %>%
       parsnip::set_mode("classification")
   } else if (best_model_name == "rf") {
+    # Extract parameters safely
+    mtry_val <- if (is.null(best_params$mtry)) {
+      NULL
+    } else if (is.list(best_params$mtry)) {
+      as.integer(best_params$mtry[[1]])
+    } else {
+      as.integer(best_params$mtry)
+    }
+
+    trees_val <- if (is.null(best_params$trees)) {
+      500
+    } else if (is.list(best_params$trees)) {
+      as.integer(best_params$trees[[1]])
+    } else {
+      as.integer(best_params$trees)
+    }
+
+    min_n_val <- if (is.null(best_params$min_n)) {
+      5
+    } else if (is.list(best_params$min_n)) {
+      as.integer(best_params$min_n[[1]])
+    } else {
+      as.integer(best_params$min_n)
+    }
+
     model_spec <- parsnip::rand_forest(
-      mtry = best_params$mtry[[1]],
-      trees = best_params$trees[[1]],
-      min_n = best_params$min_n[[1]]
+      mtry = mtry_val,
+      trees = trees_val,
+      min_n = min_n_val
     ) %>%
       parsnip::set_engine(
         "ranger",
@@ -1670,12 +1712,53 @@ fit_and_save_best_model <- function(
       ) %>%
       parsnip::set_mode("classification")
   } else if (best_model_name == "xgboost") {
+    # Extract parameters safely
+    mtry_val <- if (is.null(best_params$mtry)) {
+      NULL
+    } else if (is.list(best_params$mtry)) {
+      as.integer(best_params$mtry[[1]])
+    } else {
+      as.integer(best_params$mtry)
+    }
+
+    trees_val <- if (is.null(best_params$trees)) {
+      100
+    } else if (is.list(best_params$trees)) {
+      as.integer(best_params$trees[[1]])
+    } else {
+      as.integer(best_params$trees)
+    }
+
+    min_n_val <- if (is.null(best_params$min_n)) {
+      5
+    } else if (is.list(best_params$min_n)) {
+      as.integer(best_params$min_n[[1]])
+    } else {
+      as.integer(best_params$min_n)
+    }
+
+    tree_depth_val <- if (is.null(best_params$tree_depth)) {
+      6
+    } else if (is.list(best_params$tree_depth)) {
+      as.integer(best_params$tree_depth[[1]])
+    } else {
+      as.integer(best_params$tree_depth)
+    }
+
+    learn_rate_val <- if (is.null(best_params$learn_rate)) {
+      0.3
+    } else if (is.list(best_params$learn_rate)) {
+      as.numeric(best_params$learn_rate[[1]])
+    } else {
+      as.numeric(best_params$learn_rate)
+    }
+
     model_spec <- parsnip::boost_tree(
-      mtry = best_params$mtry[[1]],
-      trees = best_params$trees[[1]],
-      min_n = best_params$min_n[[1]],
-      tree_depth = best_params$tree_depth[[1]],
-      learn_rate = best_params$learn_rate[[1]]
+      mtry = mtry_val,
+      trees = trees_val,
+      min_n = min_n_val,
+      tree_depth = tree_depth_val,
+      learn_rate = learn_rate_val
     ) %>%
       parsnip::set_engine("xgboost") %>%
       parsnip::set_mode("classification")
