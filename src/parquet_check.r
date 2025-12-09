@@ -140,9 +140,9 @@
 #   con,
 #   "
 #   WITH
-#     static AS (SELECT cell_id, region FROM read_parquet('E:/NASCENT-LULCC/predictors/prepared/parquet_data/static/**/*.parquet')),
-#     dynamic AS (SELECT cell_id, region FROM read_parquet('E:/NASCENT-LULCC/predictors/prepared/parquet_data/dynamic/2018_2022/**/*.parquet')),
-#     trans   AS (SELECT cell_id, region FROM read_parquet('E:/NASCENT-LULCC/transition_datasets/pre_predictor_filtering/2018_2022/transitions_2018_2022.parquet'))
+#     static AS (SELECT cell_id, region FROM read_parquet('E:/nascent-lulcc/predictors/prepared/parquet_data/static/**/*.parquet')),
+#     dynamic AS (SELECT cell_id, region FROM read_parquet('E:/nascent-lulcc/predictors/prepared/parquet_data/dynamic/2018_2022/**/*.parquet')),
+#     trans   AS (SELECT cell_id, region FROM read_parquet('E:/nascent-lulcc/transition_datasets/pre_predictor_filtering/2018_2022/transitions_2018_2022.parquet'))
 
 #   SELECT
 #     s.region AS region,
