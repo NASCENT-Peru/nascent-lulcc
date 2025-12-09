@@ -193,7 +193,7 @@ lulcc.modelprechecks <- function(config = get_config()) {
     model_pre_checks <- c(
       model_pre_checks,
       list(list(
-        check = "incorrect_transition_tables",
+        check = "incorrect_transition_rates",
         message = "Transition tables do not match the transitions to be modelled, see result for details",
         result = Trans_tables_correct
       ))

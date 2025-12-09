@@ -19,10 +19,13 @@ get_config <- function(config_file = NULL, force_environment = NULL) {
 
   # Determine config file if not specified
   if (is.null(config_file)) {
+    # Find project root directory (look for DESCRIPTION file or git repo)
+    project_root <- find_project_root()
+
     config_file <- switch(
       environment,
-      "local" = "config/local_config.yaml",
-      "hpc" = "config/hpc_config.yaml",
+      "local" = file.path(project_root, "config", "local_config.yaml"),
+      "hpc" = file.path(project_root, "config", "hpc_config.yaml"),
       stop("Unknown environment: ", environment)
     )
   }
@@ -46,6 +49,48 @@ get_config <- function(config_file = NULL, force_environment = NULL) {
   message("Data base path: ", config$data_basepath)
 
   return(config)
+}
+
+#' Find project root directory
+#'
+#' @return character path to project root
+find_project_root <- function() {
+  # Start from current working directory
+  current_dir <- getwd()
+
+  # Look for indicators of project root
+  root_indicators <- c("DESCRIPTION", ".git", "README.md", "config")
+
+  # Search upward through directory tree
+  search_dir <- current_dir
+  max_levels <- 10 # Prevent infinite loops
+  level <- 0
+
+  while (level < max_levels) {
+    # Check for any root indicator
+    for (indicator in root_indicators) {
+      indicator_path <- file.path(search_dir, indicator)
+      if (file.exists(indicator_path) || dir.exists(indicator_path)) {
+        return(search_dir)
+      }
+    }
+
+    # Move up one directory
+    parent_dir <- dirname(search_dir)
+    if (parent_dir == search_dir) {
+      # Reached filesystem root
+      break
+    }
+    search_dir <- parent_dir
+    level <- level + 1
+  }
+
+  # If not found, use current working directory as fallback
+  warning(
+    "Could not find project root, using current working directory: ",
+    current_dir
+  )
+  return(current_dir)
 }
 
 #' Detect current environment (local vs HPC)
@@ -76,9 +121,17 @@ build_full_config <- function(yaml_config) {
   # Extract base path
   base_path <- yaml_config$data_basepath
 
+  # Get project root for config files
+  project_root <- find_project_root()
+
   # Helper function to build file paths
   build_path <- function(base, ...) {
     file.path(base, ...)
+  }
+
+  # Helper function to build project root paths
+  build_project_path <- function(...) {
+    file.path(project_root, ...)
   }
 
   # Build full configuration list (same structure as original setup.r)
@@ -116,64 +169,41 @@ build_full_config <- function(yaml_config) {
     ),
 
     # Tool file paths
-    LULC_aggregation_path = yaml_config$LULC_aggregation_path,
-    model_specs_path = build_path(
+    LULC_aggregation_path = build_path(
       base_path,
-      yaml_config$tools_dir,
-      yaml_config$model_specs_path
+      yaml_config$LULC_aggregation_path
     ),
-    param_grid_path = build_path(
-      base_path,
-      yaml_config$tools_dir,
-      yaml_config$param_grid_path
-    ),
-    pred_table_path = yaml_config$pred_table_path,
+    model_specs_path = build_project_path(yaml_config$model_specs_path), # Project root path
+    param_grid_path = build_path(base_path, yaml_config$param_grid_path),
+    pred_table_path = build_project_path(yaml_config$pred_table_path), # Project root path
     predict_param_grid_path = build_path(
       base_path,
-      yaml_config$tools_dir,
       yaml_config$predict_param_grid_path
     ),
     predict_model_specs_path = build_path(
       base_path,
-      yaml_config$tools_dir,
       yaml_config$predict_model_specs_path
     ),
-    ancillary_data_table = yaml_config$ancillary_data_table,
-    spat_ints_path = build_path(
-      base_path,
-      yaml_config$tools_dir,
-      yaml_config$spat_ints_path
-    ),
+    ancillary_data_table = build_project_path(yaml_config$ancillary_data_table), # Project root path
+    spat_ints_path = build_path(base_path, yaml_config$spat_ints_path),
     viable_transitions_lists = build_path(
       base_path,
-      yaml_config$tools_dir,
       yaml_config$viable_transitions_lists
     ),
-    model_lookup_path = build_path(
-      base_path,
-      yaml_config$tools_dir,
-      yaml_config$model_lookup_path
-    ),
+    model_lookup_path = build_path(base_path, yaml_config$model_lookup_path),
     glacial_area_change_xlsx = build_path(
       base_path,
-      yaml_config$tools_dir,
       yaml_config$glacial_area_change_xlsx
     ),
     scenario_area_mods_csv = build_path(
       base_path,
-      yaml_config$tools_dir,
       yaml_config$scenario_area_mods_csv
     ),
     calibration_ctrl_tbl_path = build_path(
       base_path,
-      yaml_config$tools_dir,
       yaml_config$calibration_ctrl_tbl_path
     ),
-    ctrl_tbl_path = build_path(
-      base_path,
-      yaml_config$tools_dir,
-      yaml_config$ctrl_tbl_path
-    ),
+    ctrl_tbl_path = build_path(base_path, yaml_config$ctrl_tbl_path),
 
     # Spatial reference
     ref_grid_path = build_path(base_path, yaml_config$ref_grid_path),
@@ -254,17 +284,17 @@ build_full_config <- function(yaml_config) {
     # Transition directories
     trans_rate_table_dir = build_path(
       base_path,
-      "transition_tables",
+      "transition_rates",
       "prepared_trans_tables"
     ),
     trans_rates_raw_dir = build_path(
       base_path,
-      "transition_tables",
+      "transition_rates",
       "raw_trans_tables"
     ),
     trans_rate_extrapol_dir = build_path(
       base_path,
-      "transition_tables",
+      "transition_rates",
       "extrapolations"
     ),
     best_trans_area_tables = build_path(

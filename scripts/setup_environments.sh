@@ -4,7 +4,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-ENVS_DIR="$PROJECT_ROOT/envs"
+ENVS_DIR="$PROJECT_ROOT/environments"
 
 echo "========================================="
 echo "Setting up LULCC Modeling Environments"

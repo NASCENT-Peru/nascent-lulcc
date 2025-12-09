@@ -13,7 +13,7 @@ dinamica_get_env_vars <- function() {
   LULCC_M_REF_GRID <- "data/ref_grid.gri"
   LULCC_M_CAL_PARAM_DIR <- "data/allocation_parameters/calibration"
   LULCC_M_SIM_PARAM_DIR <- "data/allocation_parameters/simulation"
-  LULCC_M_RATE_TABLE_DIR <- "data/transition_tables/prepared_trans_tables"
+  LULCC_M_RATE_TABLE_DIR <- "data/transition_rates/prepared_trans_tables"
   LULCC_M_SIM_CONTROL_TABLE <- "tools/simulation_control.csv"
   LULCC_M_SPAT_INTS_TABLE <- "tools/spatial_interventions.csv"
   LULCC_M_EI_INTS_TABLE <- "tools/ei_interventions.xlsx"

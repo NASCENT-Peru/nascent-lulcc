@@ -20,9 +20,9 @@ preds_tools_dir: "predictors/tools"
 # Additional derived directories
 calibration_param_dir: "allocation_parameters/calibration"
 simulation_param_dir: "allocation_parameters/simulation"
-trans_rate_table_dir: "transition_tables/prepared_trans_tables"
-trans_rates_raw_dir: "transition_tables/raw_trans_tables"
-trans_rate_extrapol_dir: "transition_tables/extrapolations"
+trans_rate_table_dir: "transition_rates/prepared_trans_tables"
+trans_rates_raw_dir: "results/transition_identification/raw_trans_tables"
+trans_rate_extrapol_dir: "transition_rates/extrapolations"
 trans_pre_pred_filter_dir: "transition_datasets/pre_predictor_filtering"
 trans_post_pred_filter_dir: "transition_datasets/post_predictor_filtering"
 feature_selection_dir: "results/feature_selection"
@@ -45,25 +45,25 @@ prepped_lyr_path: "predictors/prepared/layers"
 prepped_fte_dir: "predictors/prepared/socio_economic/employment"
 prepped_pred_stacks: "predictors/prepared/stacks"
 
-# Tool file paths (relative to project root or data_basepath)
+# Tool file paths (relative to data_basepath unless specified otherwise)
 LULC_aggregation_path: "tools/lulc_schema.json"
-model_specs_path: "tools/model_specs.yaml"
+model_specs_path: "config/model_specs.yaml"  # Project root - resolved by R code
 param_grid_path: "tools/param-grid.xlsx"
-pred_table_path: "inst/pred_data.yaml"
+pred_table_path: "config/pred_data.yaml"     # Project root - resolved by R code
 predict_param_grid_path: "tools/predict_param_grid.xlsx"
 predict_model_specs_path: "tools/predict_model_specs.csv"
 spat_ints_path: "tools/spatial_interventions.csv"
-viable_transitions_lists: "tools/viable_transitions_lists.rds"
+viable_transitions_lists: "results/transition_identification/viable_transitions_lists.rds"
 model_lookup_path: "tools/model_lookup.xlsx"
 glacial_area_change_xlsx: "tools/glacial_area_change.xlsx"
 scenario_area_mods_csv: "tools/simulation_lulc_areas_2060.csv"
 calibration_ctrl_tbl_path: "tools/calibration_control.csv"
 ctrl_tbl_path: "tools/simulation_control.csv"
-ancillary_data_table: "inst/ancillary_data.yaml"
+ancillary_data_table: "config/ancillary_data.yaml"  # Project root - resolved by R code
 ref_grid_path: "spatial_reference_grid/ref_grid.tif"
 
 # Derived file paths (relative to data_basepath)
-best_trans_area_tables: "transition_tables/best_area_tables.rds"
+best_trans_area_tables: "transition_rates/best_area_tables.rds"
 pred_db_path: "predictors/prepared/predictor_database.duckdb"
 bioreg_zip_local: "regionalization/biogeographische_regionen.zip"
 
