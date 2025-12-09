@@ -402,10 +402,16 @@ model_single_transition <- function(
     use_regions,
     log_file = log_file
   )
+
+  # Debug: Count actual transitions in raw data
+  raw_transitions_count <- sum(trans_df$response == 1, na.rm = TRUE)
+  raw_total_count <- nrow(trans_df)
+
   log_msg(
     sprintf(
-      "  Loaded transition data: %d rows\n",
-      nrow(trans_df)
+      "  Loaded transition data: %d total rows, %d transitions (1's) in raw data\n",
+      raw_total_count,
+      raw_transitions_count
     ),
     log_file
   )
@@ -1177,7 +1183,7 @@ tune_model <- function(
   log_file = NULL
 ) {
   # Create tuning grid
-  param_grid <- create_tuning_grid(wf, model_config, train_data)
+  param_grid <- create_tuning_grid(wf, model_config, train_data, log_file)
 
   log_msg(
     base::sprintf(
@@ -1288,10 +1294,10 @@ create_tuning_grid <- function(
     if (base::nrow(needs_finalization) > 0) {
       # Finalize parameters using the training data
       # Get number of predictors (excluding response variable)
-      n_predictors <- base::ncol(train_data) - 1
+      n_predictors <- base::ncol(train_dat) - 1
 
       param_set <- param_set %>%
-        dials::finalize(train_data %>% dplyr::select(-response))
+        dials::finalize(train_dat %>% dplyr::select(-response))
 
       log_msg(
         base::sprintf(
@@ -1332,7 +1338,7 @@ create_tuning_grid <- function(
 
   # Filter grid to ensure mtry values are valid (if mtry is being tuned)
   if ("mtry" %in% base::names(grid)) {
-    n_predictors <- base::ncol(train_data) - 1
+    n_predictors <- base::ncol(train_dat) - 1
     grid <- grid %>%
       dplyr::filter(mtry <= n_predictors)
 
@@ -1377,35 +1383,52 @@ create_metric_set <- function(metrics_config) {
     metric_names <- base::unlist(metric_names)
   }
 
-  metric_functions <- base::list(
-    roc_auc = yardstick::roc_auc(event_level = "second"),
-    accuracy = yardstick::accuracy,
-    precision = yardstick::precision,
-    recall = yardstick::recall,
-    f_meas = yardstick::f_meas,
-    kap = yardstick::kap,
-    mcc = yardstick::mcc,
-    specificity = yardstick::specificity,
-    sensitivity = yardstick::sensitivity
+  # Available metric functions
+  available_metrics <- base::c(
+    "roc_auc",
+    "accuracy",
+    "precision",
+    "recall",
+    "f_meas",
+    "kap",
+    "mcc",
+    "specificity",
+    "sensitivity"
   )
 
-  # Validate that all requested metrics are available
-  invalid_metrics <- metric_names[
-    !metric_names %in% base::names(metric_functions)
-  ]
+  # Validate requested metrics
+  invalid_metrics <- metric_names[!metric_names %in% available_metrics]
   if (base::length(invalid_metrics) > 0) {
     base::warning(base::sprintf(
       "Unknown metrics: %s. These will be ignored.",
       base::paste(invalid_metrics, collapse = ", ")
     ))
-    metric_names <- metric_names[
-      metric_names %in% base::names(metric_functions)
-    ]
+    metric_names <- metric_names[metric_names %in% available_metrics]
   }
 
-  selected_metrics <- metric_functions[metric_names]
-
-  base::do.call(yardstick::metric_set, selected_metrics)
+  # Build the metric set call manually to avoid issues with pre-configured functions
+  if ("roc_auc" %in% metric_names && "accuracy" %in% metric_names) {
+    yardstick::metric_set(
+      yardstick::roc_auc,
+      yardstick::accuracy,
+      yardstick::precision,
+      yardstick::recall,
+      yardstick::f_meas
+    )
+  } else if ("roc_auc" %in% metric_names) {
+    yardstick::metric_set(
+      yardstick::roc_auc,
+      yardstick::precision,
+      yardstick::recall
+    )
+  } else {
+    yardstick::metric_set(
+      yardstick::accuracy,
+      yardstick::precision,
+      yardstick::recall,
+      yardstick::f_meas
+    )
+  }
 }
 
 #' Calculate test set metrics
@@ -1422,7 +1445,31 @@ calculate_test_metrics <- function(
 ) {
   metrics <- create_metric_set(metrics_config)
 
-  metrics(predictions, truth = response, estimate = .pred_class, .pred_1)
+  # Set global option for event_level to handle binary classification properly
+  old_event_level <- getOption("yardstick.event_level")
+  options(yardstick.event_level = "second")
+
+  result <- tryCatch(
+    {
+      metrics(
+        predictions,
+        truth = response,
+        estimate = .pred_class,
+        .pred_1,
+        event_level = "second"
+      )
+    },
+    finally = {
+      # Restore original option
+      if (is.null(old_event_level)) {
+        options(yardstick.event_level = NULL)
+      } else {
+        options(yardstick.event_level = old_event_level)
+      }
+    }
+  )
+
+  return(result)
 }
 
 #' Aggregate results across replicates
