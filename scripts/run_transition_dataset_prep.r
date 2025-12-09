@@ -1,12 +1,12 @@
 #!/usr/bin/env Rscript
-# run_simulation_setup.r
-# Run calibration and spatial interventions preparation for Dinamica simulations
+# run_transition_dataset_prep.r
+# Run transition dataset preparation
 
 # Capture start time
 start_time <- Sys.time()
 
 cat("\n========================================\n")
-cat("Starting Simulation Setup Pipeline\n")
+cat("Starting Transition Dataset Preparation\n")
 cat("========================================\n\n")
 
 # Diagnostics: show R used and library paths
@@ -25,11 +25,7 @@ required_pkgs <- c(
   "yaml",
   "jsonlite",
   "arrow",
-  "tibble",
-  "tidyselect",
-  "tidyr",
-  "purrr",
-  "terra"
+  "tibble"
 )
 
 missing_pkgs <- setdiff(required_pkgs, rownames(installed.packages()))
@@ -90,8 +86,7 @@ cat(sprintf("Working directory set to: %s\n", getwd()))
 src_files <- c(
   "src/setup.r",
   "src/utils.r",
-  "src/calibrate_allocation_parameters.r",
-  "src/spatial_interventions_prep.r"
+  "src/transition_dataset_prep.r"
 )
 
 for (src_file in src_files) {
@@ -123,98 +118,41 @@ config <- tryCatch(
 
 cat("Configuration loaded successfully.\n\n")
 
-# Run simulation setup pipeline steps in sequence
-steps <- list(
-  list(
-    name = "Calibrate Allocation Parameters",
-    func = function() calibrate_allocation_parameters(config = config)
-  ),
-  list(
-    name = "Prepare Spatial Interventions",
-    func = function() spatial_interventions_prep(config = config)
-  )
-)
+# Run transition dataset preparation
+cat("========================================\n")
+cat("Running Transition Dataset Preparation\n")
+cat("========================================\n")
 
-# Execute each step
-results <- data.frame(
-  step = character(0),
-  status = character(0),
-  error_msg = character(0),
-  runtime_mins = numeric(0)
-)
-
-for (i in seq_along(steps)) {
-  step <- steps[[i]]
-  cat(sprintf("\n========================================\n"))
-  cat(sprintf("Step %d: %s\n", i, step$name))
-  cat(sprintf("========================================\n"))
-
-  step_start <- Sys.time()
-
-  result <- tryCatch(
-    {
-      step$func()
-      list(status = "success", error = NA)
-    },
-    error = function(e) {
-      cat(sprintf("ERROR in %s: %s\n", step$name, e$message))
-      list(status = "error", error = e$message)
-    }
-  )
-
-  step_end <- Sys.time()
-  runtime <- as.numeric(difftime(step_end, step_start, units = "mins"))
-
-  results <- rbind(
-    results,
-    data.frame(
-      step = step$name,
-      status = result$status,
-      error_msg = ifelse(is.na(result$error), "", result$error),
-      runtime_mins = runtime
-    )
-  )
-
-  cat(sprintf("Step completed: %s (%.2f minutes)\n", result$status, runtime))
-
-  if (result$status == "error") {
-    cat(sprintf("STOPPING pipeline due to error in: %s\n", step$name))
-    break
+result <- tryCatch(
+  {
+    transition_dataset_prep(config = config)
+    list(status = "success", error = NA)
+  },
+  error = function(e) {
+    cat(sprintf("ERROR in Transition Dataset Preparation: %s\n", e$message))
+    list(status = "error", error = e$message)
   }
-}
+)
 
-# Report final results
+# Report results
 end_time <- Sys.time()
 total_elapsed <- difftime(end_time, start_time, units = "mins")
 
 cat("\n========================================\n")
-cat("Simulation Setup Pipeline Summary\n")
+cat("Transition Dataset Preparation Summary\n")
 cat("========================================\n")
 cat(sprintf("Total runtime: %.2f minutes\n", as.numeric(total_elapsed)))
-cat(sprintf("Successful steps: %d\n", sum(results$status == "success")))
-cat(sprintf("Failed steps: %d\n", sum(results$status == "error")))
+cat(sprintf("Status: %s\n", result$status))
 
-if (nrow(results) > 0) {
-  cat("\nStep-by-step results:\n")
-  for (i in 1:nrow(results)) {
-    status_symbol <- ifelse(results$status[i] == "success", "✓", "✗")
-    cat(sprintf(
-      "  %s %-35s (%.2f min)\n",
-      status_symbol,
-      results$step[i],
-      results$runtime_mins[i]
-    ))
-    if (results$status[i] == "error" && results$error_msg[i] != "") {
-      cat(sprintf("    Error: %s\n", results$error_msg[i]))
-    }
-  }
+if (result$status == "error" && !is.na(result$error)) {
+  cat(sprintf("Error: %s\n", result$error))
 }
 
 # Save summary
 summary_file <- file.path(
   "logs",
   sprintf(
-    "simulation_setup_summary_%s.txt",
+    "transition_dataset_prep_summary_%s.txt",
     Sys.getenv("SLURM_JOB_ID", unset = "local")
   )
 )
@@ -228,27 +166,18 @@ cat(sprintf("Job ID: %s\n", Sys.getenv("SLURM_JOB_ID", unset = "local")))
 cat(sprintf("Start time: %s\n", start_time))
 cat(sprintf("End time: %s\n", end_time))
 cat(sprintf("Runtime: %.2f minutes\n", as.numeric(total_elapsed)))
-cat(sprintf("Successful steps: %d\n", sum(results$status == "success")))
-cat(sprintf("Failed steps: %d\n", sum(results$status == "error")))
-if (sum(results$status == "error") > 0) {
-  cat("\nFailed steps:\n")
-  failed_steps <- results[results$status == "error", ]
-  for (i in 1:nrow(failed_steps)) {
-    cat(sprintf(
-      "  - %s: %s\n",
-      failed_steps$step[i],
-      failed_steps$error_msg[i]
-    ))
-  }
+cat(sprintf("Status: %s\n", result$status))
+if (result$status == "error" && !is.na(result$error)) {
+  cat(sprintf("Error: %s\n", result$error))
 }
 sink()
 
 cat(sprintf("\nSummary saved to: %s\n", summary_file))
 
 # Exit with appropriate code
-exit_code <- ifelse(sum(results$status == "error") > 0, 1, 0)
+exit_code <- ifelse(result$status == "error", 1, 0)
 cat(sprintf(
-  "\nSimulation setup pipeline completed with exit code: %d\n",
+  "\nTransition dataset preparation completed with exit code: %d\n",
   exit_code
 ))
 quit(status = exit_code)

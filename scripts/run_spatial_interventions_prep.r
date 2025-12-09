@@ -1,12 +1,12 @@
 #!/usr/bin/env Rscript
-# run_model_finalization.r
-# Run model evaluation, finalization, and deterministic transition preparation
+# run_spatial_interventions_prep.r
+# Run spatial interventions preparation
 
 # Capture start time
 start_time <- Sys.time()
 
 cat("\n========================================\n")
-cat("Starting Model Finalization Pipeline\n")
+cat("Starting Spatial Interventions Preparation\n")
 cat("========================================\n\n")
 
 # Diagnostics: show R used and library paths
@@ -28,7 +28,8 @@ required_pkgs <- c(
   "tibble",
   "tidyselect",
   "tidyr",
-  "purrr"
+  "purrr",
+  "terra"
 )
 
 missing_pkgs <- setdiff(required_pkgs, rownames(installed.packages()))
@@ -89,10 +90,7 @@ cat(sprintf("Working directory set to: %s\n", getwd()))
 src_files <- c(
   "src/setup.r",
   "src/utils.r",
-  "src/transition_model_evaluation.r",
-  "src/lulcc.finalisemodelspecifications.r",
-  "src/trans_model_finalization.r",
-  "src/deterministic_trans_prep.r"
+  "src/spatial_interventions_prep.r"
 )
 
 for (src_file in src_files) {
@@ -124,108 +122,41 @@ config <- tryCatch(
 
 cat("Configuration loaded successfully.\n\n")
 
-# Run model finalization pipeline steps in sequence
-steps <- list(
-  list(
-    name = "Model Evaluation",
-    func = function() transition_model_evaluation(config = config)
-  ),
-  list(
-    name = "Finalize Model Specifications",
-    func = function() lulcc.finalisemodelspecifications(config = config)
-  ),
-  list(
-    name = "Final Model Training",
-    func = function() {
-      trans_model_finalization(config = config, refresh_cache = FALSE)
-    }
-  ),
-  list(
-    name = "Deterministic Transition Preparation",
-    func = function() deterministic_trans_prep(config = config)
-  )
-)
+# Run spatial interventions preparation
+cat("========================================\n")
+cat("Running Spatial Interventions Preparation\n")
+cat("========================================\n")
 
-# Execute each step
-results <- data.frame(
-  step = character(0),
-  status = character(0),
-  error_msg = character(0),
-  runtime_mins = numeric(0)
-)
-
-for (i in seq_along(steps)) {
-  step <- steps[[i]]
-  cat(sprintf("\n========================================\n"))
-  cat(sprintf("Step %d: %s\n", i, step$name))
-  cat(sprintf("========================================\n"))
-
-  step_start <- Sys.time()
-
-  result <- tryCatch(
-    {
-      step$func()
-      list(status = "success", error = NA)
-    },
-    error = function(e) {
-      cat(sprintf("ERROR in %s: %s\n", step$name, e$message))
-      list(status = "error", error = e$message)
-    }
-  )
-
-  step_end <- Sys.time()
-  runtime <- as.numeric(difftime(step_end, step_start, units = "mins"))
-
-  results <- rbind(
-    results,
-    data.frame(
-      step = step$name,
-      status = result$status,
-      error_msg = ifelse(is.na(result$error), "", result$error),
-      runtime_mins = runtime
-    )
-  )
-
-  cat(sprintf("Step completed: %s (%.2f minutes)\n", result$status, runtime))
-
-  if (result$status == "error") {
-    cat(sprintf("STOPPING pipeline due to error in: %s\n", step$name))
-    break
+result <- tryCatch(
+  {
+    spatial_interventions_prep(config = config)
+    list(status = "success", error = NA)
+  },
+  error = function(e) {
+    cat(sprintf("ERROR in Spatial Interventions Preparation: %s\n", e$message))
+    list(status = "error", error = e$message)
   }
-}
+)
 
-# Report final results
+# Report results
 end_time <- Sys.time()
 total_elapsed <- difftime(end_time, start_time, units = "mins")
 
 cat("\n========================================\n")
-cat("Model Finalization Pipeline Summary\n")
+cat("Spatial Interventions Preparation Summary\n")
 cat("========================================\n")
 cat(sprintf("Total runtime: %.2f minutes\n", as.numeric(total_elapsed)))
-cat(sprintf("Successful steps: %d\n", sum(results$status == "success")))
-cat(sprintf("Failed steps: %d\n", sum(results$status == "error")))
+cat(sprintf("Status: %s\n", result$status))
 
-if (nrow(results) > 0) {
-  cat("\nStep-by-step results:\n")
-  for (i in 1:nrow(results)) {
-    status_symbol <- ifelse(results$status[i] == "success", "✓", "✗")
-    cat(sprintf(
-      "  %s %-35s (%.2f min)\n",
-      status_symbol,
-      results$step[i],
-      results$runtime_mins[i]
-    ))
-    if (results$status[i] == "error" && results$error_msg[i] != "") {
-      cat(sprintf("    Error: %s\n", results$error_msg[i]))
-    }
-  }
+if (result$status == "error" && !is.na(result$error)) {
+  cat(sprintf("Error: %s\n", result$error))
 }
 
 # Save summary
 summary_file <- file.path(
   "logs",
   sprintf(
-    "model_finalization_summary_%s.txt",
+    "spatial_interventions_prep_summary_%s.txt",
     Sys.getenv("SLURM_JOB_ID", unset = "local")
   )
 )
@@ -239,27 +170,18 @@ cat(sprintf("Job ID: %s\n", Sys.getenv("SLURM_JOB_ID", unset = "local")))
 cat(sprintf("Start time: %s\n", start_time))
 cat(sprintf("End time: %s\n", end_time))
 cat(sprintf("Runtime: %.2f minutes\n", as.numeric(total_elapsed)))
-cat(sprintf("Successful steps: %d\n", sum(results$status == "success")))
-cat(sprintf("Failed steps: %d\n", sum(results$status == "error")))
-if (sum(results$status == "error") > 0) {
-  cat("\nFailed steps:\n")
-  failed_steps <- results[results$status == "error", ]
-  for (i in 1:nrow(failed_steps)) {
-    cat(sprintf(
-      "  - %s: %s\n",
-      failed_steps$step[i],
-      failed_steps$error_msg[i]
-    ))
-  }
+cat(sprintf("Status: %s\n", result$status))
+if (result$status == "error" && !is.na(result$error)) {
+  cat(sprintf("Error: %s\n", result$error))
 }
 sink()
 
 cat(sprintf("\nSummary saved to: %s\n", summary_file))
 
 # Exit with appropriate code
-exit_code <- ifelse(sum(results$status == "error") > 0, 1, 0)
+exit_code <- ifelse(result$status == "error", 1, 0)
 cat(sprintf(
-  "\nModel finalization pipeline completed with exit code: %d\n",
+  "\nSpatial interventions preparation completed with exit code: %d\n",
   exit_code
 ))
 quit(status = exit_code)

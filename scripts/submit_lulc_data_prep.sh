@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=scenario-prep
-#SBATCH --time=18:00:00
+#SBATCH --job-name=lulc-data-prep
+#SBATCH --time=06:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem-per-cpu=16G
-#SBATCH --output=logs/scenario-prep-%j.out
-#SBATCH --error=logs/scenario-prep-%j.err
+#SBATCH --output=logs/lulc-data-prep-%j.out
+#SBATCH --error=logs/lulc-data-prep-%j.err
 #SBATCH --profile=task
 
 # ----------------------------------------------------------
@@ -61,16 +61,16 @@ echo "✓ Using Rscript at: $RSCRIPT_BIN"
 echo
 
 # ----------------------------------------------------------
-# 5) Run scenario preparation pipeline
+# 5) Run LULC data preparation
 # ----------------------------------------------------------
-R_SCRIPT="$SLURM_SUBMIT_DIR/run_scenario_preparation.r"
+R_SCRIPT="$SLURM_SUBMIT_DIR/run_lulc_data_prep.r"
 
 if [ ! -f "$R_SCRIPT" ]; then
-    echo "ERROR: run_scenario_preparation.r not found at: $R_SCRIPT"
+    echo "ERROR: run_lulc_data_prep.r not found at: $R_SCRIPT"
     exit 1
 fi
 
-echo "✓ Running scenario preparation pipeline: $R_SCRIPT"
+echo "✓ Running LULC data preparation: $R_SCRIPT"
 "$RSCRIPT_BIN" --vanilla "$R_SCRIPT"
 EXIT_CODE=$?
 

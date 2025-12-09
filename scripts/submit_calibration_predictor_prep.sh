@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=data-prep
-#SBATCH --time=24:00:00
+#SBATCH --job-name=calibration-predictor-prep
+#SBATCH --time=06:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem-per-cpu=16G
-#SBATCH --output=logs/data-prep-%j.out
-#SBATCH --error=logs/data-prep-%j.err
+#SBATCH --output=logs/calibration-predictor-prep-%j.out
+#SBATCH --error=logs/calibration-predictor-prep-%j.err
 #SBATCH --profile=task
 
 # ----------------------------------------------------------
@@ -61,16 +61,16 @@ echo "✓ Using Rscript at: $RSCRIPT_BIN"
 echo
 
 # ----------------------------------------------------------
-# 5) Run data preparation pipeline
+# 5) Run calibration predictor preparation
 # ----------------------------------------------------------
-R_SCRIPT="$SLURM_SUBMIT_DIR/run_data_preparation.r"
+R_SCRIPT="$SLURM_SUBMIT_DIR/run_calibration_predictor_prep.r"
 
 if [ ! -f "$R_SCRIPT" ]; then
-    echo "ERROR: run_data_preparation.r not found at: $R_SCRIPT"
+    echo "ERROR: run_calibration_predictor_prep.r not found at: $R_SCRIPT"
     exit 1
 fi
 
-echo "✓ Running data preparation pipeline: $R_SCRIPT"
+echo "✓ Running calibration predictor preparation: $R_SCRIPT"
 "$RSCRIPT_BIN" --vanilla "$R_SCRIPT"
 EXIT_CODE=$?
 

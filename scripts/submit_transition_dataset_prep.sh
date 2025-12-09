@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=sim-setup
-#SBATCH --time=12:00:00
+#SBATCH --job-name=transition-dataset-prep
+#SBATCH --time=04:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem-per-cpu=16G
-#SBATCH --output=logs/sim-setup-%j.out
-#SBATCH --error=logs/sim-setup-%j.err
+#SBATCH --output=logs/transition-dataset-prep-%j.out
+#SBATCH --error=logs/transition-dataset-prep-%j.err
 #SBATCH --profile=task
 
 # ----------------------------------------------------------
@@ -22,7 +22,7 @@ eval "$($MAMBA_EXE shell hook -s bash)"
 # ----------------------------------------------------------
 # 2) Activate environment
 # ----------------------------------------------------------
-ENV_PATH="/cluster/scratch/bblack/micromamba/envs/transition_model_env"
+ENV_PATH="/cluster/scratch/bblack/micromamba/envs/feat_select_env"
 
 if [ ! -d "$ENV_PATH" ]; then
     echo "ERROR: environment not found at $ENV_PATH"
@@ -61,16 +61,16 @@ echo "✓ Using Rscript at: $RSCRIPT_BIN"
 echo
 
 # ----------------------------------------------------------
-# 5) Run simulation setup pipeline
+# 5) Run transition dataset preparation
 # ----------------------------------------------------------
-R_SCRIPT="$SLURM_SUBMIT_DIR/run_simulation_setup.r"
+R_SCRIPT="$SLURM_SUBMIT_DIR/run_transition_dataset_prep.r"
 
 if [ ! -f "$R_SCRIPT" ]; then
-    echo "ERROR: run_simulation_setup.r not found at: $R_SCRIPT"
+    echo "ERROR: run_transition_dataset_prep.r not found at: $R_SCRIPT"
     exit 1
 fi
 
-echo "✓ Running simulation setup pipeline: $R_SCRIPT"
+echo "✓ Running transition dataset preparation: $R_SCRIPT"
 "$RSCRIPT_BIN" --vanilla "$R_SCRIPT"
 EXIT_CODE=$?
 
