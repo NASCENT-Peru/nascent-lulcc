@@ -44,16 +44,34 @@ if [ ! -d "$INPUT_DIR" ]; then
     exit 1
 fi
 
-# Load R environment
-echo "Loading R environment..."
+# Load conda environment
+echo "Loading conda and R environment..."
 if [ -f "${HOME}/.bashrc" ]; then
     source "${HOME}/.bashrc"
 fi
 
-# Try to activate conda environment if available
+# Initialize conda for bash (required on some HPC systems)
 if command -v conda &> /dev/null; then
-    echo "Activating conda environment..."
-    conda activate transition_model_env 2>/dev/null || echo "Warning: Could not activate transition_model_env"
+    echo "Initializing conda..."
+    eval "$(conda shell.bash hook)"
+    
+    echo "Activating transition_model_env environment..."
+    conda activate transition_model_env
+    CONDA_EXIT_CODE=$?
+    
+    if [ $CONDA_EXIT_CODE -eq 0 ]; then
+        echo "✓ Successfully activated transition_model_env"
+        echo "Active environment: $CONDA_DEFAULT_ENV"
+    else
+        echo "✗ Failed to activate transition_model_env (exit code: $CONDA_EXIT_CODE)"
+        echo "Available environments:"
+        conda env list
+        exit 1
+    fi
+else
+    echo "✗ Conda not found in PATH"
+    echo "PATH: $PATH"
+    exit 1
 fi
 
 # Check R availability

@@ -48,6 +48,7 @@ dependencies:
   # Additional dependencies for model evaluation
   - r-proc         # ROC curves
   - r-vip          # Variable importance
+  - r-butcher      # Model object trimming
   
   # Optional: Python for any auxiliary scripts
   - python

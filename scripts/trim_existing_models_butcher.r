@@ -31,17 +31,31 @@ if (!dir.exists(input_dir)) {
   quit(status = 1)
 }
 
-# Check and install required packages
-required_packages <- c("butcher")
-for (pkg in required_packages) {
-  if (!requireNamespace(pkg, quietly = TRUE)) {
-    cat(sprintf("Installing %s package...\n", pkg))
-    install.packages(pkg, repos = "https://cloud.r-project.org/")
-  }
-}
+# Check and install required packages with error handling
+butcher_available <- FALSE
+tryCatch(
+  {
+    if (!requireNamespace("butcher", quietly = TRUE)) {
+      cat("Installing butcher package...\n")
+      install.packages(
+        "butcher",
+        repos = "https://cloud.r-project.org/",
+        dependencies = TRUE
+      )
+    }
 
-# Load required packages
-library(butcher)
+    library(butcher)
+    butcher_available <- TRUE
+    cat("✓ Butcher package loaded successfully\n")
+  },
+  error = function(e) {
+    cat("✗ Failed to install/load butcher package:", e$message, "\n")
+    cat("Will use fallback manual trimming approach\n")
+    butcher_available <- FALSE
+  }
+)
+
+cat(sprintf("Butcher package available: %s\n", butcher_available))
 
 # Create backup directory
 if (!dir.exists(backup_dir)) {
