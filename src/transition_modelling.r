@@ -219,22 +219,31 @@ perform_transition_modelling <- function(
 
   # --- Parallel processing of transitions ---
 
-  # Determine number of cores from SLURM or fallback
-  n_cores <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", "4"))
-  message(sprintf(
-    "Using up to %d parallel workers for transition processing",
-    n_cores
-  ))
+  # Determine number of cores from SLURM or fallback (default to 1 for safety)
+  n_cores <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", "1"))
 
-  # Use furrr for parallel map
-  future::plan(multicore, workers = n_cores)
+  # Use safer parallel strategy
+  if (n_cores > 1 && .Platform$OS.type == "unix") {
+    # Use multicore on Unix systems
+    future::plan(future::multicore, workers = n_cores)
+    message(sprintf("Using multicore with %d parallel workers", n_cores))
+  } else if (n_cores > 1) {
+    # Use multisession on Windows (safer)
+    future::plan(future::multisession, workers = n_cores)
+    message(sprintf("Using multisession with %d parallel workers", n_cores))
+  } else {
+    # Single-threaded for safety
+    future::plan(future::sequential)
+    message("Using single-threaded processing")
+  }
+
   options(future.rng.onMisuse = "ignore")
 
   # Build vector of row indices to iterate over
   task_ids <- seq_len(nrow(fs_summary))
 
   message(sprintf(
-    "Starting parallel processing of %d transitions...\n",
+    "Starting processing of %d transitions...\n",
     length(task_ids)
   ))
 
