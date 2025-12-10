@@ -1599,8 +1599,22 @@ aggregate_results <- function(
   ))
 }
 
-# Enhanced model saving with tidypredict support
-# Add this to the beginning of fit_and_save_best_model function
+# Null-coalescing operator for handling NULL values
+`%||%` <- function(lhs, rhs) {
+  if (is.null(lhs)) rhs else lhs
+}
+
+# Simple logging function for enhanced model saving
+log_msg <- function(message, log_file = NULL) {
+  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+  formatted_msg <- sprintf("%s | %s", timestamp, message)
+
+  if (!is.null(log_file)) {
+    cat(formatted_msg, "\n", file = log_file, append = TRUE)
+  } else {
+    cat(formatted_msg, "\n")
+  }
+}
 
 #' Enhanced model saving with tidypredict and butcher support
 #' This creates ultra-minimal model files by using tidypredict when possible
@@ -1615,6 +1629,15 @@ save_minimal_model <- function(
   can_use_tidypredict <- best_model_name %in%
     c("glm", "rf", "xgboost") &&
     requireNamespace("tidypredict", quietly = TRUE)
+
+  log_msg(
+    sprintf(
+      "Model type: %s, tidypredict supported: %s",
+      best_model_name,
+      can_use_tidypredict
+    ),
+    log_file
+  )
 
   if (can_use_tidypredict) {
     log_msg("=== USING TIDYPREDICT FOR ULTRA-MINIMAL STORAGE ===", log_file)
@@ -1750,8 +1773,73 @@ save_minimal_model <- function(
   # Remove training data from recipe
   trained_recipe$template <- NULL
 
-  # Aggressive manual cleanup for ranger models
-  if ("_ranger" %in% class(fitted_model)) {
+  # Debug: Log the fitted model class to diagnose XGBoost detection
+  log_msg(
+    sprintf(
+      "Fitted model class for cleanup: %s",
+      paste(class(fitted_model), collapse = ", ")
+    ),
+    log_file
+  )
+
+  # Check for XGBoost models FIRST (before ranger, as they're more problematic)
+  if (
+    "_xgb.Booster" %in%
+      class(fitted_model) ||
+      any(grepl("xgboost|xgb", class(fitted_model), ignore.case = TRUE))
+  ) {
+    # Special handling for XGBoost models due to serialization issues
+    log_msg(
+      "XGBoost model detected - applying special serialization handling...",
+      log_file
+    )
+
+    tryCatch(
+      {
+        # For XGBoost, we need to serialize the booster object properly
+        if (requireNamespace("xgboost", quietly = TRUE)) {
+          # Check if this is a parsnip xgboost model
+          if ("_xgb.Booster" %in% class(fitted_model)) {
+            # Direct xgboost booster object
+            xgb_model <- fitted_model$fit
+          } else if (
+            !is.null(fitted_model$fit) &&
+              inherits(fitted_model$fit, "xgb.Booster")
+          ) {
+            # Parsnip wrapped xgboost
+            xgb_model <- fitted_model$fit
+          } else {
+            stop("Cannot identify XGBoost model structure")
+          }
+
+          # Serialize the XGBoost model to raw format (this avoids pointer issues)
+          xgb_raw <- xgboost::xgb.save.raw(xgb_model)
+
+          # Replace the fitted model with serialized version + metadata
+          fitted_model$fit <- NULL # Remove problematic booster object
+          fitted_model$xgb_raw <- xgb_raw # Store serialized model
+          fitted_model$xgb_metadata <- list(
+            nfeatures = xgb_model$nfeatures %||% ncol(full_data_clean) - 1,
+            params = xgb_model$params %||% list()
+          )
+
+          log_msg(
+            "✓ Serialized XGBoost model to avoid pointer issues",
+            log_file
+          )
+        } else {
+          stop("xgboost package not available for serialization")
+        }
+      },
+      error = function(e) {
+        log_msg(
+          sprintf("XGBoost serialization failed: %s", e$message),
+          log_file
+        )
+        stop("Cannot serialize XGBoost model: ", e$message)
+      }
+    )
+  } else if ("_ranger" %in% class(fitted_model)) {
     log_msg("Aggressive ranger cleanup...", log_file)
 
     original_size_mb <- as.numeric(object.size(fitted_model)) / (1024^2)
@@ -1810,62 +1898,6 @@ save_minimal_model <- function(
         final_size_mb
       ),
       log_file
-    )
-  } else if (
-    "_xgb.Booster" %in%
-      class(fitted_model) ||
-      any(grepl("xgboost", class(fitted_model), ignore.case = TRUE))
-  ) {
-    # Special handling for XGBoost models due to serialization issues
-    log_msg(
-      "XGBoost model detected - applying special serialization handling...",
-      log_file
-    )
-
-    tryCatch(
-      {
-        # For XGBoost, we need to serialize the booster object properly
-        if (requireNamespace("xgboost", quietly = TRUE)) {
-          # Check if this is a parsnip xgboost model
-          if ("_xgb.Booster" %in% class(fitted_model)) {
-            # Direct xgboost booster object
-            xgb_model <- fitted_model$fit
-          } else if (
-            !is.null(fitted_model$fit) &&
-              inherits(fitted_model$fit, "xgb.Booster")
-          ) {
-            # Parsnip wrapped xgboost
-            xgb_model <- fitted_model$fit
-          } else {
-            stop("Cannot identify XGBoost model structure")
-          }
-
-          # Serialize the XGBoost model to raw format (this avoids pointer issues)
-          xgb_raw <- xgboost::xgb.save.raw(xgb_model)
-
-          # Replace the fitted model with serialized version + metadata
-          fitted_model$fit <- NULL # Remove problematic booster object
-          fitted_model$xgb_raw <- xgb_raw # Store serialized model
-          fitted_model$xgb_metadata <- list(
-            nfeatures = xgb_model$nfeatures %||% ncol(full_data_clean) - 1,
-            params = xgb_model$params %||% list()
-          )
-
-          log_msg(
-            "✓ Serialized XGBoost model to avoid pointer issues",
-            log_file
-          )
-        } else {
-          stop("xgboost package not available for serialization")
-        }
-      },
-      error = function(e) {
-        log_msg(
-          sprintf("XGBoost serialization failed: %s", e$message),
-          log_file
-        )
-        stop("Cannot serialize XGBoost model: ", e$message)
-      }
     )
   }
 
