@@ -350,6 +350,27 @@ aggressive_trim_model <- function(model_obj, filepath) {
     }
   }
 
+  # Final cleanup: remove any NULL elements and compact the object
+  if (length(removed_components) > 0) {
+    cat("    Performing final object cleanup...\n")
+
+    # Function to recursively remove NULL elements
+    clean_nulls <- function(obj) {
+      if (is.list(obj) && !is.data.frame(obj)) {
+        # Remove NULL elements
+        obj <- obj[!sapply(obj, is.null)]
+        # Recursively clean child objects
+        obj <- lapply(obj, clean_nulls)
+      }
+      return(obj)
+    }
+
+    model_obj <- clean_nulls(model_obj)
+
+    # Force garbage collection to compact memory
+    gc(verbose = FALSE)
+  }
+
   final_size <- as.numeric(object.size(model_obj)) / (1024^2)
   reduction <- original_size - final_size
   reduction_pct <- if (original_size > 0) {
@@ -415,14 +436,59 @@ for (i in seq_along(rds_files)) {
         file.copy(filepath, backup_path, overwrite = TRUE)
         cat(" Done\n")
 
-        # Save trimmed model
-        cat("  Saving trimmed model...")
-        saveRDS(model_obj, filepath)
+        # Force garbage collection and object compaction
+        cat("  Forcing garbage collection...")
+        gc(verbose = FALSE)
         cat(" Done\n")
+
+        # Reconstruct the object to ensure proper compaction
+        cat("  Reconstructing object for compaction...")
+        temp_file_reconstruct <- tempfile(fileext = ".rds")
+        saveRDS(model_obj, temp_file_reconstruct, compress = "xz")
+        model_obj <- readRDS(temp_file_reconstruct)
+        unlink(temp_file_reconstruct)
+        cat(" Done\n")
+
+        # Final verification of object size
+        compacted_size <- as.numeric(object.size(model_obj)) / (1024^2)
+        cat(sprintf(
+          "  Object size after compaction: %.1f MB\n",
+          compacted_size
+        ))
+
+        # Save trimmed model with compression
+        cat("  Saving trimmed model...")
+        # Use temporary file first to ensure atomic write
+        temp_filepath <- paste0(filepath, ".tmp")
+        saveRDS(model_obj, temp_filepath, compress = "xz")
+
+        # Replace original file atomically
+        file.rename(temp_filepath, filepath)
+        cat(" Done\n")
+
+        # Force another garbage collection after saving
+        gc(verbose = FALSE)
 
         # Get new file size
         new_file_size <- get_file_size_mb(filepath)
         total_size_after <- total_size_after + new_file_size
+
+        # Verify the saved file by loading it back
+        cat("  Verifying saved file...")
+        tryCatch(
+          {
+            verified_obj <- readRDS(filepath)
+            verified_size <- as.numeric(object.size(verified_obj)) / (1024^2)
+            cat(sprintf(" Done (%.1f MB in memory)\n", verified_size))
+
+            # Clear the verification object
+            rm(verified_obj)
+            gc(verbose = FALSE)
+          },
+          error = function(e) {
+            cat(sprintf(" ERROR: %s\n", e$message))
+          }
+        )
 
         cat(sprintf(
           "  ✓ HEAVILY TRIMMED: %.1f MB → %.1f MB (%.1f%% reduction)\n",
@@ -431,9 +497,14 @@ for (i in seq_along(rds_files)) {
           trim_result$reduction_pct
         ))
         cat(sprintf(
-          "    File size: %.1f MB → %.1f MB\n",
+          "    File size: %.1f MB → %.1f MB (%.1f%% reduction)\n",
           original_file_size,
-          new_file_size
+          new_file_size,
+          if (original_file_size > 0) {
+            ((original_file_size - new_file_size) / original_file_size) * 100
+          } else {
+            0
+          }
         ))
         cat(sprintf(
           "    Removed %d components totaling %.1f MB\n",
