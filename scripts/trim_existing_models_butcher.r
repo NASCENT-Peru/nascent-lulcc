@@ -186,6 +186,28 @@ butcher_trim_model <- function(model_obj, filepath) {
         pred_size
       ))
     }
+
+    # Also remove inbag.counts from workflows
+    if (
+      !is.null(trimmed_obj$fit) &&
+        !is.null(trimmed_obj$fit$fit) &&
+        !is.null(trimmed_obj$fit$fit$fit) &&
+        !is.null(trimmed_obj$fit$fit$fit$inbag.counts)
+    ) {
+      inbag_size <- as.numeric(object.size(
+        trimmed_obj$fit$fit$fit$inbag.counts
+      )) /
+        (1024^2)
+      trimmed_obj$fit$fit$fit$inbag.counts <- NULL
+      operations_performed <- c(
+        operations_performed,
+        sprintf("manual inbag.counts removal (%.1f MB)", inbag_size)
+      )
+      cat(sprintf(
+        "      ✓ Manually removed inbag.counts: %.1f MB\n",
+        inbag_size
+      ))
+    }
   } else if (is_minimal) {
     cat(
       "    Detected minimal model structure - applying targeted butcher operations...\n"
@@ -262,6 +284,26 @@ butcher_trim_model <- function(model_obj, filepath) {
         cat(sprintf(
           "      ✓ Manually removed predictions matrix: %.1f MB\n",
           pred_size
+        ))
+      }
+
+      # Also remove inbag.counts if present (can be large)
+      if (
+        !is.null(trimmed_obj$model$fit) &&
+          !is.null(trimmed_obj$model$fit$inbag.counts)
+      ) {
+        inbag_size <- as.numeric(object.size(
+          trimmed_obj$model$fit$inbag.counts
+        )) /
+          (1024^2)
+        trimmed_obj$model$fit$inbag.counts <- NULL
+        operations_performed <- c(
+          operations_performed,
+          sprintf("manual inbag.counts removal (%.1f MB)", inbag_size)
+        )
+        cat(sprintf(
+          "      ✓ Manually removed inbag.counts: %.1f MB\n",
+          inbag_size
         ))
       }
     }
@@ -392,14 +434,96 @@ for (i in seq_along(rds_files)) {
         gc(verbose = FALSE)
         cat(" Done\n")
 
-        # Save trimmed model with compression
-        cat("  Saving trimmed model...")
-        saveRDS(model_obj, filepath, compress = "xz")
+        # Additional aggressive cleanup before saving
+        cat("  Performing additional cleanup...")
+
+        # Manual cleanup of known problematic components
+        if (inherits(model_obj, "workflow")) {
+          # Check for ranger predictions in workflow
+          if (
+            !is.null(model_obj$fit) &&
+              !is.null(model_obj$fit$fit) &&
+              !is.null(model_obj$fit$fit$fit)
+          ) {
+            if (!is.null(model_obj$fit$fit$fit$predictions)) {
+              cat(" removing workflow predictions...")
+              model_obj$fit$fit$fit$predictions <- NULL
+            }
+            if (!is.null(model_obj$fit$fit$fit$inbag.counts)) {
+              cat(" removing inbag.counts...")
+              model_obj$fit$fit$fit$inbag.counts <- NULL
+            }
+          }
+        } else if (is.list(model_obj) && "model" %in% names(model_obj)) {
+          # Check for ranger predictions in minimal structure
+          if (!is.null(model_obj$model) && !is.null(model_obj$model$fit)) {
+            if (!is.null(model_obj$model$fit$predictions)) {
+              cat(" removing model predictions...")
+              model_obj$model$fit$predictions <- NULL
+            }
+            if (!is.null(model_obj$model$fit$inbag.counts)) {
+              cat(" removing inbag.counts...")
+              model_obj$model$fit$inbag.counts <- NULL
+            }
+          }
+        }
+
         cat(" Done\n")
+
+        # Force garbage collection multiple times
+        cat("  Multiple garbage collections...")
+        for (i in 1:3) {
+          gc(verbose = FALSE)
+        }
+        cat(" Done\n")
+
+        # Get final object size before saving
+        final_obj_size <- as.numeric(object.size(model_obj)) / (1024^2)
+        cat(sprintf(
+          "  Final object size before saving: %.1f MB\n",
+          final_obj_size
+        ))
+
+        # Save trimmed model with maximum compression and timing
+        cat(
+          "  Saving trimmed model (this may take a while for large objects)..."
+        )
+        start_save_time <- Sys.time()
+
+        # Try different compression approaches
+        tryCatch(
+          {
+            saveRDS(model_obj, filepath, compress = "xz")
+          },
+          error = function(e) {
+            cat(" xz failed, trying gzip...")
+            saveRDS(model_obj, filepath, compress = "gzip")
+          }
+        )
+
+        end_save_time <- Sys.time()
+        save_duration <- as.numeric(difftime(
+          end_save_time,
+          start_save_time,
+          units = "secs"
+        ))
+        cat(sprintf(" Done (%.1f seconds)\n", save_duration))
 
         # Get new file size
         new_file_size <- get_file_size_mb(filepath)
         total_size_after <- total_size_after + new_file_size
+
+        # Check if file size actually changed
+        file_size_change <- original_file_size - new_file_size
+        if (abs(file_size_change) < 0.1) {
+          cat(sprintf(
+            "  ⚠️  WARNING: File size barely changed (%.1f MB reduction)\n",
+            file_size_change
+          ))
+          cat(
+            "     This suggests the large components were not successfully removed\n"
+          )
+        }
 
         # Verify the saved file by loading it back
         cat("  Verifying saved file...")
