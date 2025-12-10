@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=trim_models_butcher
-#SBATCH --output=%x_%j.out
-#SBATCH --error=%x_%j.err
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
 #SBATCH --time=03:00:00
 #SBATCH --cpus-per-task=3
 #SBATCH --mem-per-cpu=42G
@@ -90,13 +90,27 @@ cd "$PROJECT_ROOT"
 echo "Current working directory: $(pwd)"
 
 # Verify the R script exists
-if [ ! -f "trim_existing_models_butcher.r" ]; then
-    echo "✗ ERROR: trim_existing_models_butcher.r not found in $(pwd)"
-    echo "Contents of current directory:"
-    ls -la
+if [ ! -f "scripts/trim_existing_models_butcher.r" ]; then
+    echo "✗ ERROR: scripts/trim_existing_models_butcher.r not found in $(pwd)"
+    echo "Contents of scripts directory:"
+    ls -la scripts/
     exit 1
 else
-    echo "✓ Found trim_existing_models_butcher.r"
+    echo "✓ Found scripts/trim_existing_models_butcher.r"
+fi
+
+# Define model directory (adjust this path as needed)
+MODEL_DIR="${PROJECT_ROOT}/models"
+BACKUP_DIR="${PROJECT_ROOT}/models_backup"
+
+# Check if model directory exists
+if [ ! -d "$MODEL_DIR" ]; then
+    echo "✗ ERROR: Model directory not found: $MODEL_DIR"
+    echo "Contents of project root:"
+    ls -la "$PROJECT_ROOT"
+    echo ""
+    echo "Please check if models are stored in a different location and update the MODEL_DIR variable"
+    exit 1
 fi
 
 # Run the model trimming script
@@ -104,8 +118,11 @@ echo ""
 echo "============================================"
 echo "Starting model trimming with butcher package..."
 echo "============================================"
+echo "Model directory: $MODEL_DIR"
+echo "Backup directory: $BACKUP_DIR"
+echo ""
 
-Rscript trim_existing_models_butcher.r
+Rscript scripts/trim_existing_models_butcher.r "$MODEL_DIR" "$BACKUP_DIR"
 
 TRIMMING_EXIT_CODE=$?
 
