@@ -36,7 +36,7 @@ dependencies:
   - r-tidymodels
   - r-ranger       # Random Forest
   - r-glmnet       # Regularized regression
-  - r-xgboost      # Gradient boosting
+  - r-xgboost=1.7  # Gradient boosting - pin to 1.7.x for tidypredict compatibility
   - r-yardstick    # Model evaluation metrics
   - r-tune         # Hyperparameter tuning
   - r-workflows    # modelling workflows
