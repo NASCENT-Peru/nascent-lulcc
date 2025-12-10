@@ -1,17 +1,17 @@
 #!/bin/bash
-#SBATCH --job-name=trim_models_aggressive
-#SBATCH --output=logs/trim_models_aggressive_%j.out
-#SBATCH --error=logs/trim_models_aggressive_%j.err
-#SBATCH --time=04:00:00
+#SBATCH --job-name=trim_models_butcher
+#SBATCH --output=logs/trim_models_butcher_%j.out
+#SBATCH --error=logs/trim_models_butcher_%j.err
+#SBATCH --time=02:00:00
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=32G
+#SBATCH --mem=16G
 #SBATCH --partition=cpu
 
-# trim_existing_models_aggressive.sbatch
-# SLURM batch script to run the aggressive model trimming script on HPC
+# trim_existing_models_butcher.sbatch
+# SLURM batch script to run the butcher model trimming script on HPC
 
 echo "========================================="
-echo "AGGRESSIVE Model Trimming Job"
+echo "BUTCHER Model Trimming Job"
 echo "========================================="
 echo "Job ID: $SLURM_JOB_ID"
 echo "Job Name: $SLURM_JOB_NAME"
@@ -32,7 +32,7 @@ if [ $# -eq 0 ]; then
 fi
 
 INPUT_DIR="$1"
-BACKUP_DIR="${2:-${INPUT_DIR}_backup_aggressive}"
+BACKUP_DIR="${2:-${INPUT_DIR}_backup_butcher}"
 
 echo "Input directory: $INPUT_DIR"
 echo "Backup directory: $BACKUP_DIR"
@@ -66,13 +66,13 @@ echo ""
 echo "Memory information:"
 free -h
 
-# Run the aggressive trimming script
+# Run the butcher trimming script
 echo ""
-echo "Starting AGGRESSIVE model trimming process..."
-echo "This will analyze ALL large components and remove training artifacts"
+echo "Starting BUTCHER model trimming process..."
+echo "Using tidymodels butcher package for consistent model cleanup"
 echo "========================================="
 
-Rscript scripts/trim_existing_models_aggressive.r "$INPUT_DIR" "$BACKUP_DIR"
+Rscript scripts/trim_existing_models_butcher.r "$INPUT_DIR" "$BACKUP_DIR"
 EXIT_CODE=$?
 
 echo ""

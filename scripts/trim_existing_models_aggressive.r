@@ -1,7 +1,16 @@
 #!/usr/bin/env Rscript
 # trim_existing_models_aggressive.r
 # Aggressive script to trim ALL large components from existing model .rds files
-# This script comprehensively analyzes and removes large components from models
+# This script uses the tidymodels 'butcher' package for consistent model trimming
+
+# Check and install butcher package if needed
+if (!requireNamespace("butcher", quietly = TRUE)) {
+  cat("Installing butcher package...\n")
+  install.packages("butcher", repos = "https://cloud.r-project.org/")
+}
+
+# Load required packages
+library(butcher)
 
 # Parse command line arguments
 args <- commandArgs(trailingOnly = TRUE)
@@ -200,42 +209,20 @@ safe_remove_component <- function(obj, path_string) {
   }
 }
 
-# Function to aggressively trim model components
-aggressive_trim_model <- function(model_obj, filepath) {
+# Function to trim model components using butcher
+butcher_trim_model <- function(model_obj, filepath) {
   original_size <- as.numeric(object.size(model_obj)) / (1024^2)
 
-  cat(sprintf(
-    "    Analyzing object structure (%.1f MB total)...\n",
-    original_size
-  ))
+  cat(sprintf("    Original object size: %.1f MB\n", original_size))
 
-  # Analyze all components > 0.5MB
-  large_components <- analyze_object_sizes(
-    model_obj,
-    "obj",
-    threshold_mb = 0.5,
-    max_depth = 8
-  )
+  # Check if this is a workflow or minimal model structure
+  is_workflow <- inherits(model_obj, "workflow")
+  is_minimal <- is.list(model_obj) &&
+    "model" %in% names(model_obj) &&
+    "recipe" %in% names(model_obj)
 
-  if (length(large_components) > 0) {
-    cat("    Large components found:\n")
-    # Sort by size descending
-    component_sizes <- sapply(large_components, function(x) x$size_mb)
-    sorted_indices <- order(component_sizes, decreasing = TRUE)
-
-    for (i in sorted_indices) {
-      comp_name <- names(large_components)[i]
-      comp_info <- large_components[[comp_name]]
-      cat(sprintf(
-        "      %s: %.1f MB (%s, len=%d, matrix=%s)\n",
-        gsub("^obj\\$", "", comp_name),
-        comp_info$size_mb,
-        comp_info$type,
-        comp_info$length,
-        comp_info$is_matrix
-      ))
-    }
-  }
+  trimmed_obj <- model_obj
+  operations_performed <- c()
 
   # Track what components we remove
   removed_components <- c()
@@ -420,7 +407,8 @@ for (i in seq_along(rds_files)) {
 
       # Aggressively trim the model
       cat("  Analyzing and trimming components...\n")
-      trim_result <- aggressive_trim_model(model_obj, filepath)
+      trim_result <- butcher_trim_model(model_obj, filepath)
+      model_obj <- trim_result$trimmed_obj
 
       if (trim_result$trimmed) {
         # Create backup path maintaining directory structure
