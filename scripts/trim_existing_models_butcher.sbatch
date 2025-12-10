@@ -100,8 +100,8 @@ else
 fi
 
 # Define model directory (adjust this path as needed)
-MODEL_DIR="${PROJECT_ROOT}/models"
-BACKUP_DIR="${PROJECT_ROOT}/models_backup"
+MODEL_DIR="/cluster/scratch/bblack/nascent-lulcc/transition_models/2018_2022"
+BACKUP_DIR="/cluster/scratch/bblack/nascent-lulcc/transition_models/2018_2022_backup"
 
 # Check if model directory exists
 if [ ! -d "$MODEL_DIR" ]; then
