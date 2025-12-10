@@ -2,9 +2,9 @@
 #SBATCH --job-name=trim_models_butcher
 #SBATCH --output=%x_%j.out
 #SBATCH --error=%x_%j.err
-#SBATCH --time=02:00:00
-#SBATCH --mem=32G
-#SBATCH --cpus-per-task=4
+#SBATCH --time=03:00:00
+#SBATCH --cpus-per-task=3
+#SBATCH --mem-per-cpu=42G
 #SBATCH --partition=compute
 
 # Exit on any error
@@ -88,7 +88,7 @@ echo "============================================"
 echo "Starting model trimming with butcher package..."
 echo "============================================"
 
-Rscript trim_existing_models_butcher.R
+Rscript trim_existing_models_butcher.r
 
 TRIMMING_EXIT_CODE=$?
 
