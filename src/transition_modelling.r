@@ -1631,6 +1631,14 @@ save_minimal_model <- function(
           names(full_data_clean) != "response"
         ]
 
+        # Ensure we have proper response levels for all model types
+        response_levels <- if ("response" %in% names(full_data_clean)) {
+          levels(full_data_clean$response)
+        } else {
+          # Fallback: get from model fit if available
+          model_fit$lvl %||% c("0", "1")
+        }
+
         if (best_model_name == "glm") {
           # For GLM, get coefficients and create SQL/dplyr expression
           pred_expr <- tidypredict::tidypredict_fit(model_fit)
@@ -1642,7 +1650,7 @@ save_minimal_model <- function(
             prediction_expr = pred_expr,
             coefficients = coefficients,
             recipe = trained_recipe,
-            response_levels = levels(full_data_clean$response)
+            response_levels = response_levels
           )
 
           log_msg("✓ Created tidypredict GLM (coefficients only)", log_file)
@@ -1655,25 +1663,38 @@ save_minimal_model <- function(
             predictor_names = predictor_names,
             prediction_expr = pred_expr,
             recipe = trained_recipe,
-            response_levels = levels(full_data_clean$response)
+            response_levels = response_levels
           )
 
           log_msg("✓ Created tidypredict RF (decision expressions)", log_file)
         } else if (best_model_name == "xgboost") {
-          # For XGBoost, create gradient boosting expressions
-          pred_expr <- tidypredict::tidypredict_fit(model_fit)
+          # For XGBoost, need special handling due to serialization issues
+          tryCatch(
+            {
+              # Try to create tidypredict expression
+              pred_expr <- tidypredict::tidypredict_fit(model_fit)
 
-          minimal_obj <- list(
-            model_type = "tidypredict_xgboost",
-            predictor_names = predictor_names,
-            prediction_expr = pred_expr,
-            recipe = trained_recipe,
-            response_levels = levels(full_data_clean$response)
-          )
+              minimal_obj <- list(
+                model_type = "tidypredict_xgboost",
+                predictor_names = predictor_names,
+                prediction_expr = pred_expr,
+                recipe = trained_recipe,
+                response_levels = response_levels
+              )
 
-          log_msg(
-            "✓ Created tidypredict XGBoost (gradient boosting expressions)",
-            log_file
+              log_msg(
+                "✓ Created tidypredict XGBoost (gradient boosting expressions)",
+                log_file
+              )
+            },
+            error = function(xgb_error) {
+              log_msg(
+                sprintf("XGBoost tidypredict failed: %s", xgb_error$message),
+                log_file
+              )
+              # Force fallback to butcher approach
+              stop("XGBoost tidypredict conversion failed")
+            }
           )
         }
 
@@ -1789,6 +1810,62 @@ save_minimal_model <- function(
         final_size_mb
       ),
       log_file
+    )
+  } else if (
+    "_xgb.Booster" %in%
+      class(fitted_model) ||
+      any(grepl("xgboost", class(fitted_model), ignore.case = TRUE))
+  ) {
+    # Special handling for XGBoost models due to serialization issues
+    log_msg(
+      "XGBoost model detected - applying special serialization handling...",
+      log_file
+    )
+
+    tryCatch(
+      {
+        # For XGBoost, we need to serialize the booster object properly
+        if (requireNamespace("xgboost", quietly = TRUE)) {
+          # Check if this is a parsnip xgboost model
+          if ("_xgb.Booster" %in% class(fitted_model)) {
+            # Direct xgboost booster object
+            xgb_model <- fitted_model$fit
+          } else if (
+            !is.null(fitted_model$fit) &&
+              inherits(fitted_model$fit, "xgb.Booster")
+          ) {
+            # Parsnip wrapped xgboost
+            xgb_model <- fitted_model$fit
+          } else {
+            stop("Cannot identify XGBoost model structure")
+          }
+
+          # Serialize the XGBoost model to raw format (this avoids pointer issues)
+          xgb_raw <- xgboost::xgb.save.raw(xgb_model)
+
+          # Replace the fitted model with serialized version + metadata
+          fitted_model$fit <- NULL # Remove problematic booster object
+          fitted_model$xgb_raw <- xgb_raw # Store serialized model
+          fitted_model$xgb_metadata <- list(
+            nfeatures = xgb_model$nfeatures %||% ncol(full_data_clean) - 1,
+            params = xgb_model$params %||% list()
+          )
+
+          log_msg(
+            "✓ Serialized XGBoost model to avoid pointer issues",
+            log_file
+          )
+        } else {
+          stop("xgboost package not available for serialization")
+        }
+      },
+      error = function(e) {
+        log_msg(
+          sprintf("XGBoost serialization failed: %s", e$message),
+          log_file
+        )
+        stop("Cannot serialize XGBoost model: ", e$message)
+      }
     )
   }
 

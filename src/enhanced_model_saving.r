@@ -1,6 +1,23 @@
 # Enhanced model saving with tidypredict support
 # Add this to the beginning of fit_and_save_best_model function
 
+# Null-coalescing operator for handling NULL values
+`%||%` <- function(lhs, rhs) {
+  if (is.null(lhs)) rhs else lhs
+}
+
+# Simple logging function for enhanced model saving
+log_msg <- function(message, log_file = NULL) {
+  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+  formatted_msg <- sprintf("%s | %s", timestamp, message)
+
+  if (!is.null(log_file)) {
+    cat(formatted_msg, "\n", file = log_file, append = TRUE)
+  } else {
+    cat(formatted_msg, "\n")
+  }
+}
+
 #' Enhanced model saving with tidypredict and butcher support
 #' This creates ultra-minimal model files by using tidypredict when possible
 save_minimal_model <- function(
@@ -30,6 +47,14 @@ save_minimal_model <- function(
           names(full_data_clean) != "response"
         ]
 
+        # Ensure we have proper response levels for all model types
+        response_levels <- if ("response" %in% names(full_data_clean)) {
+          levels(full_data_clean$response)
+        } else {
+          # Fallback: get from model fit if available
+          model_fit$lvl %||% c("0", "1")
+        }
+
         if (best_model_name == "glm") {
           # For GLM, get coefficients and create SQL/dplyr expression
           pred_expr <- tidypredict::tidypredict_fit(model_fit)
@@ -41,7 +66,7 @@ save_minimal_model <- function(
             prediction_expr = pred_expr,
             coefficients = coefficients,
             recipe = trained_recipe,
-            response_levels = levels(full_data_clean$response)
+            response_levels = response_levels
           )
 
           log_msg("✓ Created tidypredict GLM (coefficients only)", log_file)
@@ -54,25 +79,38 @@ save_minimal_model <- function(
             predictor_names = predictor_names,
             prediction_expr = pred_expr,
             recipe = trained_recipe,
-            response_levels = levels(full_data_clean$response)
+            response_levels = response_levels
           )
 
           log_msg("✓ Created tidypredict RF (decision expressions)", log_file)
         } else if (best_model_name == "xgboost") {
-          # For XGBoost, create gradient boosting expressions
-          pred_expr <- tidypredict::tidypredict_fit(model_fit)
+          # For XGBoost, need special handling due to serialization issues
+          tryCatch(
+            {
+              # Try to create tidypredict expression
+              pred_expr <- tidypredict::tidypredict_fit(model_fit)
 
-          minimal_obj <- list(
-            model_type = "tidypredict_xgboost",
-            predictor_names = predictor_names,
-            prediction_expr = pred_expr,
-            recipe = trained_recipe,
-            response_levels = levels(full_data_clean$response)
-          )
+              minimal_obj <- list(
+                model_type = "tidypredict_xgboost",
+                predictor_names = predictor_names,
+                prediction_expr = pred_expr,
+                recipe = trained_recipe,
+                response_levels = response_levels
+              )
 
-          log_msg(
-            "✓ Created tidypredict XGBoost (gradient boosting expressions)",
-            log_file
+              log_msg(
+                "✓ Created tidypredict XGBoost (gradient boosting expressions)",
+                log_file
+              )
+            },
+            error = function(xgb_error) {
+              log_msg(
+                sprintf("XGBoost tidypredict failed: %s", xgb_error$message),
+                log_file
+              )
+              # Force fallback to butcher approach
+              stop("XGBoost tidypredict conversion failed")
+            }
           )
         }
 
@@ -189,6 +227,62 @@ save_minimal_model <- function(
       ),
       log_file
     )
+  } else if (
+    "_xgb.Booster" %in%
+      class(fitted_model) ||
+      any(grepl("xgboost", class(fitted_model), ignore.case = TRUE))
+  ) {
+    # Special handling for XGBoost models due to serialization issues
+    log_msg(
+      "XGBoost model detected - applying special serialization handling...",
+      log_file
+    )
+
+    tryCatch(
+      {
+        # For XGBoost, we need to serialize the booster object properly
+        if (requireNamespace("xgboost", quietly = TRUE)) {
+          # Check if this is a parsnip xgboost model
+          if ("_xgb.Booster" %in% class(fitted_model)) {
+            # Direct xgboost booster object
+            xgb_model <- fitted_model$fit
+          } else if (
+            !is.null(fitted_model$fit) &&
+              inherits(fitted_model$fit, "xgb.Booster")
+          ) {
+            # Parsnip wrapped xgboost
+            xgb_model <- fitted_model$fit
+          } else {
+            stop("Cannot identify XGBoost model structure")
+          }
+
+          # Serialize the XGBoost model to raw format (this avoids pointer issues)
+          xgb_raw <- xgboost::xgb.save.raw(xgb_model)
+
+          # Replace the fitted model with serialized version + metadata
+          fitted_model$fit <- NULL # Remove problematic booster object
+          fitted_model$xgb_raw <- xgb_raw # Store serialized model
+          fitted_model$xgb_metadata <- list(
+            nfeatures = xgb_model$nfeatures %||% ncol(full_data_clean) - 1,
+            params = xgb_model$params %||% list()
+          )
+
+          log_msg(
+            "✓ Serialized XGBoost model to avoid pointer issues",
+            log_file
+          )
+        } else {
+          stop("xgboost package not available for serialization")
+        }
+      },
+      error = function(e) {
+        log_msg(
+          sprintf("XGBoost serialization failed: %s", e$message),
+          log_file
+        )
+        stop("Cannot serialize XGBoost model: ", e$message)
+      }
+    )
   }
 
   # Create minimal object structure
@@ -220,132 +314,238 @@ save_minimal_model <- function(
   return(minimal_obj)
 }
 
-# Also create a corresponding prediction function
+# Enhanced prediction function for all model types based on testing insights
 predict_minimal_model <- function(model_path, new_data, type = "prob") {
+  # Load model and validate
   model_obj <- readRDS(model_path)
 
+  # Validate inputs
+  if (!type %in% c("prob", "class")) {
+    stop("type must be either 'prob' or 'class'")
+  }
+
+  # Always apply preprocessing first using saved recipe
+  processed_data <- recipes::bake(model_obj$recipe, new_data = new_data)
+  n_obs <- nrow(processed_data)
+
+  # Handle tidypredict models
   if (model_obj$model_type == "tidypredict_glm") {
-    # Use tidypredict for GLM predictions
+    # GLM: Single linear expression with logistic transformation
     library(tidypredict)
-    library(dplyr)
 
-    # Apply preprocessing using saved recipe
-    processed_data <- recipes::bake(model_obj$recipe, new_data = new_data)
+    tryCatch(
+      {
+        # Evaluate linear predictor using manual evaluation (more reliable)
+        linear_pred <- eval(model_obj$prediction_expr, envir = processed_data)
 
-    # Use tidypredict expression for prediction
-    if (type == "prob") {
-      # For GLM, calculate probabilities using logistic function
-      processed_data$linear_pred <- tidypredict::tidypredict_to_column(
-        processed_data,
-        model_obj$prediction_expr
-      )
-      processed_data$prob_1 <- 1 / (1 + exp(-processed_data$linear_pred))
-      processed_data$prob_0 <- 1 - processed_data$prob_1
+        # Apply logistic transformation to get probabilities
+        prob_1 <- 1 / (1 + exp(-linear_pred))
+        prob_0 <- 1 - prob_1
 
-      return(processed_data[, c("prob_0", "prob_1")])
-    } else {
-      # For class prediction
-      processed_data$prob_1 <- 1 /
-        (1 +
-          exp(
-            -tidypredict::tidypredict_to_column(
-              processed_data,
-              model_obj$prediction_expr
+        if (type == "prob") {
+          return(tibble(.pred_0 = prob_0, .pred_1 = prob_1))
+        } else {
+          pred_classes <- ifelse(
+            prob_1 > 0.5,
+            model_obj$response_levels[2],
+            model_obj$response_levels[1]
+          )
+          return(tibble(
+            .pred_class = factor(
+              pred_classes,
+              levels = model_obj$response_levels
             )
           ))
-      processed_data$pred_class <- ifelse(
-        processed_data$prob_1 > 0.5,
-        model_obj$response_levels[2],
-        model_obj$response_levels[1]
-      )
-
-      return(data.frame(
-        .pred_class = factor(
-          processed_data$pred_class,
-          levels = model_obj$response_levels
-        )
-      ))
-    }
-  } else if (model_obj$model_type == "tidypredict_rf") {
-    # Use tidypredict for RF predictions
-    library(tidypredict)
-    library(dplyr)
-
-    # Apply preprocessing
-    processed_data <- recipes::bake(model_obj$recipe, new_data = new_data)
-
-    # Use tidypredict expression
-    predictions <- tidypredict::tidypredict_to_column(
-      processed_data,
-      model_obj$prediction_expr
+        }
+      },
+      error = function(e) {
+        stop(sprintf("GLM prediction failed: %s", e$message))
+      }
     )
-
-    if (type == "prob") {
-      # Return as probabilities
-      return(data.frame(.pred_0 = 1 - predictions, .pred_1 = predictions))
-    } else {
-      # Return as classes
-      pred_classes <- ifelse(
-        predictions > 0.5,
-        model_obj$response_levels[2],
-        model_obj$response_levels[1]
-      )
-      return(data.frame(
-        .pred_class = factor(pred_classes, levels = model_obj$response_levels)
-      ))
-    }
-  } else if (model_obj$model_type == "tidypredict_xgboost") {
-    # Use tidypredict for XGBoost predictions
+  } else if (model_obj$model_type == "tidypredict_rf") {
+    # Random Forest: Multiple tree expressions to evaluate and average
     library(tidypredict)
-    library(dplyr)
 
-    # Apply preprocessing
-    processed_data <- recipes::bake(model_obj$recipe, new_data = new_data)
+    tryCatch(
+      {
+        n_trees <- length(model_obj$prediction_expr)
+        all_predictions <- numeric(n_obs)
 
-    # Use tidypredict expression for XGBoost
-    if (type == "prob") {
-      # XGBoost usually outputs logits, so apply sigmoid transformation
-      logits <- tidypredict::tidypredict_to_column(
-        processed_data,
-        model_obj$prediction_expr
-      )
-      prob_1 <- 1 / (1 + exp(-logits)) # Sigmoid transformation
-      prob_0 <- 1 - prob_1
+        # Evaluate each tree expression and accumulate predictions
+        for (i in seq_len(n_trees)) {
+          tree_result <- eval(
+            model_obj$prediction_expr[[i]],
+            envir = processed_data
+          )
 
-      return(data.frame(.pred_0 = prob_0, .pred_1 = prob_1))
-    } else {
-      # For class prediction
-      logits <- tidypredict::tidypredict_to_column(
-        processed_data,
-        model_obj$prediction_expr
-      )
-      prob_1 <- 1 / (1 + exp(-logits))
-      pred_classes <- ifelse(
-        prob_1 > 0.5,
-        model_obj$response_levels[2],
-        model_obj$response_levels[1]
-      )
+          # Convert character predictions to numeric if needed
+          if (is.character(tree_result)) {
+            tree_result <- as.numeric(
+              tree_result == model_obj$response_levels[2]
+            )
+          }
 
-      return(data.frame(
-        .pred_class = factor(pred_classes, levels = model_obj$response_levels)
-      ))
-    }
+          all_predictions <- all_predictions + tree_result
+        }
+
+        # Average across all trees to get final probabilities
+        prob_1 <- all_predictions / n_trees
+        prob_0 <- 1 - prob_1
+
+        if (type == "prob") {
+          return(tibble(.pred_0 = prob_0, .pred_1 = prob_1))
+        } else {
+          pred_classes <- ifelse(
+            prob_1 > 0.5,
+            model_obj$response_levels[2],
+            model_obj$response_levels[1]
+          )
+          return(tibble(
+            .pred_class = factor(
+              pred_classes,
+              levels = model_obj$response_levels
+            )
+          ))
+        }
+      },
+      error = function(e) {
+        stop(sprintf("Random Forest prediction failed: %s", e$message))
+      }
+    )
+  } else if (model_obj$model_type == "tidypredict_xgboost") {
+    # XGBoost: Boosted tree expressions with logit transformation
+    library(tidypredict)
+
+    tryCatch(
+      {
+        # XGBoost tidypredict expressions typically return logits
+        if (is.list(model_obj$prediction_expr)) {
+          # Multiple expressions (boosting rounds)
+          n_rounds <- length(model_obj$prediction_expr)
+          all_logits <- numeric(n_obs)
+
+          for (i in seq_len(n_rounds)) {
+            round_result <- eval(
+              model_obj$prediction_expr[[i]],
+              envir = processed_data
+            )
+            all_logits <- all_logits + round_result
+          }
+
+          logits <- all_logits
+        } else {
+          # Single combined expression
+          logits <- eval(model_obj$prediction_expr, envir = processed_data)
+        }
+
+        # Apply sigmoid transformation to convert logits to probabilities
+        prob_1 <- 1 / (1 + exp(-logits))
+        prob_0 <- 1 - prob_1
+
+        if (type == "prob") {
+          return(tibble(.pred_0 = prob_0, .pred_1 = prob_1))
+        } else {
+          pred_classes <- ifelse(
+            prob_1 > 0.5,
+            model_obj$response_levels[2],
+            model_obj$response_levels[1]
+          )
+          return(tibble(
+            .pred_class = factor(
+              pred_classes,
+              levels = model_obj$response_levels
+            )
+          ))
+        }
+      },
+      error = function(e) {
+        stop(sprintf("XGBoost prediction failed: %s", e$message))
+      }
+    )
+  } else if (grepl("^butchered_", model_obj$model_type)) {
+    # Butchered models: Use standard tidymodels workflow prediction
+    tryCatch(
+      {
+        # Extract the original model type
+        original_model_type <- gsub("^butchered_", "", model_obj$model_type)
+
+        # Special handling for serialized XGBoost models
+        if (
+          original_model_type == "xgboost" && !is.null(model_obj$model$xgb_raw)
+        ) {
+          # Deserialize XGBoost model from raw format
+          library(xgboost)
+
+          # Load the serialized booster
+          xgb_model <- xgb.load.raw(model_obj$model$xgb_raw)
+
+          # Convert processed data to DMatrix format
+          feature_matrix <- as.matrix(processed_data)
+          dtest <- xgb.DMatrix(data = feature_matrix)
+
+          # Make predictions directly with XGBoost
+          raw_predictions <- predict(xgb_model, dtest)
+
+          # Convert to probabilities (XGBoost outputs logits for binary classification)
+          prob_1 <- 1 / (1 + exp(-raw_predictions))
+          prob_0 <- 1 - prob_1
+
+          if (type == "prob") {
+            return(tibble(.pred_0 = prob_0, .pred_1 = prob_1))
+          } else {
+            pred_classes <- ifelse(
+              prob_1 > 0.5,
+              model_obj$response_levels[2],
+              model_obj$response_levels[1]
+            )
+            return(tibble(
+              .pred_class = factor(
+                pred_classes,
+                levels = model_obj$response_levels
+              )
+            ))
+          }
+        }
+
+        # Standard workflow recreation for non-XGBoost or non-serialized models
+        # Create appropriate model specification
+        if (original_model_type == "glm") {
+          model_spec <- parsnip::logistic_reg() %>%
+            parsnip::set_engine("glmnet") %>%
+            parsnip::set_mode("classification")
+        } else if (original_model_type == "rf") {
+          model_spec <- parsnip::rand_forest() %>%
+            parsnip::set_engine("ranger") %>%
+            parsnip::set_mode("classification")
+        } else if (original_model_type == "xgboost") {
+          model_spec <- parsnip::boost_tree() %>%
+            parsnip::set_engine("xgboost") %>%
+            parsnip::set_mode("classification")
+        } else {
+          stop(sprintf("Unknown butchered model type: %s", original_model_type))
+        }
+
+        # Recreate workflow for prediction
+        temp_workflow <- workflows::workflow() %>%
+          workflows::add_model(model_spec) %>%
+          workflows::add_recipe(model_obj$recipe)
+
+        # Manually fit the workflow with the saved model
+        temp_workflow$fit <- list(fit = model_obj$model)
+        class(temp_workflow) <- c("workflow", class(temp_workflow))
+
+        # Make predictions
+        if (type == "prob") {
+          return(predict(temp_workflow, processed_data, type = "prob"))
+        } else {
+          return(predict(temp_workflow, processed_data, type = "class"))
+        }
+      },
+      error = function(e) {
+        stop(sprintf("Butchered model prediction failed: %s", e$message))
+      }
+    )
   } else {
-    # Use standard workflow prediction for butchered models
-    processed_data <- recipes::bake(model_obj$recipe, new_data = new_data)
-
-    # Recreate a minimal workflow for prediction
-    temp_workflow <- workflows::workflow() %>%
-      workflows::add_model(parsnip::set_mode(
-        model_obj$model,
-        "classification"
-      )) %>%
-      workflows::add_recipe(model_obj$recipe)
-
-    if (type == "prob") {
-      return(predict(temp_workflow, processed_data, type = "prob"))
-    } else {
-      return(predict(temp_workflow, processed_data, type = "class"))
-    }
+    stop(sprintf("Unknown model type: %s", model_obj$model_type))
   }
 }
