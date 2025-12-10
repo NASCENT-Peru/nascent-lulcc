@@ -96,8 +96,71 @@ save_minimal_model <- function(
           # For XGBoost, need special handling due to serialization issues
           tryCatch(
             {
+              # Enhanced diagnostics for XGBoost
+              log_msg("XGBoost tidypredict diagnostics:", log_file)
+              log_msg(
+                sprintf("  - XGBoost version: %s", packageVersion("xgboost")),
+                log_file
+              )
+              log_msg(
+                sprintf(
+                  "  - tidypredict version: %s",
+                  packageVersion("tidypredict")
+                ),
+                log_file
+              )
+              log_msg(
+                sprintf(
+                  "  - model_fit class: %s",
+                  paste(class(model_fit), collapse = ", ")
+                ),
+                log_file
+              )
+              log_msg(
+                sprintf(
+                  "  - model_fit$fit class: %s",
+                  paste(class(model_fit$fit), collapse = ", ")
+                ),
+                log_file
+              )
+              log_msg(
+                sprintf(
+                  "  - data rows: %d, cols: %d",
+                  nrow(full_data_clean),
+                  ncol(full_data_clean)
+                ),
+                log_file
+              )
+              log_msg(
+                sprintf(
+                  "  - predictor_names length: %d",
+                  length(predictor_names)
+                ),
+                log_file
+              )
+              log_msg(
+                sprintf(
+                  "  - response_levels: %s",
+                  paste(response_levels, collapse = ", ")
+                ),
+                log_file
+              )
+
               # Try to create tidypredict expression
+              log_msg("  - Attempting tidypredict_fit...", log_file)
               pred_expr <- tidypredict::tidypredict_fit(model_fit)
+
+              log_msg(
+                sprintf(
+                  "  - tidypredict_fit succeeded, expr type: %s",
+                  class(pred_expr)
+                ),
+                log_file
+              )
+              log_msg(
+                sprintf("  - Expression length: %d", length(pred_expr)),
+                log_file
+              )
 
               minimal_obj <- list(
                 model_type = "tidypredict_xgboost",
@@ -117,6 +180,17 @@ save_minimal_model <- function(
                 sprintf("XGBoost tidypredict failed: %s", xgb_error$message),
                 log_file
               )
+              log_msg("XGBoost error details:", log_file)
+              log_msg(
+                sprintf("  - Error class: %s", class(xgb_error)),
+                log_file
+              )
+              if (!is.null(xgb_error$call)) {
+                log_msg(
+                  sprintf("  - Error call: %s", deparse(xgb_error$call)),
+                  log_file
+                )
+              }
               # Force fallback to butcher approach
               stop("XGBoost tidypredict conversion failed")
             }
