@@ -2,10 +2,9 @@
 #SBATCH --job-name=trim_models
 #SBATCH --output=logs/trim_models_%j.out
 #SBATCH --error=logs/trim_models_%j.err
-#SBATCH --time=02:00:00
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=16G
+#SBATCH --time=03:00:00
+#SBATCH --cpus-per-task=3
+#SBATCH --mem-per-cpu=42G
 #SBATCH --partition=cpu
 
 # trim_existing_models.sbatch
