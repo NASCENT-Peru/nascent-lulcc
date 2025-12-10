@@ -102,7 +102,281 @@ get_file_size_mb <- function(filepath) {
   return(0)
 }
 
-# Function to trim model components using butcher
+# Function to create a completely new minimal model object
+create_minimal_model <- function(model_obj, filepath) {
+  original_size <- as.numeric(object.size(model_obj)) / (1024^2)
+  cat(sprintf("    Original object size: %.1f MB\n", original_size))
+
+  # Check if this is a workflow or minimal model structure
+  is_workflow <- inherits(model_obj, "workflow")
+  is_minimal <- is.list(model_obj) &&
+    "model" %in% names(model_obj) &&
+    "recipe" %in% names(model_obj)
+
+  if (!is_workflow && !is_minimal) {
+    return(list(
+      trimmed = FALSE,
+      reason = "Unknown model structure - cannot create minimal version",
+      original_size_mb = original_size,
+      final_size_mb = original_size,
+      reduction_mb = 0,
+      reduction_pct = 0,
+      operations_performed = character(0),
+      trimmed_obj = model_obj
+    ))
+  }
+
+  cat("    Creating completely new minimal object...\n")
+  operations_performed <- c()
+
+  # Create new minimal object structure
+  new_obj <- list()
+
+  if (is_workflow) {
+    cat("      Extracting essential components from workflow...\n")
+
+    # Extract recipe (but clean it)
+    if (!is.null(model_obj$pre) && !is.null(model_obj$pre$actions)) {
+      cat("        ✓ Extracting recipe\n")
+      new_obj$recipe <- model_obj$pre$actions$recipe$recipe
+      # Clean the recipe
+      if (!is.null(new_obj$recipe)) {
+        new_obj$recipe$template <- NULL # Remove training data
+        new_obj$recipe$orig_lvls <- NULL # Remove original levels (can be large)
+        operations_performed <- c(operations_performed, "cleaned recipe")
+      }
+    }
+
+    # Extract model fit (but only essential parts)
+    if (!is.null(model_obj$fit) && !is.null(model_obj$fit$fit)) {
+      cat("        ✓ Extracting model fit\n")
+      original_model <- model_obj$fit$fit
+
+      # Create new minimal model structure
+      new_model <- list()
+      new_model$spec <- original_model$spec # Keep model specification
+
+      # For the actual fit, only keep prediction-essential components
+      if (!is.null(original_model$fit)) {
+        ranger_fit <- original_model$fit
+
+        # Keep only essential ranger components for prediction
+        minimal_ranger <- list()
+        if (!is.null(ranger_fit$forest)) {
+          minimal_ranger$forest <- ranger_fit$forest # Essential for prediction
+        }
+        if (!is.null(ranger_fit$treetype)) {
+          minimal_ranger$treetype <- ranger_fit$treetype
+        }
+        if (!is.null(ranger_fit$call)) {
+          # Keep a minimal call without large environments
+          minimal_ranger$call <- call("ranger")
+        }
+        if (!is.null(ranger_fit$num.trees)) {
+          minimal_ranger$num.trees <- ranger_fit$num.trees
+        }
+        if (!is.null(ranger_fit$mtry)) {
+          minimal_ranger$mtry <- ranger_fit$mtry
+        }
+        if (!is.null(ranger_fit$min.node.size)) {
+          minimal_ranger$min.node.size <- ranger_fit$min.node.size
+        }
+        if (!is.null(ranger_fit$variable.importance)) {
+          minimal_ranger$variable.importance <- ranger_fit$variable.importance
+        }
+
+        # Explicitly exclude large components
+        # minimal_ranger$predictions <- NULL  (don't even copy)
+        # minimal_ranger$inbag.counts <- NULL (don't even copy)
+
+        new_model$fit <- minimal_ranger
+        class(new_model$fit) <- class(ranger_fit)
+        operations_performed <- c(
+          operations_performed,
+          "created minimal ranger fit"
+        )
+
+        pred_size <- if (!is.null(ranger_fit$predictions)) {
+          as.numeric(object.size(ranger_fit$predictions)) / (1024^2)
+        } else {
+          0
+        }
+
+        inbag_size <- if (!is.null(ranger_fit$inbag.counts)) {
+          as.numeric(object.size(ranger_fit$inbag.counts)) / (1024^2)
+        } else {
+          0
+        }
+
+        if (pred_size > 0) {
+          operations_performed <- c(
+            operations_performed,
+            sprintf("excluded predictions (%.1f MB)", pred_size)
+          )
+          cat(sprintf(
+            "        ✓ Excluded predictions matrix: %.1f MB\n",
+            pred_size
+          ))
+        }
+        if (inbag_size > 0) {
+          operations_performed <- c(
+            operations_performed,
+            sprintf("excluded inbag.counts (%.1f MB)", inbag_size)
+          )
+          cat(sprintf("        ✓ Excluded inbag.counts: %.1f MB\n", inbag_size))
+        }
+      }
+
+      class(new_model) <- class(original_model)
+      new_obj$model <- new_model
+    }
+  } else if (is_minimal) {
+    cat("      Extracting essential components from minimal structure...\n")
+
+    # Copy and clean recipe
+    if (!is.null(model_obj$recipe)) {
+      cat("        ✓ Cleaning recipe\n")
+      new_obj$recipe <- model_obj$recipe
+      new_obj$recipe$template <- NULL
+      new_obj$recipe$orig_lvls <- NULL
+      operations_performed <- c(operations_performed, "cleaned recipe")
+    }
+
+    # Create minimal model
+    if (!is.null(model_obj$model) && !is.null(model_obj$model$fit)) {
+      cat("        ✓ Creating minimal model\n")
+      original_fit <- model_obj$model$fit
+
+      # Create minimal ranger object
+      minimal_ranger <- list()
+      if (!is.null(original_fit$forest)) {
+        minimal_ranger$forest <- original_fit$forest
+      }
+      if (!is.null(original_fit$treetype)) {
+        minimal_ranger$treetype <- original_fit$treetype
+      }
+      if (!is.null(original_fit$call)) {
+        minimal_ranger$call <- call("ranger")
+      }
+      if (!is.null(original_fit$num.trees)) {
+        minimal_ranger$num.trees <- original_fit$num.trees
+      }
+      if (!is.null(original_fit$mtry)) {
+        minimal_ranger$mtry <- original_fit$mtry
+      }
+      if (!is.null(original_fit$min.node.size)) {
+        minimal_ranger$min.node.size <- original_fit$min.node.size
+      }
+      if (!is.null(original_fit$variable.importance)) {
+        minimal_ranger$variable.importance <- original_fit$variable.importance
+      }
+
+      class(minimal_ranger) <- class(original_fit)
+
+      # Create new model wrapper
+      new_model <- list()
+      new_model$spec <- model_obj$model$spec
+      new_model$fit <- minimal_ranger
+      class(new_model) <- class(model_obj$model)
+
+      new_obj$model <- new_model
+      operations_performed <- c(
+        operations_performed,
+        "created minimal model structure"
+      )
+
+      # Report on excluded components
+      pred_size <- if (!is.null(original_fit$predictions)) {
+        as.numeric(object.size(original_fit$predictions)) / (1024^2)
+      } else {
+        0
+      }
+
+      inbag_size <- if (!is.null(original_fit$inbag.counts)) {
+        as.numeric(object.size(original_fit$inbag.counts)) / (1024^2)
+      } else {
+        0
+      }
+
+      if (pred_size > 0) {
+        operations_performed <- c(
+          operations_performed,
+          sprintf("excluded predictions (%.1f MB)", pred_size)
+        )
+        cat(sprintf(
+          "        ✓ Excluded predictions matrix: %.1f MB\n",
+          pred_size
+        ))
+      }
+      if (inbag_size > 0) {
+        operations_performed <- c(
+          operations_performed,
+          sprintf("excluded inbag.counts (%.1f MB)", inbag_size)
+        )
+        cat(sprintf("        ✓ Excluded inbag.counts: %.1f MB\n", inbag_size))
+      }
+    }
+  }
+
+  # Copy other essential top-level components if they exist
+  for (name in names(model_obj)) {
+    if (
+      !name %in% c("model", "recipe", "pre", "fit") &&
+        !is.null(model_obj[[name]])
+    ) {
+      # Only copy if it's small (< 1MB)
+      component_size <- as.numeric(object.size(model_obj[[name]])) / (1024^2)
+      if (component_size < 1.0) {
+        new_obj[[name]] <- model_obj[[name]]
+        operations_performed <- c(
+          operations_performed,
+          sprintf("copied %s", name)
+        )
+      } else {
+        cat(sprintf(
+          "        - Skipped large component %s (%.1f MB)\n",
+          name,
+          component_size
+        ))
+        operations_performed <- c(
+          operations_performed,
+          sprintf("excluded large %s (%.1f MB)", name, component_size)
+        )
+      }
+    }
+  }
+
+  # Ensure proper class structure
+  class(new_obj) <- class(model_obj)
+
+  # Force garbage collection
+  gc(verbose = FALSE)
+
+  final_size <- as.numeric(object.size(new_obj)) / (1024^2)
+  reduction <- original_size - final_size
+  reduction_pct <- if (original_size > 0) {
+    (reduction / original_size) * 100
+  } else {
+    0
+  }
+
+  return(list(
+    trimmed = length(operations_performed) > 0,
+    reason = if (length(operations_performed) > 0) {
+      paste(operations_performed, collapse = "; ")
+    } else {
+      "No operations performed"
+    },
+    original_size_mb = original_size,
+    final_size_mb = final_size,
+    reduction_mb = reduction,
+    reduction_pct = reduction_pct,
+    operations_performed = operations_performed,
+    trimmed_obj = new_obj
+  ))
+}
+
+# Function to trim model components using butcher (fallback approach)
 butcher_trim_model <- function(model_obj, filepath) {
   original_size <- as.numeric(object.size(model_obj)) / (1024^2)
 
@@ -410,9 +684,16 @@ for (i in seq_along(rds_files)) {
         as.numeric(object.size(model_obj)) / (1024^2)
       ))
 
-      # Apply butcher trimming
-      cat("  Applying butcher operations...\n")
-      trim_result <- butcher_trim_model(model_obj, filepath)
+      # Apply minimal object creation (more aggressive than butcher)
+      cat("  Creating minimal model object...\n")
+      trim_result <- create_minimal_model(model_obj, filepath)
+
+      # If minimal creation failed, try butcher as fallback
+      if (!trim_result$trimmed) {
+        cat("  Minimal creation failed, trying butcher operations...\n")
+        trim_result <- butcher_trim_model(model_obj, filepath)
+      }
+
       model_obj <- trim_result$trimmed_obj
 
       if (trim_result$trimmed) {
