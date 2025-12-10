@@ -72,15 +72,32 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Get the directory containing the SLURM script
+# Get the directory containing the SLURM script and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
+# If that doesn't work (running from SLURM spool), use the submitted directory
+if [[ "$PROJECT_ROOT" == *"/var/spool/slurm"* ]]; then
+    PROJECT_ROOT="$SLURM_SUBMIT_DIR"
+fi
+
 echo ""
+echo "Script directory: $SCRIPT_DIR"
 echo "Project root: $PROJECT_ROOT"
 
 # Change to project root
 cd "$PROJECT_ROOT"
+echo "Current working directory: $(pwd)"
+
+# Verify the R script exists
+if [ ! -f "trim_existing_models_butcher.r" ]; then
+    echo "✗ ERROR: trim_existing_models_butcher.r not found in $(pwd)"
+    echo "Contents of current directory:"
+    ls -la
+    exit 1
+else
+    echo "✓ Found trim_existing_models_butcher.r"
+fi
 
 # Run the model trimming script
 echo ""
