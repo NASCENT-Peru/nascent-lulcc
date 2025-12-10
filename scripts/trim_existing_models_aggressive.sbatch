@@ -50,26 +50,26 @@ if [ -f "${HOME}/.bashrc" ]; then
     source "${HOME}/.bashrc"
 fi
 
-# Initialize conda for bash (required on some HPC systems)
-if command -v conda &> /dev/null; then
-    echo "Initializing conda..."
-    eval "$(conda shell.bash hook)"
+# Initialize micromamba for bash (required on some HPC systems)
+if command -v micromamba &> /dev/null; then
+    echo "Initializing micromamba..."
+    eval "$(micromamba shell hook --shell bash)"
     
     echo "Activating transition_model_env environment..."
-    conda activate transition_model_env
-    CONDA_EXIT_CODE=$?
+    micromamba activate transition_model_env
+    MAMBA_EXIT_CODE=$?
     
-    if [ $CONDA_EXIT_CODE -eq 0 ]; then
+    if [ $MAMBA_EXIT_CODE -eq 0 ]; then
         echo "✓ Successfully activated transition_model_env"
         echo "Active environment: $CONDA_DEFAULT_ENV"
     else
-        echo "✗ Failed to activate transition_model_env (exit code: $CONDA_EXIT_CODE)"
+        echo "✗ Failed to activate transition_model_env (exit code: $MAMBA_EXIT_CODE)"
         echo "Available environments:"
-        conda env list
+        micromamba env list
         exit 1
     fi
 else
-    echo "✗ Conda not found in PATH"
+    echo "✗ Micromamba not found in PATH"
     echo "PATH: $PATH"
     exit 1
 fi
