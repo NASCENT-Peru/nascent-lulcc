@@ -49,6 +49,7 @@ dependencies:
   - r-proc         # ROC curves
   - r-vip          # Variable importance
   - r-butcher      # Model object trimming
+  - r-tidypredict  # Ultra-minimal model storage via prediction expressions
   
   # Optional: Python for any auxiliary scripts
   - python

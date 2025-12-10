@@ -1599,6 +1599,228 @@ aggregate_results <- function(
   ))
 }
 
+# Enhanced model saving with tidypredict support
+# Add this to the beginning of fit_and_save_best_model function
+
+#' Enhanced model saving with tidypredict and butcher support
+#' This creates ultra-minimal model files by using tidypredict when possible
+save_minimal_model <- function(
+  final_workflow,
+  best_model_name,
+  full_data_clean,
+  output_path,
+  log_file = NULL
+) {
+  # Check if tidypredict can be used
+  can_use_tidypredict <- best_model_name %in%
+    c("glm", "rf", "xgboost") &&
+    requireNamespace("tidypredict", quietly = TRUE)
+
+  if (can_use_tidypredict) {
+    log_msg("=== USING TIDYPREDICT FOR ULTRA-MINIMAL STORAGE ===", log_file)
+
+    tryCatch(
+      {
+        library(tidypredict)
+
+        # Extract recipe and model
+        trained_recipe <- workflows::extract_recipe(final_workflow)
+        trained_recipe$template <- NULL # Remove training data
+        model_fit <- workflows::extract_fit_parsnip(final_workflow)
+        predictor_names <- names(full_data_clean)[
+          names(full_data_clean) != "response"
+        ]
+
+        if (best_model_name == "glm") {
+          # For GLM, get coefficients and create SQL/dplyr expression
+          pred_expr <- tidypredict::tidypredict_fit(model_fit)
+          coefficients <- coef(model_fit$fit)
+
+          minimal_obj <- list(
+            model_type = "tidypredict_glm",
+            predictor_names = predictor_names,
+            prediction_expr = pred_expr,
+            coefficients = coefficients,
+            recipe = trained_recipe,
+            response_levels = levels(full_data_clean$response)
+          )
+
+          log_msg("✓ Created tidypredict GLM (coefficients only)", log_file)
+        } else if (best_model_name == "rf") {
+          # For Random Forest, create decision tree expressions
+          pred_expr <- tidypredict::tidypredict_fit(model_fit)
+
+          minimal_obj <- list(
+            model_type = "tidypredict_rf",
+            predictor_names = predictor_names,
+            prediction_expr = pred_expr,
+            recipe = trained_recipe,
+            response_levels = levels(full_data_clean$response)
+          )
+
+          log_msg("✓ Created tidypredict RF (decision expressions)", log_file)
+        } else if (best_model_name == "xgboost") {
+          # For XGBoost, create gradient boosting expressions
+          pred_expr <- tidypredict::tidypredict_fit(model_fit)
+
+          minimal_obj <- list(
+            model_type = "tidypredict_xgboost",
+            predictor_names = predictor_names,
+            prediction_expr = pred_expr,
+            recipe = trained_recipe,
+            response_levels = levels(full_data_clean$response)
+          )
+
+          log_msg(
+            "✓ Created tidypredict XGBoost (gradient boosting expressions)",
+            log_file
+          )
+        }
+
+        # Check size
+        tidypredict_size_mb <- as.numeric(object.size(minimal_obj)) / (1024^2)
+        log_msg(
+          sprintf("Tidypredict object size: %.2f MB", tidypredict_size_mb),
+          log_file
+        )
+
+        # Save the ultra-minimal object
+        saveRDS(minimal_obj, output_path, compress = "xz")
+        file_size_mb <- file.info(output_path)$size / (1024^2)
+
+        log_msg(
+          sprintf("✓ Saved tidypredict model: %.2f MB file", file_size_mb),
+          log_file
+        )
+        return(minimal_obj)
+      },
+      error = function(e) {
+        log_msg(sprintf("Tidypredict failed: %s", e$message), log_file)
+        log_msg("Falling back to butcher approach...", log_file)
+      }
+    )
+  }
+
+  # Fallback: Use butcher + aggressive manual cleanup
+  log_msg("=== USING BUTCHER + MANUAL CLEANUP ===", log_file)
+
+  # Apply butcher operations if available
+  if (requireNamespace("butcher", quietly = TRUE)) {
+    library(butcher)
+
+    butchered_workflow <- final_workflow
+    butchered_workflow <- butcher::axe_call(butchered_workflow)
+    butchered_workflow <- butcher::axe_fitted(butchered_workflow)
+    butchered_workflow <- butcher::axe_data(butchered_workflow)
+    butchered_workflow <- butcher::axe_env(butchered_workflow)
+
+    log_msg("✓ Applied butcher operations", log_file)
+
+    # Extract components from butchered workflow
+    trained_recipe <- workflows::extract_recipe(butchered_workflow)
+    fitted_model <- butchered_workflow$fit$fit
+  } else {
+    # No butcher available
+    trained_recipe <- workflows::extract_recipe(final_workflow)
+    fitted_model <- final_workflow$fit$fit
+    log_msg("Butcher not available, using manual cleanup only", log_file)
+  }
+
+  # Remove training data from recipe
+  trained_recipe$template <- NULL
+
+  # Aggressive manual cleanup for ranger models
+  if ("_ranger" %in% class(fitted_model)) {
+    log_msg("Aggressive ranger cleanup...", log_file)
+
+    original_size_mb <- as.numeric(object.size(fitted_model)) / (1024^2)
+
+    # Remove the massive predictions matrix (biggest culprit)
+    if (!is.null(fitted_model$fit$predictions)) {
+      pred_size_mb <- as.numeric(object.size(fitted_model$fit$predictions)) /
+        (1024^2)
+      log_msg(
+        sprintf("  Removing predictions matrix: %.1f MB", pred_size_mb),
+        log_file
+      )
+      fitted_model$fit$predictions <- NULL
+    }
+
+    # Remove inbag.counts
+    if (!is.null(fitted_model$fit$inbag.counts)) {
+      inbag_size_mb <- as.numeric(object.size(fitted_model$fit$inbag.counts)) /
+        (1024^2)
+      log_msg(
+        sprintf("  Removing inbag.counts: %.1f MB", inbag_size_mb),
+        log_file
+      )
+      fitted_model$fit$inbag.counts <- NULL
+    }
+
+    # Remove all non-essential components
+    essential_ranger <- c(
+      "forest",
+      "treetype",
+      "num.trees",
+      "mtry",
+      "min.node.size"
+    )
+    all_components <- names(fitted_model$fit)
+
+    for (comp in setdiff(all_components, essential_ranger)) {
+      if (!is.null(fitted_model$fit[[comp]])) {
+        comp_size_mb <- as.numeric(object.size(fitted_model$fit[[comp]])) /
+          (1024^2)
+        if (comp_size_mb > 0.01) {
+          log_msg(
+            sprintf("  Removing %s: %.2f MB", comp, comp_size_mb),
+            log_file
+          )
+        }
+        fitted_model$fit[[comp]] <- NULL
+      }
+    }
+
+    final_size_mb <- as.numeric(object.size(fitted_model)) / (1024^2)
+    log_msg(
+      sprintf(
+        "  Ranger cleanup: %.1f MB → %.1f MB",
+        original_size_mb,
+        final_size_mb
+      ),
+      log_file
+    )
+  }
+
+  # Create minimal object structure
+  minimal_obj <- list(
+    model_type = paste0("butchered_", best_model_name),
+    recipe = trained_recipe,
+    model = fitted_model,
+    response_levels = levels(full_data_clean$response),
+    predictor_names = names(full_data_clean)[
+      names(full_data_clean) != "response"
+    ]
+  )
+
+  # Force garbage collection
+  gc(verbose = FALSE)
+
+  obj_size_mb <- as.numeric(object.size(minimal_obj)) / (1024^2)
+  log_msg(sprintf("Final object size: %.2f MB", obj_size_mb), log_file)
+
+  # Save with compression
+  saveRDS(minimal_obj, output_path, compress = "xz")
+  file_size_mb <- file.info(output_path)$size / (1024^2)
+
+  log_msg(
+    sprintf("✓ Saved butchered model: %.2f MB file", file_size_mb),
+    log_file
+  )
+
+  return(minimal_obj)
+}
+
 #' Fit best model to full dataset and save for prediction
 #'
 #' @param results Results object from multi_spec_trans_modelling
@@ -1953,11 +2175,32 @@ fit_and_save_best_model <- function(
     base::dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   }
 
-  # Save minimal workflow for prediction
+  # Check if tidypredict can be used for this model type
+  can_use_tidypredict <- best_model_name %in% c("glm", "rf", "xgboost") # tidypredict supports these
+
   log_msg(
-    sprintf("  Preparing minimal model for saving to: %s", output_path),
+    sprintf("  Preparing model for saving to: %s", output_path),
     log_file
   )
+
+  if (can_use_tidypredict) {
+    log_msg(
+      sprintf(
+        "  Using tidypredict for ultra-minimal storage (%s)",
+        best_model_name
+      ),
+      log_file
+    )
+
+    # Load tidypredict if available
+    if (!requireNamespace("tidypredict", quietly = TRUE)) {
+      log_msg(
+        "  tidypredict not available, falling back to butcher approach",
+        log_file
+      )
+      can_use_tidypredict <- FALSE
+    }
+  }
 
   # Check initial model size
   initial_size_mb <- as.numeric(object.size(final_workflow)) / (1024^2)
@@ -2067,8 +2310,21 @@ fit_and_save_best_model <- function(
 
   tryCatch(
     {
-      base::saveRDS(minimal_workflow, output_path)
-      log_msg(sprintf("Saved minimal model to: %s", output_path), log_file)
+      # Use enhanced model saving with tidypredict support
+      source(file.path("src", "enhanced_model_saving.r"))
+
+      saved_model <- save_minimal_model(
+        final_workflow = final_workflow,
+        best_model_name = best_model_name,
+        full_data_clean = full_data_clean,
+        output_path = output_path,
+        log_file = log_file
+      )
+
+      log_msg(
+        sprintf("✓ Saved enhanced minimal model to: %s", output_path),
+        log_file
+      )
     },
     error = function(e) {
       log_msg(sprintf("  ERROR saving model: %s", e$message), log_file)
@@ -2116,6 +2372,17 @@ predict_with_saved_model <- function(model_path, new_data, type = "prob") {
   }
 
   model_obj <- base::readRDS(model_path)
+
+  # Check if this is a tidypredict model and use enhanced prediction
+  if (
+    !is.null(model_obj$model_type) &&
+      model_obj$model_type %in%
+        c("tidypredict_glm", "tidypredict_rf", "tidypredict_xgboost")
+  ) {
+    # Source enhanced prediction functions
+    source(file.path("src", "enhanced_model_saving.r"))
+    return(predict_minimal_model(model_path, new_data, type))
+  }
 
   # Check if this is a minimal model or full workflow
   if (
