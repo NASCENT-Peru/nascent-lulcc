@@ -227,7 +227,7 @@ tryCatch(
   {
     transition_modelling(
       config = config,
-      refresh_cache = FALSE,
+      refresh_cache = FALSE, # Skip existing models
       model_dir = config[["transition_model_dir"]],
       eval_dir = config[["transition_model_eval_dir"]],
       use_regions = isTRUE(config[["regionalization"]]),

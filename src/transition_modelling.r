@@ -8,7 +8,7 @@
 
 #' Transition modelling for Land Use Land Cover Change
 #' @param config A list containing configuration parameters
-#' @param refresh_cache Logical, whether to refresh cached datasets
+#' @param refresh_cache Logical, whether to refresh cached datasets and overwrite existing model files
 #' @param model_dir Directory to save trained models
 #' @param eval_dir Directory to save model evaluation results
 #' @param use_regions Logical, whether to use regionalization
@@ -19,6 +19,10 @@
 #' This function orchestrates the transition modelling process for specified time periods.
 #' It reads model specifications, processes each period sequentially to manage memory usage,
 #' and saves the combined evaluation results.
+#'
+#' The function includes intelligent caching: if a model file already exists for a
+#' transition-region combination, it will be skipped unless refresh_cache = TRUE.
+#' This allows for efficient re-runs when only some models need to be updated.
 #' @export
 transition_modelling <- function(
   config = get_config(),
@@ -328,12 +332,45 @@ perform_transition_modelling <- function(
   )
 
   future::plan(future::sequential) # Reset to sequential
+
+  # Log summary of processed vs skipped models
+  total_tasks <- length(task_ids)
+  skipped_models <- sum(
+    sapply(transitions_model_results, function(x) {
+      !is.null(x$skipped) && x$skipped == TRUE
+    }),
+    na.rm = TRUE
+  )
+  processed_models <- total_tasks - skipped_models
+
+  message(sprintf(
+    "\nModel processing summary for period %s:",
+    periods_to_process
+  ))
+  message(sprintf(
+    "  Total transition-region combinations: %d",
+    total_tasks
+  ))
+  message(sprintf(
+    "  Models processed: %d",
+    processed_models
+  ))
+  message(sprintf(
+    "  Models skipped (existing): %d",
+    skipped_models
+  ))
+  if (skipped_models > 0) {
+    message(sprintf(
+      "  To reprocess existing models, set refresh_cache = TRUE"
+    ))
+  }
+
   return(transitions_model_results)
 }
 
 #' Model a single transition for a given region
 #' @param trans_name Name of the transition to model
-#' @param refresh_cache Logical, whether to refresh cached datasets
+#' @param refresh_cache Logical, whether to refresh cached datasets and overwrite existing model files
 #' @param region Name of the region to model (NULL for national extent)
 #' @param use_regions Logical, whether regionalization is used
 #' @param ds_transitions Arrow dataset for transition data
@@ -346,14 +383,18 @@ perform_transition_modelling <- function(
 #' @param save_debug Logical, whether to save debug information
 #' @param log_file Path to log file for recording messages
 #' @param fs_summary Data frame summarizing feature selection results
-#' @return A list containing model fitting and evaluation results
+#' @return A list containing model fitting and evaluation results, or a skipped status if model exists
 #' @details
 #' This function performs the following steps:
-#' 1. Loads transition data for the specified transition and region
-#' 2. Retrieves selected predictor names from feature selection summary
-#' 3. Loads predictor data for the specified predictors and region
-#' 4. Calls `multi_spec_trans_modelling()` to fit and evaluate multiple model specifications
-#' 5. Returns the results from the modelling process
+#' 1. Checks if model file already exists and skips if refresh_cache = FALSE
+#' 2. Loads transition data for the specified transition and region
+#' 3. Retrieves selected predictor names from feature selection summary
+#' 4. Loads predictor data for the specified predictors and region
+#' 5. Calls `multi_spec_trans_modelling()` to fit and evaluate multiple model specifications
+#' 6. Returns the results from the modelling process
+#'
+#' If a model file already exists for the transition-region combination and refresh_cache = FALSE,
+#' the function will skip processing and return a status indicating the model was skipped.
 #' @export
 model_single_transition <- function(
   trans_name,
@@ -380,6 +421,42 @@ model_single_transition <- function(
     ),
     log_file
   )
+
+  # Construct model file path for existence check
+  region_suffix <- ifelse(
+    is.null(region),
+    "national",
+    gsub(" ", "_", tolower(region))
+  )
+  model_filename <- sprintf("%s_%s.rds", trans_name, region_suffix)
+  model_path <- file.path(model_dir, model_filename)
+
+  # Check if model file already exists and skip if refresh_cache = FALSE
+  if (!refresh_cache && file.exists(model_path)) {
+    log_msg(
+      sprintf(
+        "  Model file already exists: %s (skipping - set refresh_cache=TRUE to overwrite)",
+        model_path
+      ),
+      log_file
+    )
+
+    # Return a simplified result indicating the model was skipped
+    return(list(
+      transition = trans_name,
+      region = ifelse(is.null(region), "National extent", region),
+      status = "skipped_existing_model",
+      model_path = model_path,
+      skipped = TRUE,
+      cv_metrics = NULL,
+      test_metrics = NULL,
+      final_model = list(
+        model_path = model_path,
+        model_type = "existing",
+        status = "skipped"
+      )
+    ))
+  }
 
   # Resolve region_value if requested
   region_value <- NULL
@@ -521,15 +598,7 @@ model_single_transition <- function(
   #   file = "test_results.rds"
   # )
 
-  # Fit best model to full dataset and save
-  region_suffix <- ifelse(
-    is.null(region),
-    "national",
-    gsub(" ", "_", tolower(region))
-  )
-  model_filename <- sprintf("%s_%s.rds", trans_name, region_suffix)
-  model_path <- file.path(model_dir, model_filename)
-
+  # Fit best model to full dataset and save (model_path already constructed above)
   best_model_info <- fit_and_save_best_model(
     results = results,
     full_data = transition_data,
@@ -1890,6 +1959,13 @@ fit_and_save_best_model <- function(
     log_file
   )
 
+  # Check initial model size
+  initial_size_mb <- as.numeric(object.size(final_workflow)) / (1024^2)
+  log_msg(
+    sprintf("  Initial workflow size: %.1f MB", initial_size_mb),
+    log_file
+  )
+
   # Create minimal workflow for prediction by extracting only essential components
   minimal_workflow <- tryCatch(
     {
@@ -1906,6 +1982,42 @@ fit_and_save_best_model <- function(
 
       # Extract the fitted model
       fitted_model <- final_workflow$fit$fit
+
+      # For ranger models, remove the massive predictions matrix and other large components
+      if ("_ranger" %in% class(fitted_model)) {
+        log_msg(
+          "  Trimming ranger model components to reduce size...",
+          log_file
+        )
+
+        # Remove out-of-bag predictions (this can be 15M+ rows!)
+        if (!is.null(fitted_model$fit$predictions)) {
+          log_msg("    Removing predictions matrix to save space", log_file)
+          fitted_model$fit$predictions <- NULL
+        }
+
+        # Remove variable importance if not essential for prediction
+        if (!is.null(fitted_model$fit$variable.importance)) {
+          log_msg("    Removing variable importance to save space", log_file)
+          fitted_model$fit$variable.importance <- NULL
+        }
+
+        # Remove call object
+        if (!is.null(fitted_model$fit$call)) {
+          fitted_model$fit$call <- NULL
+        }
+
+        # Remove inbag.counts if present (another potentially large matrix)
+        if (!is.null(fitted_model$fit$inbag.counts)) {
+          fitted_model$fit$inbag.counts <- NULL
+        }
+      }
+
+      # For xgboost models, minimal cleanup
+      if ("_xgb.Booster" %in% class(fitted_model)) {
+        log_msg("  Trimming xgboost model components...", log_file)
+        # XGBoost cleanup would go here if needed
+      }
 
       # Create a minimal structure with only what's needed for prediction
       list(
@@ -1940,6 +2052,17 @@ fit_and_save_best_model <- function(
     }
   )
 
+  # Check final model size
+  final_size_mb <- as.numeric(object.size(minimal_workflow)) / (1024^2)
+  log_msg(sprintf("  Minimal workflow size: %.1f MB", final_size_mb), log_file)
+  log_msg(
+    sprintf(
+      "  Size reduction: %.1f MB (%.1f%%)",
+      initial_size_mb - final_size_mb,
+      ((initial_size_mb - final_size_mb) / initial_size_mb) * 100
+    ),
+    log_file
+  )
   log_msg("  Created minimal workflow for efficient storage", log_file)
 
   tryCatch(
