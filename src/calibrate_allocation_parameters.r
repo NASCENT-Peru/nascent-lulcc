@@ -17,9 +17,8 @@
 #' @author Ben Black
 
 calibrate_allocation_parameters <- function(config = get_config()) {
-  # A - Preparation ####
-  # vector years of LULC data
-  LULC_years <-
+  # vector years of lulc data
+  lulc_years <-
     list.files(
       config[["aggregated_lulc_dir"]],
       full.names = FALSE,
@@ -28,7 +27,7 @@ calibrate_allocation_parameters <- function(config = get_config()) {
     stringr::str_extract("\\d{4}")
 
   # Load list of historic lulc rasters
-  LULC_rasters <- lapply(
+  lulc_rasters <- lapply(
     list.files(
       config[["aggregated_lulc_dir"]],
       full.names = TRUE,
@@ -36,38 +35,82 @@ calibrate_allocation_parameters <- function(config = get_config()) {
     ),
     raster::raster
   )
-  names(LULC_rasters) <- LULC_years
-
-  # B - Calculating patch size parameters for each historic period ####
+  names(lulc_rasters) <- lulc_years
 
   # create folders for results
   ensure_dir(config[["simulation_param_dir"]])
   ensure_dir(file.path(config[["calibration_param_dir"]], "periodic"))
 
-  # because each period relies on a different combination of raster layers
-  # create a vector of these to run through
-  LULC_change_periods <- c()
-  for (i in 1:(length(LULC_years) - 1)) {
-    LULC_change_periods[[i]] <- c(LULC_years[i], LULC_years[i + 1])
-  }
-  names(LULC_change_periods) <- sapply(
-    LULC_change_periods,
-    function(x) paste(x[1], x[2], sep = "_")
+  # loop over config$data_periods to create list of raster combinations
+  lulc_change_periods <- lapply(
+    config[["data_periods"]],
+    function(period) {
+      years <- as.numeric(stringr::str_split(period, "_")[[1]])
+      c(
+        paste0(years[1]),
+        paste0(years[2])
+      )
+    }
   )
+  names(lulc_change_periods) <- config[["data_periods"]]
 
-  lulcc.periodicparametercalculation <- function(Raster_combo, Raster_stack, period_name) {
+  #' Function to calculate allocation parameters for a given time period
+  #' @param comparison_years vector of the names of the two years to compare
+  #' @param lulc_rasters list of rasters
+  #' @param period_name name of the time period
+  #' @param use_regions logical, whether to calculate parameters by region
+  #' @return data frame of allocation parameters
+  calculate_allocation_params_for_periods <- function(
+    comparison_years,
+    lulc_rasters,
+    period_name,
+    use_regions = isTRUE(config[["regionalization"]])
+  ) {
     # seperate rasters required for time period
-    yr1 <- Raster_stack[[grep(Raster_combo[1], names(Raster_stack))]]
-    yr2 <- Raster_stack[[grep(Raster_combo[2], names(Raster_stack))]]
+    yr1 <- lulc_rasters[[grep(comparison_years[1], names(lulc_rasters))]]
+    yr2 <- lulc_rasters[[grep(comparison_years[2], names(lulc_rasters))]]
 
-    # load list of transitions
-    transitions <- read.csv(
-      list.files(
-        config[["trans_rates_raw_dir"]],
-        full.names = TRUE,
-        pattern = paste0(period_name, "_viable_trans")
+    # --- Set up regions ---
+    if (use_regions) {
+      regions <- jsonlite::fromJSON(file.path(
+        config[["reg_dir"]],
+        "regions.json"
+      ))
+      region_names <- regions$label
+      message(sprintf(
+        "Processing %d regions: %s\n",
+        length(region_names),
+        paste(region_names, collapse = ", ")
+      ))
+      # load the region raster
+      region_rast <- terra::rast(list.files(
+        config[["reg_dir"]],
+        pattern = "regions.tif$",
+        full.names = TRUE
+      ))
+    } else {
+      region_names <- "National extent"
+      message("Processing national extent (no regionalization)\n")
+    }
+
+    # load summary of transition feature selection
+    transitions <- readRDS(
+      file.path(
+        config[["feature_selection_dir"]],
+        sprintf(
+          "transition_feature_selection_summary_%s.rds",
+          period_name
+        )
       )
     )
+
+    # Filter out transitions that failed feature selection
+    transitions <- transitions %>%
+      dplyr::filter(
+        !is.na(selected_predictors) &
+          selected_predictors != "" &
+          nchar(trimws(selected_predictors)) > 0
+      )
 
     # Loop over transitions
     results <- furrr::future_map_dfr(
@@ -142,19 +185,21 @@ calibrate_allocation_parameters <- function(config = get_config()) {
 
         # calculate the proportions of transition cells
         # that exist in new patches vs. expansion
-        perc_expander <- (
-          raster::freq(expansion_or_new, value = 10) /
-            raster::freq(r, value = 1) * 100
-        )
-        perc_patcher <- (
-          raster::freq(expansion_or_new, value = 5) /
-            raster::freq(r, value = 1) * 100
-        )
+        perc_expander <- (raster::freq(expansion_or_new, value = 10) /
+          raster::freq(r, value = 1) *
+          100)
+        perc_patcher <- (raster::freq(expansion_or_new, value = 5) /
+          raster::freq(r, value = 1) *
+          100)
 
         # Calculate class statistics for patchs in rasters
         # FIXME this is a pretty broken package, see if we can replace these guesses
         # with some other package's patch metrics.
-        cl.data <- SDMTools::ClassStat(r, bkgd = 0, cellsize = raster::res(r)[1])
+        cl.data <- SDMTools::ClassStat(
+          r,
+          bkgd = 0,
+          cellsize = raster::res(r)[1]
+        )
 
         # Mean patch area
         mpa <- cl.data$mean.patch.area / 10000
@@ -197,10 +242,10 @@ calibrate_allocation_parameters <- function(config = get_config()) {
 
   # Apply function
   Allocation_params_by_period <- mapply(
-    lulcc.periodicparametercalculation,
-    Raster_combo = LULC_change_periods,
-    period_name = names(LULC_change_periods),
-    MoreArgs = list(Raster_stack = LULC_rasters),
+    calculate_allocation_params_for_periods,
+    comparison_years = lulc_change_periods,
+    period_name = names(lulc_change_periods),
+    MoreArgs = list(lulc_rasters = lulc_rasters),
     SIMPLIFY = FALSE
   )
 
@@ -290,10 +335,14 @@ calibrate_allocation_parameters <- function(config = get_config()) {
   names(Time_points_by_period) <- config[["data_periods"]]
 
   # remove any time periods that are empty
-  Time_points_by_period <- Time_points_by_period[lapply(Time_points_by_period, length) > 0]
+  Time_points_by_period <- Time_points_by_period[
+    lapply(Time_points_by_period, length) > 0
+  ]
 
   # subset the list of allocation params tables by the names of the time_periods
-  Allocation_params_by_period <- Allocation_params_by_period[names(Time_points_by_period)]
+  Allocation_params_by_period <- Allocation_params_by_period[names(
+    Time_points_by_period
+  )]
 
   # create seperate files of the estimated allocation parameters for each time point
   # under the ID: v1
@@ -312,7 +361,10 @@ calibrate_allocation_parameters <- function(config = get_config()) {
           ".csv"
         )
       )
-      readr::write_csv(Allocation_params_by_period[[period_indices]], file = file_name)
+      readr::write_csv(
+        Allocation_params_by_period[[period_indices]],
+        file = file_name
+      )
     })
   })
 
@@ -336,15 +388,18 @@ calibrate_allocation_parameters <- function(config = get_config()) {
           rnorm(length(param_table$Perc_expander), mean = 0, sd = 0.05)
 
         # if any values are greater than 1 or less than 0 then set to these values
-        param_table$Perc_expander <- sapply(param_table$Perc_expander, function(x) {
-          if (x > 1) {
-            x <- 1
-          } else if (x < 0) {
-            0
-          } else {
-            x
+        param_table$Perc_expander <- sapply(
+          param_table$Perc_expander,
+          function(x) {
+            if (x > 1) {
+              x <- 1
+            } else if (x < 0) {
+              0
+            } else {
+              x
+            }
           }
-        })
+        )
 
         # recalculate % patcher so that total does not exceed 1 (100%)
         param_table$Perc_patcher <- 1 - param_table$Perc_expander
