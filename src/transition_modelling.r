@@ -594,10 +594,14 @@ model_single_transition <- function(
   rm(predictor_data)
   log_msg("  Prepared transition dataset for modelling", log_file)
 
+  # Load model specifications
+  model_specs <- yaml::yaml.load_file(model_specs_path)
+  log_msg("Loaded model specifications", log_file)
+
   # call multi_spec_trans_modelling
   results <- multi_spec_trans_modelling(
     transition_data = transition_data,
-    model_specs_path = model_specs_path,
+    model_specs = model_specs,
     log_file = log_file
   )
 
@@ -612,7 +616,8 @@ model_single_transition <- function(
     results = results,
     full_data = transition_data,
     output_path = model_path,
-    log_file = log_file
+    log_file = log_file,
+    max_final_fit_size = model_specs$global$max_final_fit_size
   )
 
   # Add best model info to results
@@ -623,17 +628,13 @@ model_single_transition <- function(
 #' Fit and evaluate multiple specifications of statical models for a single transition
 #'
 #' @param transition_data Data frame containing response variable and predictors
-#' @param model_specs_path Path to JSON configuration file
+#' @param model_specs List containing model specifications loaded from YAML
 #' @return List containing results for all models, replicates, and performance metrics
 multi_spec_trans_modelling <- function(
   transition_data,
-  model_specs_path,
+  model_specs,
   log_file = NULL
 ) {
-  # Load model specifications
-  model_specs <- yaml::yaml.load_file(model_specs_path)
-  log_msg("Loaded model specifications", log_file)
-
   # Validate transition data
   log_msg(
     sprintf(
@@ -1639,12 +1640,12 @@ save_minimal_model <- function(
     c("glm", "rf", "xgboost") &&
     requireNamespace("tidypredict", quietly = TRUE)
 
-  # XGBoost 3.x has breaking changes that break tidypredict compatibility
-  if (best_model_name == "xgboost" && packageVersion("xgboost") >= "3.0.0") {
+  # Disable tidypredict for RF models with many observations (it's inefficient)
+  if (best_model_name == "rf" && nrow(full_data_clean) > 10000) {
     log_msg(
       sprintf(
-        "XGBoost %s detected - disabling tidypredict due to compatibility issues",
-        packageVersion("xgboost")
+        "Disabling tidypredict for RF with %d observations (tidypredict is inefficient for large RF models)",
+        nrow(full_data_clean)
       ),
       log_file
     )
@@ -2031,18 +2032,21 @@ save_minimal_model <- function(
 #' @param full_data Complete dataset (response + predictors) to fit final model
 #' @param output_path Path to save the fitted model workflow (.rds file)
 #' @param log_file Optional path to log file
+#' @param max_final_fit_size Maximum number of observations for final fit (default: 50000)
 #' @return Path to saved model file
 #' @details
 #' This function:
 #' 1. Identifies the best performing model based on optimization metric
 #' 2. Extracts the best hyperparameters for that model
-#' 3. Creates and fits a workflow with those parameters on the full dataset
-#' 4. Saves the fitted workflow as an RDS file for future predictions
+#' 3. Creates a representative sample of full dataset that preserves class imbalance
+#' 4. Fits workflow with those parameters on the sampled dataset
+#' 5. Saves the fitted workflow as an RDS file for future predictions
 fit_and_save_best_model <- function(
   results,
   full_data,
   output_path,
-  log_file = NULL
+  log_file = NULL,
+  max_final_fit_size = 50000
 ) {
   # Get optimization metric from model specs
   opt_metric <- if (is.null(results$model_specs$metrics$optimization_metric)) {
@@ -2137,23 +2141,112 @@ fit_and_save_best_model <- function(
     log_file
   )
 
-  # Check data size and memory
-  data_size_mb <- object.size(full_data_clean) / 1024^2
-  log_msg(sprintf("  Full dataset size: %.1f MB", data_size_mb), log_file)
-
   # Check response distribution
   response_table <- table(full_data_clean$response)
+  n_minority <- min(response_table)
+  n_majority <- max(response_table)
+  minority_class <- names(which.min(response_table))
+  majority_class <- names(which.max(response_table))
+  total_obs <- nrow(full_data_clean)
+  true_imbalance_ratio <- n_minority / n_majority
+
   log_msg(
     sprintf(
-      "  Final response distribution: %s",
-      paste(names(response_table), "=", response_table, collapse = ", ")
+      "  Full dataset: %d obs, minority=%d (%s), majority=%d (%s), ratio=%.4f",
+      total_obs,
+      n_minority,
+      minority_class,
+      n_majority,
+      majority_class,
+      true_imbalance_ratio
     ),
     log_file
   )
 
+  # Determine if sampling is needed
+  if (total_obs <= max_final_fit_size) {
+    log_msg(
+      sprintf(
+        "  Using full dataset (%d <= %d max)",
+        total_obs,
+        max_final_fit_size
+      ),
+      log_file
+    )
+    final_fit_data <- full_data_clean
+  } else {
+    # Sample to preserve true imbalance ratio
+    # Strategy: Keep ALL minority class, sample majority to meet target size
+    target_majority <- min(
+      max_final_fit_size - n_minority, # Don't exceed max size
+      n_majority # Don't exceed available majority samples
+    )
+
+    # Ensure we maintain the true imbalance ratio as closely as possible
+    # If we have room, sample majority proportionally
+    if (n_minority + target_majority > max_final_fit_size) {
+      target_majority <- max_final_fit_size - n_minority
+    }
+
+    sampled_imbalance_ratio <- n_minority / target_majority
+
+    log_msg(
+      sprintf(
+        "  Sampling to %d obs: %d minority (all), %d majority (%.1f%% of available)",
+        n_minority + target_majority,
+        n_minority,
+        target_majority,
+        100 * target_majority / n_majority
+      ),
+      log_file
+    )
+
+    log_msg(
+      sprintf(
+        "  True imbalance ratio: %.4f, Sampled ratio: %.4f (%.1f%% preserved)",
+        true_imbalance_ratio,
+        sampled_imbalance_ratio,
+        100 * sampled_imbalance_ratio / true_imbalance_ratio
+      ),
+      log_file
+    )
+
+    # Perform stratified sampling
+    final_fit_data <- full_data_clean %>%
+      dplyr::group_by(response) %>%
+      {
+        minority_data <- dplyr::filter(., response == minority_class)
+
+        majority_data <- dplyr::filter(., response == majority_class) %>%
+          dplyr::slice_sample(n = target_majority, replace = FALSE)
+
+        dplyr::bind_rows(minority_data, majority_data)
+      } %>%
+      dplyr::ungroup()
+
+    # Verify the sampling
+    final_response_table <- table(final_fit_data$response)
+    log_msg(
+      sprintf(
+        "  Sampled data: %s",
+        paste(
+          names(final_response_table),
+          "=",
+          final_response_table,
+          collapse = ", "
+        )
+      ),
+      log_file
+    )
+  }
+
+  # Check data size
+  data_size_mb <- object.size(final_fit_data) / 1024^2
+  log_msg(sprintf("  Final fit dataset size: %.1f MB", data_size_mb), log_file)
+
   # Create recipe (same preprocessing as during tuning)
   log_msg("  Creating recipe for preprocessing", log_file)
-  recipe_obj <- recipes::recipe(response ~ ., data = full_data_clean) %>%
+  recipe_obj <- recipes::recipe(response ~ ., data = final_fit_data) %>%
     recipes::step_normalize(recipes::all_numeric_predictors()) %>%
     recipes::step_zv(recipes::all_predictors())
 
@@ -2351,7 +2444,7 @@ fit_and_save_best_model <- function(
 
   final_workflow <- tryCatch(
     {
-      parsnip::fit(workflow_obj, data = full_data_clean)
+      parsnip::fit(workflow_obj, data = final_fit_data)
     },
     error = function(e) {
       log_msg(

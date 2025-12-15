@@ -6,6 +6,7 @@ global:
   train_proportion: 0.75
   cv_folds: 3        # Reduced from 5 to 3 for faster CV
   random_seed: 123
+  max_final_fit_size: 100000
 
 metrics:
   metrics:
