@@ -281,6 +281,12 @@ build_full_config <- function(yaml_config) {
       "simulation"
     ),
 
+    # temp dir
+    temp_dir = build_path(
+      base_path,
+      yaml_config$temp_dir
+    ),
+
     # Transition directories
     trans_rate_table_dir = build_path(
       base_path,
