@@ -595,21 +595,21 @@ process_single_region <- function(
   debug_dir
 ) {
   region_label <- region_names[region_idx]
-  region_filter_val <- as.integer(regions$value[region_idx])
+  region_val <- as.integer(regions$value[region_idx])
 
   message(sprintf(
     "\n[Region %d/%d] Processing: %s (ID=%d)",
     region_idx,
     length(region_names),
     region_label,
-    region_filter_val
+    region_val
   ))
 
   # --- Step 1: Create region-specific masked rasters ---
   message("  [1/4] Creating region-specific masked rasters...")
 
   # Create region mask (cells in region = 1, outside = NA)
-  region_mask <- terra::ifel(region_rast == region_filter_val, 1L, NA)
+  region_mask <- terra::ifel(region_rast == region_val, 1L, NA)
 
   # Mask the LULC rasters to this region only (outside region = NA)
   # Note: We don't crop the extent - this keeps cell IDs consistent with
@@ -618,24 +618,24 @@ process_single_region <- function(
   yr2_region <- terra::mask(yr2, region_mask)
 
   # Save to temporary files (required for future package compatibility)
-  yr1_temp_path <- file.path(
+  yr1_masked_path <- file.path(
     temp_dir,
-    sprintf("yr1_region_%d_%s.tif", region_filter_val, period_name)
+    sprintf("yr1_region_%d_%s.tif", region_val, period_name)
   )
-  yr2_temp_path <- file.path(
+  yr2_masked_path <- file.path(
     temp_dir,
-    sprintf("yr2_region_%d_%s.tif", region_filter_val, period_name)
+    sprintf("yr2_region_%d_%s.tif", region_val, period_name)
   )
 
   terra::writeRaster(
     yr1_region,
-    yr1_temp_path,
+    yr1_masked_path,
     overwrite = TRUE,
     wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
   )
   terra::writeRaster(
     yr2_region,
-    yr2_temp_path,
+    yr2_masked_path,
     overwrite = TRUE,
     wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
   )
@@ -654,7 +654,7 @@ process_single_region <- function(
   message(sprintf(
     "        Dataset path: %s (region filter: %d)",
     transitions_dir,
-    region_filter_val
+    region_val
   ))
 
   # Filter transitions to those relevant for this region
@@ -663,7 +663,7 @@ process_single_region <- function(
       if (is.character(region)) {
         region == region_label
       } else {
-        region == region_filter_val
+        region == region_val
       }
     )
 
@@ -678,9 +678,9 @@ process_single_region <- function(
   region_results <- process_region_transitions(
     region_transitions = region_transitions,
     transitions_dir = transitions_dir,
-    region_filter_val = region_filter_val,
-    yr1_temp_path = yr1_temp_path,
-    yr2_temp_path = yr2_temp_path,
+    region_val = region_val,
+    yr1_masked_path = yr1_masked_path,
+    yr2_masked_path = yr2_masked_path,
     region_label = region_label,
     debug_dir = debug_dir,
     period_name = period_name
@@ -690,11 +690,11 @@ process_single_region <- function(
   gc(verbose = FALSE)
 
   # Clean up temporary raster files
-  if (file.exists(yr1_temp_path)) {
-    unlink(yr1_temp_path)
+  if (file.exists(yr1_masked_path)) {
+    unlink(yr1_masked_path)
   }
-  if (file.exists(yr2_temp_path)) {
-    unlink(yr2_temp_path)
+  if (file.exists(yr2_masked_path)) {
+    unlink(yr2_masked_path)
   }
 
   message(sprintf(
@@ -709,9 +709,9 @@ process_single_region <- function(
 #' Process all transitions for a single region (parallel)
 #' @param region_transitions data frame of transitions for this region
 #' @param transitions_dir path to transition parquet dataset
-#' @param region_filter_val numeric region filter value
-#' @param yr1_temp_path path to yr1 temp raster file
-#' @param yr2_temp_path path to yr2 temp raster file
+#' @param region_val numeric region filter value
+#' @param yr1_masked_path path to yr1 temp raster file
+#' @param yr2_masked_path path to yr2 temp raster file
 #' @param region_label label of the region
 #' @param debug_dir directory for debug/log files
 #' @param period_name name of the time period
@@ -719,9 +719,9 @@ process_single_region <- function(
 process_region_transitions <- function(
   region_transitions,
   transitions_dir,
-  region_filter_val,
-  yr1_temp_path,
-  yr2_temp_path,
+  region_val,
+  yr1_masked_path,
+  yr2_masked_path,
   region_label,
   debug_dir,
   period_name
@@ -747,15 +747,15 @@ process_region_transitions <- function(
         transitions[["Final_class"]][i]
       )
       log_file <- file.path(
-        debug_dir_path,
+        debug_dir,
         sprintf("log_%s_%s.txt", region_label, trans_name)
       )
 
       calculate_single_transition_params(
         i = i,
-        region_transitions = transitions,
+        region_transitions = region_transitions,
         transitions_dir = trans_dir,
-        region_filter_val = region_val,
+        region_val = region_val,
         trans_name = trans_name,
         yr1_path = yr1_path,
         yr2_path = yr2_path,
@@ -764,14 +764,14 @@ process_region_transitions <- function(
         period_name = period_name
       )
     },
-    yr1_path = yr1_temp_path,
-    yr2_path = yr2_temp_path,
+    yr1_path = yr1_masked_path,
+    yr2_path = yr2_masked_path,
     region_label = region_label,
-    transitions = region_transitions,
-    debug_dir_path = debug_dir,
+    region_transitions = region_transitions,
+    debug_dir = debug_dir,
     period_name = period_name,
     trans_dir = transitions_dir,
-    region_val = region_filter_val
+    region_val = region_val
   )
 }
 
@@ -779,7 +779,7 @@ process_region_transitions <- function(
 #' @param i index of transition
 #' @param region_transitions data frame of transitions
 #' @param transitions_dir path to transition parquet dataset
-#' @param region_filter_val numeric region filter value
+#' @param region_val numeric region filter value
 #' @param trans_name name of the transition column
 #' @param yr1_path path to yr1 raster file
 #' @param yr2_path path to yr2 raster file
@@ -791,10 +791,10 @@ calculate_single_transition_params <- function(
   i,
   region_transitions,
   transitions_dir,
-  region_filter_val,
+  region_val,
   trans_name,
-  yr1_path,
-  yr2_path,
+  yr1_masked_path,
+  yr2_masked_path,
   region_label,
   log_file = NULL,
   period_name
@@ -832,7 +832,7 @@ calculate_single_transition_params <- function(
         transitions_dir,
         partitioning = arrow::hive_partition(region = arrow::int32())
       ) %>%
-        dplyr::filter(region == region_filter_val) %>%
+        dplyr::filter(region == region_val) %>%
         dplyr::select(cell_id, !!trans_name) %>%
         dplyr::filter(!!rlang::sym(trans_name) == 1) %>%
         dplyr::pull(cell_id) %>%
@@ -855,46 +855,108 @@ calculate_single_transition_params <- function(
     log_file
   )
 
-  # Load region-specific rasters inside parallel worker
-  # (terra SpatRaster objects are not exportable with future)
-  log_msg("  Loading masked rasters...", log_file)
-  yr1_region <- terra::rast(yr1_path)
-  yr2_region <- terra::rast(yr2_path)
-
-  # Create binary classification rasters efficiently using terra::app()
-  # This skips NA cells entirely (much faster than nested ifel)
+  # Create binary classification rasters efficiently using terra vectorized operations
   # bin1: 1 where yr1 == to_val, 0 elsewhere (within region, NA outside)
   # bin2: 1 where yr2 == to_val, 0 elsewhere (within region, NA outside)
   log_msg("  Creating binary rasters...", log_file)
-  bin1 <- terra::app(
-    yr1_region,
-    fun = function(x) {
-      ifelse(x == to_val, 1L, 0L)
-    }
+  patch1_path <- file.path(
+    temp_dir,
+    sprintf(
+      "patches_yr1_%s_region_%d_%s.tif",
+      trans_name,
+      region_val,
+      period_name
+    )
+  )
+  patch2_path <- file.path(
+    temp_dir,
+    sprintf(
+      "patches_yr2_%s_region_%d_%s.tif",
+      trans_name,
+      region_val,
+      period_name
+    )
   )
 
-  bin2 <- terra::app(
-    yr2_region,
-    fun = function(x) {
-      ifelse(x == to_val, 1L, 0L)
-    }
-  )
+  if (!file.exists(patch1_path)) {
+    log_msg(
+      sprintf(
+        "No raster of patches for final class %s in initial yeart",
+        to_class
+      ),
+      log_file
+    )
+    log_msg("  Loading mask raster for initial year", log_file)
+    yr1_region <- terra::rast(yr1_masked_path)
+    log_msg("  Creating binary raster for initial year...", log_file)
+    bin1 <- yr1_region == to_val
+    log_msg("   Generating patch raster for initial year", log_file)
+    patch1 <- terra::patches(
+      bin1,
+      directions = 8,
+      zeroAsNA = TRUE
+    )
+    terra::writeRaster(
+      patch1,
+      patch1_path,
+      overwrite = TRUE,
+      wopt = list(datatype = "INT4S", gdal = c("COMPRESS=LZW"))
+    )
+  } else {
+    log_msg(
+      sprintf(
+        "Raster of patches for final class %s in initial year already exists, loading from disk",
+        to_class
+      ),
+      log_file
+    )
+    patch1 <- terra::rast(patch1_path)
+  }
+  if (!file.exists(patch2_path)) {
+    # Load region-specific rasters inside parallel worker
+    # (terra SpatRaster objects are not exportable with future)
+    log_msg("  Loading mask rasters for final year", log_file)
+    yr2_region <- terra::rast(yr2_masked_path)
+    log_msg("  Creating binary raster for final year...", log_file)
+    bin2 <- yr2_region == to_val
+    log_msg("   Generating patch raster for final year", log_file)
+    patch2 <- terra::patches(
+      bin2,
+      directions = 8,
+      zeroAsNA = TRUE
+    )
+    terra::writeRaster(
+      patch2,
+      patch2_path,
+      overwrite = TRUE,
+      wopt = list(datatype = "INT4S", gdal = c("COMPRESS=LZW"))
+    )
+  } else {
+    log_msg(
+      sprintf(
+        "Raster of patches for final class %s in final year already exists, loading from disk",
+        to_class
+      ),
+      log_file
+    )
+    patch2 <- terra::rast(patch2_path)
+  }
 
-  # identify patches, then reduce to binary indicators for adjacency logic
-  log_msg("  Identifying patches...", log_file)
-  cl1 <- terra::patches(bin1, directions = 8, zeroAsNA = TRUE)
-  cl2 <- terra::patches(bin2, directions = 8, zeroAsNA = TRUE)
-  cl1b <- cl1
-  cl2b <- cl2
-  cl1b[cl1b > 0] <- 1
-  cl1b[is.na(cl1b[])] <- 0
-  cl2b[cl2b > 0] <- 1
-  cl2b[is.na(cl2b[])] <- 0
+  # terra::patches returns a raster with unique patch IDs (integers) for each patch
+  # Create binary presence/absence rasters for each year
+  patch1_binary <- patch1
+  patch2_binary <- patch2
+  rm(patch1) # need to keep patch 2 for patch size metrics
+  gc(verbose = FALSE)
+  patch1_binary[patch1_binary > 0] <- 1
+  patch1_binary[is.na(patch1_binary[])] <- 0
+  patch2_binary[patch2_binary > 0] <- 1
+  patch2_binary[is.na(patch2_binary[])] <- 0
 
   # create combined code as in original logic: 0,1,10,11 by using 1 and 10
-  cl2b10 <- cl2b
+  cl2b10 <- patch2_binary
   cl2b10[cl2b10 > 0] <- 10
-  yr1_yr2_patches <- cl1b + cl2b10
+  yr1_yr2_patches <- patch1_binary + cl2b10
 
   # Extract values at region transition cells and determine which are 'new patch' (10)
   trans_vals <- terra::values(yr1_yr2_patches)[
@@ -904,7 +966,7 @@ calculate_single_transition_params <- function(
   ]
   new_patch_cells <- region_transition_cells[which(trans_vals == 10)]
 
-  # adjacency check: for each new_patch cell test if any neighbour is in cl1b (old patch)
+  # adjacency check: for each new_patch cell test if any neighbour is in patch1_binary (old patch)
   log_msg(
     sprintf(
       "  Calculating expander/patcher percentages (%d new patches)...",
@@ -921,7 +983,7 @@ calculate_single_transition_params <- function(
         directions = 8,
         pairs = FALSE
       )
-      if (length(nc) > 0 && any(cl1b[nc] == 1, na.rm = TRUE)) {
+      if (length(nc) > 0 && any(patch1_binary[nc] == 1, na.rm = TRUE)) {
         n_expansion <- n_expansion + 1L
       }
     }
@@ -940,9 +1002,9 @@ calculate_single_transition_params <- function(
   )
 
   # Patch size metrics for the final class in yr2 (restricted to region)
-  # Use clumps from cl2 (patch ids) and compute areas
+  # Use clumps from patch2 (patch ids) and compute areas
   log_msg("  Calculating patch size metrics...", log_file)
-  f <- terra::freq(cl2)
+  f <- terra::freq(patch2)
   if (is.null(f) || nrow(f) == 0) {
     mpa <- NA_real_
     sda <- NA_real_
@@ -951,7 +1013,7 @@ calculate_single_transition_params <- function(
     fdf <- as.data.frame(f)
     # Filter out NA values if present
     fdf <- fdf[!is.na(fdf$value), ]
-    cellsize <- terra::res(cl2)[1]
+    cellsize <- terra::res(patch2)[1]
     areas_ha <- (fdf$count * (cellsize * cellsize)) / 10000
     mpa <- mean(areas_ha, na.rm = TRUE)
     sda <- stats::sd(areas_ha, na.rm = TRUE)
@@ -968,6 +1030,7 @@ calculate_single_transition_params <- function(
   # Aggregation index via landscapemetrics (requires categorical raster)
   # Create mask raster with to_val where present, NA elsewhere
   log_msg("  Calculating aggregation index...", log_file)
+  yr2_region <- terra::rast(yr2_masked_path)
   mask_r <- terra::app(
     yr2_region,
     fun = function(x) {
