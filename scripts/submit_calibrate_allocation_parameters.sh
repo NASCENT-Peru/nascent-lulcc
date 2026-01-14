@@ -43,7 +43,7 @@ echo
 # ----------------------------------------------------------
 # Run calibrate allocation parameters
 # ----------------------------------------------------------
-R_SCRIPT="$SLURM_SUBMIT_DIR/run_calibrate_allocation_parameters.r"
+R_SCRIPT="$SCRIPT_DIR/run_calibrate_allocation_parameters.r"
 
 if [ ! -f "$R_SCRIPT" ]; then
     echo "ERROR: run_calibrate_allocation_parameters.r not found at: $R_SCRIPT"
