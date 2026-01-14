@@ -17,22 +17,22 @@ find_micromamba() {
     for loc in "${POSSIBLE_LOCATIONS[@]}"; do
         if [ -n "$loc" ] && [ -f "$loc" ]; then
             MAMBA_EXE="$loc"
-            echo "Found micromamba at: $MAMBA_EXE"
+            echo "Found micromamba at: $MAMBA_EXE" >&2
             break
         fi
     done
 
     if [ -z "$MAMBA_EXE" ] || [ ! -f "$MAMBA_EXE" ]; then
-        echo "ERROR: micromamba not found in any expected location"
-        echo "Tried locations:"
+        echo "ERROR: micromamba not found in any expected location" >&2
+        echo "Tried locations:" >&2
         for loc in "${POSSIBLE_LOCATIONS[@]}"; do
             if [ -n "$loc" ]; then
-                echo "  - $loc"
+                echo "  - $loc" >&2
             fi
         done
-        echo
-        echo "Please install micromamba using: bash scripts/install_micromamba.sh"
-        echo "Or set MAMBA_EXE_CUSTOM environment variable"
+        echo >&2
+        echo "Please install micromamba using: bash scripts/install_micromamba.sh" >&2
+        echo "Or set MAMBA_EXE_CUSTOM environment variable" >&2
         return 1
     fi
 
