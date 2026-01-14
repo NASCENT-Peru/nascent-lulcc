@@ -13,10 +13,31 @@ echo "Environments directory: $ENVS_DIR"
 echo
 
 # Check if micromamba is available
-MAMBA_EXE="/cluster/project/eawag/p01002/.local/bin/micromamba"
-if [ ! -f "$MAMBA_EXE" ]; then
-    echo "ERROR: micromamba not found at $MAMBA_EXE"
-    echo "Please adjust the MAMBA_EXE path in this script"
+# Try multiple possible locations
+MAMBA_EXE=""
+POSSIBLE_LOCATIONS=(
+    "$HOME/.local/bin/micromamba"
+    "/cluster/home/bblack/.local/bin/micromamba"
+    "$MAMBA_EXE_CUSTOM"  # Allow override via environment variable
+)
+
+for loc in "${POSSIBLE_LOCATIONS[@]}"; do
+    if [ -f "$loc" ]; then
+        MAMBA_EXE="$loc"
+        echo "Found micromamba at: $MAMBA_EXE"
+        break
+    fi
+done
+
+if [ -z "$MAMBA_EXE" ] || [ ! -f "$MAMBA_EXE" ]; then
+    echo "ERROR: micromamba not found in any expected location"
+    echo "Tried locations:"
+    for loc in "${POSSIBLE_LOCATIONS[@]}"; do
+        echo "  - $loc"
+    done
+    echo
+    echo "Please install micromamba using: bash scripts/install_micromamba.sh"
+    echo "Or set MAMBA_EXE_CUSTOM environment variable to point to your micromamba"
     exit 1
 fi
 
@@ -67,6 +88,14 @@ else
     exit 1
 fi
 
+# Create allocation parameters environment
+if [ -f "$ENVS_DIR/allocation_params_env.yml" ]; then
+    create_env "$ENVS_DIR/allocation_params_env.yml" "allocation_params_env"
+else
+    echo "ERROR: allocation_params_env.yml not found"
+    exit 1
+fi
+
 # Create distance calculation environment (if exists)
 if [ -f "$ENVS_DIR/dist_calc_env.yml" ]; then
     create_env "$ENVS_DIR/dist_calc_env.yml" "dist_calc_env"
@@ -91,6 +120,7 @@ echo
 echo "To activate an environment, use:"
 echo "  micromamba activate $ENV_BASE_PATH/feat_select_env"
 echo "  micromamba activate $ENV_BASE_PATH/transition_model_env"
+echo "  micromamba activate $ENV_BASE_PATH/allocation_params_env"
 echo
 
 echo "Done!"

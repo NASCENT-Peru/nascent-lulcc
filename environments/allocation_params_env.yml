@@ -1,0 +1,44 @@
+name: allocation_params_env
+channels:
+  - conda-forge
+dependencies:
+  # Core R
+  - r-base=4.3
+  
+  # Spatial libraries (required by terra)
+  - gdal
+  - libgdal-hdf5
+  - hdf5
+  - proj
+  - geos
+  
+  # Spatial raster processing
+  - r-terra
+  
+  # Arrow for parquet file handling
+  - r-arrow
+  
+  # Data manipulation (tidyverse core)
+  - r-dplyr
+  - r-purrr
+  - r-tibble
+  - r-readr
+  - r-stringr
+  - r-tidyr
+  - r-tidyselect
+  
+  # Configuration and data formats
+  - r-yaml
+  - r-jsonlite
+  
+  # Parallel processing
+  - r-future
+  - r-furrr
+  
+  # C++ compilation support
+  - r-rcpp
+  - compilers  # Provides gcc/g++ for C++ compilation
+  
+  # Optional: Python for any auxiliary scripts
+  - python
+  - numpy

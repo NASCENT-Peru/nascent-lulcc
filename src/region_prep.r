@@ -92,14 +92,65 @@ region_prep <- function(config = get_config()) {
     full.names = TRUE
   )
 
+  # Extract region indices from filenames and sort
+  # Distance files should be named dist_1.tif, dist_2.tif, dist_3.tif, dist_4.tif
+  # matching region IDs 1, 2, 3, 4 in the shapefile
+  dist_indices <- as.numeric(gsub(
+    ".*dist_(\\d+)\\.tif$",
+    "\\1",
+    basename(dist_rasts)
+  ))
+  dist_rasts_sorted <- dist_rasts[order(dist_indices)]
+
+  message("Loading distance rasters in order:")
+  message(paste(basename(dist_rasts_sorted), collapse = ", "))
+
+  # Show the mapping between distance files and region IDs
+  message("\nDistance file to Region ID mapping:")
+  for (i in seq_along(dist_rasts_sorted)) {
+    dist_file_id <- as.numeric(gsub(
+      ".*dist_(\\d+)\\.tif$",
+      "\\1",
+      basename(dist_rasts_sorted[i])
+    ))
+    region_id <- region_vals[i]
+    region_label <- regions_clean[i]
+    message(sprintf(
+      "  %s (file ID: %d) -> Region ID: %d (%s)",
+      basename(dist_rasts_sorted[i]),
+      dist_file_id,
+      region_id,
+      region_label
+    ))
+  }
+
   # Load distance rasters
-  dist_stack <- terra::rast(dist_rasts)
+  dist_stack <- terra::rast(dist_rasts_sorted)
 
   # Mask to gap cells
   dist_stack <- terra::mask(dist_stack, gap_cells)
 
-  # Find nearest region: no `-1` since using 1-based IDs
-  nearest_region <- terra::which.min(dist_stack)
+  # Find nearest region
+  # which.min returns 1-based layer index (1,2,3,4)
+  # Distance files are now named dist_1, dist_2, dist_3, dist_4
+  # matching the region IDs 1, 2, 3, 4 in the shapefile
+
+  # Get layer index (1-based: returns 1,2,3,4)
+  layer_index <- terra::which.min(dist_stack)
+
+  # Extract the actual region IDs from distance filenames
+  dist_file_ids <- as.numeric(gsub(
+    ".*dist_(\\d+)\\_new.tif$",
+    "\\1",
+    basename(dist_rasts_sorted)
+  ))
+
+  # Map layer index to region ID using the file IDs
+  # Layer 1 should map to dist_file_ids[1], layer 2 to dist_file_ids[2], etc.
+  nearest_region <- terra::classify(
+    layer_index,
+    cbind(1:length(dist_file_ids), dist_file_ids)
+  )
 
   # Fill gaps
   reg_rast_final <- terra::ifel(gap_cells == 1, nearest_region, reg_rast)

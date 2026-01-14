@@ -69,13 +69,14 @@ bioreg_zip_local: "regionalization/biogeographische_regionen.zip"
 
 # Model configuration
 step_length: 4
-data_periods: ["2010_2014", "2014_2018", "2018_2022"]
+data_periods: ["2018_2022"] #"2010_2014", "2014_2018", 
 regionalization: true
 inclusion_threshold: 0.5
 scenario_names: ["BAU", "EI-NAT", "EI-CUL", "EI-SOC", "GR-EX"]
 
 # System configuration
 reference_crs: "epsg:2056"
+temp_dir: "temp"
 
 # Remote URLs
 bioreg_zip_remote: "https://data.geo.admin.ch/ch.bafu.biogeographische_regionen/data.zip"
