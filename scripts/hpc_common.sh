@@ -99,11 +99,11 @@ verify_rscript() {
     local RSCRIPT_BIN="$ENV_PATH/bin/Rscript"
     
     if [ ! -x "$RSCRIPT_BIN" ]; then
-        echo "ERROR: Rscript not found in $ENV_PATH/bin/"
+        echo "ERROR: Rscript not found in $ENV_PATH/bin/" >&2
         return 1
     fi
     
-    echo "✓ Using Rscript at: $RSCRIPT_BIN"
+    echo "✓ Using Rscript at: $RSCRIPT_BIN" >&2
     echo "$RSCRIPT_BIN"
     return 0
 }
