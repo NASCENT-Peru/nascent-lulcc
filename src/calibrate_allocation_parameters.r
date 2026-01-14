@@ -164,6 +164,12 @@ calculate_allocation_params_for_periods <- function(
   use_regions = isTRUE(config[["regionalization"]]),
   temp_dir = config[["temp_dir"]]
 ) {
+  # Handle both list and vector input for comparison_years
+  # (mapply passes vectors, but manual calls might pass lists)
+  if (is.list(comparison_years) && !is.data.frame(comparison_years)) {
+    comparison_years <- comparison_years[[1]]
+  }
+
   message(paste(rep("=", 80), collapse = ""))
   message(sprintf(
     "STARTING ALLOCATION PARAMETER CALCULATION FOR PERIOD: %s",
@@ -190,8 +196,28 @@ calculate_allocation_params_for_periods <- function(
     "Loading LULC rasters for years: %s",
     paste(comparison_years, collapse = ", ")
   ))
-  yr1 <- lulc_rasters[[grep(comparison_years[1], names(lulc_rasters))]]
-  yr2 <- lulc_rasters[[grep(comparison_years[2], names(lulc_rasters))]]
+
+  # Find exact matches for the years
+  yr1_idx <- which(names(lulc_rasters) == comparison_years[1])
+  yr2_idx <- which(names(lulc_rasters) == comparison_years[2])
+
+  if (length(yr1_idx) == 0) {
+    stop(sprintf(
+      "Year %s not found in LULC rasters. Available years: %s",
+      comparison_years[1],
+      paste(names(lulc_rasters), collapse = ", ")
+    ))
+  }
+  if (length(yr2_idx) == 0) {
+    stop(sprintf(
+      "Year %s not found in LULC rasters. Available years: %s",
+      comparison_years[2],
+      paste(names(lulc_rasters), collapse = ", ")
+    ))
+  }
+
+  yr1 <- lulc_rasters[[yr1_idx]]
+  yr2 <- lulc_rasters[[yr2_idx]]
   message("  ✓ LULC rasters loaded")
 
   # --- Set up regions ---

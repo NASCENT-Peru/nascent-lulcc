@@ -8,60 +8,39 @@
 #SBATCH --profile=task
 
 # ----------------------------------------------------------
-# 1) Load micromamba
+# Load common HPC functions
 # ----------------------------------------------------------
-export MAMBA_EXE="/cluster/project/eawag/p01002/.local/bin/micromamba"
-
-if [ ! -f "$MAMBA_EXE" ]; then
-    echo "ERROR: micromamba not found at $MAMBA_EXE"
-    exit 1
-fi
-
-eval "$($MAMBA_EXE shell hook -s bash)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/hpc_common.sh"
 
 # ----------------------------------------------------------
-# 2) Activate environment
+# Setup environment
 # ----------------------------------------------------------
-ENV_PATH="/cluster/scratch/bblack/micromamba/envs/transition_model_env"
+ENV_NAME="transition_model_env"
+ENV_PATH="$ENV_BASE_PATH/$ENV_NAME"
 
-if [ ! -d "$ENV_PATH" ]; then
-    echo "ERROR: environment not found at $ENV_PATH"
-    exit 1
-fi
-
-micromamba activate "$ENV_PATH"
-echo "✓ Activated env: $ENV_PATH"
-
-# ----------------------------------------------------------
-# 3) Set personal R libs & UTF-8 locale
-# ----------------------------------------------------------
-export R_LIBS_USER="$HOME/R_libs"
-mkdir -p "$R_LIBS_USER"
-
-export LC_ALL=en_US.UTF-8
-export LANG=en_US.UTF-8
-echo "Using UTF-8 locale"
-
-# Set environment variables for simulations
-export EVOLAND_SIMULATION_DIR="/cluster/scratch/bblack/simulation"
-mkdir -p "$EVOLAND_SIMULATION_DIR"
-echo "✓ Simulation directory: $EVOLAND_SIMULATION_DIR"
-
-# ----------------------------------------------------------
-# 4) Confirm Rscript exists
-# ----------------------------------------------------------
-RSCRIPT_BIN="$ENV_PATH/bin/Rscript"
-
-if [ ! -x "$RSCRIPT_BIN" ]; then
-    echo "ERROR: Rscript not found in $ENV_PATH/bin/"
-    exit 1
-fi
-
-echo "✓ Using Rscript at: $RSCRIPT_BIN"
+echo "========================================="
+echo "Job: transition_model_env"
+echo "========================================="
+echo "Environment: $ENV_NAME"
+echo "Path: $ENV_PATH"
 echo
 
+# Setup common environment variables
+setup_common_env
+
+# Activate environment
+activate_env "$ENV_PATH"
+echo
+
+# Verify Rscript
+RSCRIPT_BIN=$(verify_rscript "$ENV_PATH")
+if [ $? -ne 0 ]; then
+    exit 1
+fi
+echo
 # ----------------------------------------------------------
-# 5) Run Dinamica simulations
+# un Dinamica simulations
 # ----------------------------------------------------------
 R_SCRIPT="$SLURM_SUBMIT_DIR/run_dinamica_simulations.r"
 
