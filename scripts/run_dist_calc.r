@@ -324,9 +324,9 @@ result <- tryCatch(
 
     # combine the sets of predictors
     preds_list <- c(
-      #hydro_vect_paths,
-      socio_econ_paths
-      #airport_path
+      hydro_vect_paths,
+      socio_econ_paths,
+      infra_paths
     )
 
     # convert to named vector
