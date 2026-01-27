@@ -188,8 +188,8 @@ nhood_predictor_prep <- function(
       active_lulc_classes = Active_classes,
       nhood_folder_path = Nhood_folder_path,
       ncores = parallel::detectCores() - 4,
-      refresh_cache = refresh_cache,
-      tempdir = terra_temp
+      refresh = refresh_cache,
+      temp_dir = terra_temp
     )
   )
 

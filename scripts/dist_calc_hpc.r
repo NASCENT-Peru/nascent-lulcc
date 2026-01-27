@@ -1,11 +1,28 @@
 #' Compute distance-to-hydrological-features rasters in a batch on HPC
-#' is called by the sbatch script: scripts/run_dist_calc.sh
-#' which requires the conda environment (evs/dist_calc_env.yml) to be created with the script: scripts/setup_dist_calc_env.sh.
+#' is called by the sbatch script: scripts/submit_dist_calc.sh
+#' which requires the conda environment (envs/dist_calc_env.yml) to be created with the script: scripts/setup_environments.sh
 # Integer meters + heavy compression (DEFLATE level 9, predictor=2)
 library(terra)
 library(yaml)
 
+# Load project configuration
+source("src/setup.r")
+
 # functions --------------------------------------------------------------
+
+#' Log a message with timestamp to file and/or console
+#' @param msg Character. Message to log.
+#' @param log_file Character. Path to log file (optional).
+#' @param also_console Logical. Whether to also print to console.
+log_msg <- function(msg, log_file = NULL, also_console = TRUE) {
+  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+  line <- paste0(timestamp, " | ", msg, "\n")
+  if (!is.null(log_file)) {
+    dir.create(dirname(log_file), recursive = TRUE, showWarnings = FALSE)
+    cat(line, file = log_file, append = TRUE)
+  }
+  if (also_console) cat(line)
+}
 
 #' Remove auxiliary GDAL files associated with a dataset
 #' @param path Character. Path to the main dataset file.
@@ -21,9 +38,10 @@ rm_ds <- function(path) {
 #' Process a single shapefile to compute distance raster
 #' @param shp_path Character. Path to input shapefile.
 #' @param out_basename Character. Base name for output raster (without extension).
-process_shapefile <- function(shp_path, out_basename) {
+#' @param log_file Character. Path to log file (optional).
+process_shapefile <- function(shp_path, out_basename, log_file = NULL) {
   if (!file.exists(shp_path)) {
-    message("! Missing shapefile: ", shp_path)
+    log_msg(paste("! Missing shapefile:", shp_path), log_file)
     return(NULL)
   }
 
@@ -32,7 +50,7 @@ process_shapefile <- function(shp_path, out_basename) {
 
   # --- Early exit if output already exists -----------------------------------
   if (file.exists(out_dist_path)) {
-    message("↷ Skipping (already exists): ", out_dist_path)
+    log_msg(paste("↷ Skipping (already exists):", out_dist_path), log_file)
     # Still show header so the run log lists what was used
     print(tryCatch(rast(out_dist_path), error = function(e) {
       paste("  (could not read:", e$message, ")")
@@ -40,7 +58,10 @@ process_shapefile <- function(shp_path, out_basename) {
     return(out_dist_path)
   }
 
-  message("\n=== Processing: ", shp_path, " -> ", out_dist_path, " ===")
+  log_msg(
+    paste("\n=== Processing:", shp_path, "->", out_dist_path, "==="),
+    log_file
+  )
 
   # Load vector; align CRS to ref
   v <- vect(shp_path)
@@ -250,21 +271,61 @@ process_shapefile <- function(shp_path, out_basename) {
   rm_ds(prox_metric_path_m)
 
   print(rast(out_dist_path))
-  message("✓ Done: ", out_dist_path)
+  log_msg(paste("✓ Done:", out_dist_path), log_file)
   invisible(out_dist_path)
 }
 
 
 # Main -------------------------------------------------------------------
 
+# -------- Load configuration ----------------------------------------------
+message("========================================")
+message("Distance Calculation HPC Script")
+message("========================================")
+
+config <- get_config()
+
+# Create log directory and file
+log_dir <- file.path(config$data_basepath, "logs", "dist_calc")
+dir.create(log_dir, recursive = TRUE, showWarnings = FALSE)
+log_file <- file.path(
+  log_dir,
+  sprintf("dist_calc_%s.log", format(Sys.time(), "%Y%m%d_%H%M%S"))
+)
+
+log_msg("========================================", log_file)
+log_msg("Distance Calculation HPC Script Started", log_file)
+log_msg("========================================", log_file)
+log_msg(paste("Data basepath:", config$data_basepath), log_file)
+log_msg(paste("Log file:", log_file), log_file)
+log_msg("", log_file)
+
 # -------- Load reference grid -------------------------------------------------
-ref_grid_path <- "ref_grid.tif" # WGS84 lon/lat ref (EPSG:4326 expected)
+ref_grid_path <- file.path(
+  config$data_basepath,
+  config$ref_grid_path
+)
+log_msg(paste("Loading reference grid from:", ref_grid_path), log_file)
+if (!file.exists(ref_grid_path)) {
+  log_msg(paste("ERROR: Reference grid not found at:", ref_grid_path), log_file)
+  stop("Reference grid not found at: ", ref_grid_path)
+}
+
 ref <- rast(ref_grid_path)
 stopifnot(is.lonlat(ref)) # assumes EPSG:4326 in GDAL calls
+log_msg(
+  paste("✓ Reference grid loaded:", ncol(ref), "cols x", nrow(ref), "rows"),
+  log_file
+)
+log_msg("", log_file)
 
 # -------- Env & threading -----------------------------------------------------
 n_threads <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", "1"))
 tmp_dir <- Sys.getenv("TMPDIR", unset = tempdir())
+
+log_msg(paste("Threads available:", n_threads), log_file)
+log_msg(paste("Temporary directory:", tmp_dir), log_file)
+
 terraOptions(
   tempdir = tmp_dir,
   memfrac = 0.2,
@@ -286,10 +347,14 @@ co_heavy_int <- c(
 nodata_u32 <- "4294967295" # UInt32 NoData sentinel
 
 # -------- Locate GDAL utilities ----------------------------------------------
+log_msg("Locating GDAL utilities...", log_file)
+
 gdalwarp <- Sys.which("gdalwarp")
 if (gdalwarp == "") {
+  log_msg("ERROR: gdalwarp not found", log_file)
   stop("gdalwarp not found")
 }
+log_msg(paste("  ✓ gdalwarp:", gdalwarp), log_file)
 
 gdal_prox <- Sys.which("gdal_proximity")
 prefix <- character(0)
@@ -307,8 +372,10 @@ if (gdal_prox == "") {
   }
 }
 if (gdal_prox == "") {
+  log_msg("ERROR: gdal_proximity not found", log_file)
   stop("gdal_proximity not found")
 }
+log_msg(paste("  ✓ gdal_proximity:", gdal_prox), log_file)
 
 gdal_calc <- Sys.which("gdal_calc.py")
 calc_prefix <- character(0)
@@ -329,6 +396,8 @@ help_out <- tryCatch(
   error = function(e) ""
 )
 has_geo_units <- any(grepl("distunits", help_out, ignore.case = TRUE))
+log_msg(paste("  ✓ GDAL -distunits support:", has_geo_units), log_file)
+log_msg("", log_file)
 
 # -------- Pre-compute metric pixel size from ref ------------------------------
 res_deg <- res(ref)
@@ -344,11 +413,10 @@ pix_m <- min(dx_m, dy_m) # meter-sized square pixel on EPSG:3395 grid
 
 # -------- Define shapefiles to process ----------------------------------------
 
-# Replace this base directory for your cluster path:
-base_dir <- "./"
-
+log_msg("Loading predictor metadata...", log_file)
 # predictor yaml file path
-predictor_yaml_path <- file.path("pred_data.yaml")
+predictor_yaml_path <- config$pred_table_path
+log_msg(paste("Predictor YAML:", predictor_yaml_path), log_file)
 
 # read predictor yaml
 predictor_yaml <- yaml::yaml.load_file(predictor_yaml_path)
@@ -364,7 +432,8 @@ hydro_vect_paths <- sapply(
   hydro_predictors,
   function(x) {
     file.path(
-      base_dir,
+      config$data_basepath,
+      config$predictors_raw_dir,
       x$raw_dir,
       x$raw_filename
     )
@@ -387,7 +456,7 @@ socio_econ_paths <- sapply(
   socio_economic_predictors,
   function(x) {
     file.path(
-      base_dir,
+      config$data_basepath,
       x$intermediate_path
     )
   },
@@ -408,7 +477,8 @@ infra_paths <- sapply(
   infra_predictors,
   function(x) {
     file.path(
-      base_dir,
+      config$data_basepath,
+      config$predictors_raw_dir,
       x$raw_dir,
       x$raw_filename
     )
@@ -431,21 +501,50 @@ preds_list <- c(
 preds_to_process <- as.character(preds_list) # drop names for safety
 names(preds_to_process) <- names(preds_list) # preserve original names
 
+log_msg("", log_file)
+log_msg(
+  paste("Total predictors to process:", length(preds_to_process)),
+  log_file
+)
+log_msg("========================================", log_file)
+log_msg("", log_file)
+
 
 # -------- Run function for each named layer -------------------------------------------
 existing <- preds_to_process[file.exists(preds_to_process)]
 if (length(existing) == 0L) {
+  log_msg("ERROR: No shapefiles found", log_file)
+  log_msg(
+    paste("Searched paths:", paste(preds_to_process, collapse = "\n")),
+    log_file
+  )
   stop("No shapefiles found at:\n", paste(preds_to_process, collapse = "\n"))
 }
 
-message("Found ", length(existing), " shapefile(s).")
+log_msg(paste("Found", length(existing), "shapefile(s) to process"), log_file)
+log_msg("", log_file)
+
 results <- lapply(names(existing), function(nm) {
   shp <- existing[[nm]]
-  tryCatch(process_shapefile(shp, nm), error = function(e) {
-    message("✗ Error on ", shp, ": ", conditionMessage(e))
+  tryCatch(process_shapefile(shp, nm, log_file), error = function(e) {
+    log_msg(paste("✗ Error on", shp, ":", conditionMessage(e)), log_file)
     NULL
   })
 })
+
+log_msg("", log_file)
+log_msg("========================================", log_file)
+log_msg("Batch processing finished", log_file)
+log_msg(
+  paste(
+    "Successful outputs:",
+    sum(!sapply(results, is.null)),
+    "/",
+    length(results)
+  ),
+  log_file
+)
+log_msg("========================================", log_file)
 
 message("\nBatch finished. Outputs (non-NULL):")
 print(Filter(Negate(is.null), results))

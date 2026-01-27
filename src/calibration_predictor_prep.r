@@ -76,8 +76,8 @@ calibration_predictor_prep <- function(
     terra_temp = terra_temp
   )
 
-  # hydrological predictors
-  hydrological_pred_prep(
+  # prepare socio-economic predictors
+  socio_economic_pred_prep(
     config = config,
     refresh_cache = refresh_cache,
     terra_temp = terra_temp
@@ -86,24 +86,24 @@ calibration_predictor_prep <- function(
   # prepare infrastructure predictors
   infrastructure_pred_prep(
     config = config,
-    refresh_cache = refresh_cache,
-    terra_temp = terra_temp
+    refresh_cache = refresh_cache
   )
 
-  # prepare socio-economic predictors
-  socio_economic_pred_prep(
+  # perform distance calculations to prepare intermediate layers for hydrological and infrastructure predictors
+  source("src/dist_calc_functions.r")
+  source("scripts/run_dist_calc.r")
+
+  # hydrological predictors
+  hydrological_pred_prep(
     config = config,
     refresh_cache = refresh_cache,
-    terra_temp = terra_temp,
-    modelling_periods = modelling_periods
+    terra_temp = terra_temp
   )
 
   # prepare climatic predictors
   climatic_pred_prep(
     config = config,
-    refresh_cache = refresh_cache,
-    terra_temp = terra_temp,
-    pre_modelling_years = pre_modelling_years
+    refresh_cache = refresh_cache
   )
 
   message(

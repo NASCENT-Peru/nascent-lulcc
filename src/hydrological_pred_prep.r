@@ -33,11 +33,11 @@ hydrological_pred_prep <- function(
   # calculating distance based rasters from them on a desktop computer is likely not feasible.
 
   # Instead the layers were calculated on a high-performance computing cluster using
-  # a custom R script (R/dist_calc_hpc.r) that uses GDAL utilities.
+  # a custom R script (scripts/run_dist_calc.r) that uses GDAL utilities.
   # This workflow can be reproduced by users with access to similar HPC resources.
-  # First create the required environment using the script (scripts/setup_dist_calc_env.sh)
+  # First create the required environment using the script (scripts/setup_environments.sh)
   # which uses envs/dist_calc_env.yml to create a conda environment with the required dependencies.
-  # Then run the sbatch script (scripts/run_dist_calc.sbatch) to submit the job to the cluster.
+  # Then run the sbatch script (scripts/submit_dist_calc.sh) to submit the job to the cluster.
   # Note that you will need to manually move the required shapefiles to the cluster and adjust paths in the scripts accordingly
   # and manually move the resulting rasters back to the appropriate directory in your local data structure.
 

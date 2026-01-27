@@ -16,7 +16,7 @@ socio_economic_pred_prep <- function(
   # load the ref_grid
   ref_raster <- terra::rast(config[["ref_grid_path"]])
 
-  # subset to soil predictor entries grouping is socioeconomic
+  # subset to socio-economic predictor entries grouping is socioeconomic
   socio_economic_preds <- Filter(
     function(x) !is.null(x$grouping) && x$grouping == "socioeconomic",
     pred_table
@@ -65,10 +65,15 @@ socio_economic_pred_prep <- function(
   # mask to the ref raster
   gav_rast <- terra::mask(gav_rast, ref_raster)
 
+  gav_pred_dir <- file.path(
+    config[["prepped_lyr_path"]],
+    gav_pred$grouping
+  )
+  ensure_dir(gav_pred_dir)
+
   # save the raster
   gav_outpath <- file.path(
-    config[["prepped_lyr_path"]],
-    gav_pred$grouping,
+    gav_pred_dir,
     "gross_added_value.tif"
   )
   write_raster(gav_rast, filename = gav_outpath)
@@ -138,10 +143,15 @@ socio_economic_pred_prep <- function(
   # mask to the ref raster
   pop_rast <- terra::mask(pop_rast, ref_raster)
 
+  pop_pred_dir <- file.path(
+    config[["prepped_lyr_path"]],
+    pop_pred$grouping
+  )
+  ensure_dir(pop_pred_dir)
+
   # output path
   pop_outpath <- file.path(
-    config[["prepped_lyr_path"]],
-    pop_pred$grouping,
+    pop_pred_dir,
     "pop_growth_density.tif"
   )
 
@@ -220,10 +230,15 @@ socio_economic_pred_prep <- function(
       paste0(group_name, ".shp")
     )
 
+    market_pred_dir <- file.path(
+      config[["prepped_lyr_path"]],
+      market_pred$grouping
+    )
+    ensure_dir(market_pred_dir)
+
     # final output path
     outpath <- file.path(
-      config[["prepped_lyr_path"]],
-      market_pred$grouping,
+      market_pred_dir,
       paste0("dist_to_", group_name, ".tif")
     )
 
@@ -306,10 +321,15 @@ socio_economic_pred_prep <- function(
       paste0(group_name, ".shp")
     )
 
+    commercial_pred_dir <- file.path(
+      config[["prepped_lyr_path"]],
+      commercial_pred$grouping
+    )
+    ensure_dir(commercial_pred_dir)
+
     # final output path
     outpath <- file.path(
-      config[["prepped_lyr_path"]],
-      commercial_pred$grouping,
+      commercial_pred_dir,
       paste0("dist_to_", group_name, ".tif")
     )
 
@@ -372,10 +392,15 @@ socio_economic_pred_prep <- function(
   # make sure extent matches ref raster
   financial_vect <- terra::crop(financial_vect, terra::ext(ref_raster))
 
+  financial_pred_dir <- file.path(
+    config[["prepped_lyr_path"]],
+    financial_pred$grouping
+  )
+  ensure_dir(financial_pred_dir)
+
   # final output path
   outpath <- file.path(
-    config[["prepped_lyr_path"]],
-    financial_pred$grouping,
+    financial_pred_dir,
     "dist_to_financial_services.tif"
   )
 
@@ -481,10 +506,15 @@ socio_economic_pred_prep <- function(
     travel_time_vect$trav_time[travel_time_vect$cat_tiempo == cat] <- i
   }
 
+  travel_time_pred_dir <- file.path(
+    config[["prepped_lyr_path"]],
+    travel_time_pred$grouping
+  )
+  ensure_dir(travel_time_pred_dir)
+
   # final output path
   outpath <- file.path(
-    config[["prepped_lyr_path"]],
-    travel_time_pred$grouping,
+    travel_time_pred_dir,
     "trav_time_to_dept_cap.tif"
   )
 

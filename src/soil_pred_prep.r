@@ -34,38 +34,40 @@ soil_pred_prep <- function(
   for (f in seq_along(soil_pred_entries)) {
     message(paste("Processing", names(soil_pred_paths)[f]))
 
+    soil_dir <- file.path(config[["prepped_lyr_path"]], "soil")
+    ensure_dir(soil_dir)
+
     # save the aligned raster to the prepped_lyr_path directory
     out_name <- basename(soil_pred_paths[f])
     out_path <- file.path(
-      config[["prepped_lyr_path"]],
-      "soil",
+      soil_dir,
       paste0("soil_", out_name)
     )
 
-    # # skip if already exists and not refreshing
-    # if (file.exists(out_path) & !refresh_cache) {
-    #   message(paste("File", out_name, "already exists. Skipping..."))
-    #   next
-    # } else {
-    #   message(paste("Saving to", out_path))
-    # }
+    # skip if already exists and not refreshing
+    if (file.exists(out_path) & !refresh_cache) {
+      message(paste("File", out_name, "already exists. Skipping..."))
+      next
+    } else {
+      message(paste("Saving to", out_path))
+    }
 
-    # start_time <- Sys.time()
-    # # align the raster to the reference grid
-    # align_to_ref(
-    #   x = soil_pred_paths[f],
-    #   ref = config[["ref_grid_path"]],
-    #   filename = out_path,
-    #   tempdir = terra_temp
-    # )
-    # end_time <- Sys.time()
-    # message(paste(
-    #   "Processed",
-    #   out_name,
-    #   "in",
-    #   round(difftime(end_time, start_time, units = "mins"), 2),
-    #   "minutes"
-    # ))
+    start_time <- Sys.time()
+    # align the raster to the reference grid
+    align_to_ref(
+      x = soil_pred_paths[f],
+      ref = config[["ref_grid_path"]],
+      filename = out_path,
+      tempdir = terra_temp
+    )
+    end_time <- Sys.time()
+    message(paste(
+      "Processed",
+      out_name,
+      "in",
+      round(difftime(end_time, start_time, units = "mins"), 2),
+      "minutes"
+    ))
 
     # extract metadata for YAML update
     pred_name <- names(soil_pred_paths)[f]

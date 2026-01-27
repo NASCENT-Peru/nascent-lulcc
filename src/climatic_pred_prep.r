@@ -3,7 +3,7 @@ climatic_pred_prep <- function(
   refresh_cache = FALSE,
   LULC_years = c(2010, 2014, 2018, 2022)
 ) {
-  message("starting infrastructure predictor prep")
+  message("starting climate predictor prep")
 
   # Load predictor YAML
   pred_yaml_file <- config[["pred_table_path"]]
@@ -36,6 +36,21 @@ climatic_pred_prep <- function(
     pattern = "\\.tif$",
     full.names = TRUE
   )
+
+  # identify all files that have _historic in the name
+  historic_files <- climatic_files[grepl("_historical", climatic_files)]
+  if (!length(historic_files) == 0) {
+    # remove the _historic string and rename the files
+    for (f in climatic_files) {
+      new_name <- gsub("_historical", "", f)
+      file.rename(f, new_name)
+    }
+    climatic_files <- list.files(
+      climatic_pred_dir,
+      pattern = "\\.tif$",
+      full.names = TRUE
+    )
+  }
 
   # stack and mask all files simultaneously
   climatic_stack <- terra::rast(climatic_files)
