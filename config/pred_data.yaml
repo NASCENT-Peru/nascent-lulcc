@@ -3294,7 +3294,7 @@ bio1_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio1_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -4024,7 +4024,7 @@ bio10_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio10_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -4754,7 +4754,7 @@ bio11_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio11_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -5484,7 +5484,7 @@ bio12_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio12_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -6184,7 +6184,7 @@ bio13_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio13_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -6914,7 +6914,7 @@ bio14_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio14_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -7644,7 +7644,7 @@ bio15_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio15_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -8374,7 +8374,7 @@ bio16_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio16_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -9104,7 +9104,7 @@ bio17_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio17_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -9834,7 +9834,7 @@ bio18_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio18_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -10564,7 +10564,7 @@ bio19_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio19_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -11294,7 +11294,7 @@ bio2_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio2_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -11994,7 +11994,7 @@ bio3_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio3_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -12694,7 +12694,7 @@ bio4_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio4_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -13424,7 +13424,7 @@ bio5_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio5_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -14154,7 +14154,7 @@ bio6_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio6_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -14884,7 +14884,7 @@ bio7_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio7_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -15614,7 +15614,7 @@ bio8_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio8_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -16344,7 +16344,7 @@ bio9_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/bio9_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -17734,7 +17734,7 @@ gdd_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/gdd_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -18434,7 +18434,7 @@ pr_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/pr_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -19134,7 +19134,7 @@ tas_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/tas_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -19834,7 +19834,7 @@ tasmax_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/tasmax_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -20534,7 +20534,7 @@ tasmin_2018:
     resolution monthly precipitation and temperature timeseries for the period 2006-2100.
     Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
   scenario_variant: ~
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/climatic/tasmin_2018.tif
   intermediate_path: ~
   grouping: climatic
@@ -21156,6 +21156,1494 @@ tasmin_2060_ssp585:
   scenario_variant: ssp585
   period: '2060'
   path: predictors/prepared/layers/climatic/tasmin_2060_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Minimum Temperature' for scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio1_1996_ssp126:
+  base_name: bio1
+  clean_name: Annual Mean Temperature
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio1_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Annual Mean Temperature' for scenario
+    'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio1_1996_ssp245:
+  base_name: bio1
+  clean_name: Annual Mean Temperature
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio1_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Annual Mean Temperature' for scenario
+    'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio1_1996_ssp585:
+  base_name: bio1
+  clean_name: Annual Mean Temperature
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio1_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Annual Mean Temperature' for scenario
+    'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio10_1996_ssp126:
+  base_name: bio10
+  clean_name: Mean Temperature of Warmest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio10_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Mean Temperature of Warmest Quarter' for
+    scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio10_1996_ssp245:
+  base_name: bio10
+  clean_name: Mean Temperature of Warmest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio10_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Mean Temperature of Warmest Quarter' for
+    scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio10_1996_ssp585:
+  base_name: bio10
+  clean_name: Mean Temperature of Warmest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio10_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Mean Temperature of Warmest Quarter' for
+    scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio11_1996_ssp126:
+  base_name: bio11
+  clean_name: Mean Temperature of Coldest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio11_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Mean Temperature of Coldest Quarter' for
+    scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio11_1996_ssp245:
+  base_name: bio11
+  clean_name: Mean Temperature of Coldest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio11_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Mean Temperature of Coldest Quarter' for
+    scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio11_1996_ssp585:
+  base_name: bio11
+  clean_name: Mean Temperature of Coldest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio11_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Mean Temperature of Coldest Quarter' for
+    scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio12_1996_ssp126:
+  base_name: bio12
+  clean_name: Annual Precipitation
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio12_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Annual Precipitation' for scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio12_1996_ssp245:
+  base_name: bio12
+  clean_name: Annual Precipitation
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio12_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Annual Precipitation' for scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio12_1996_ssp585:
+  base_name: bio12
+  clean_name: Annual Precipitation
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio12_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Annual Precipitation' for scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio13_1996_ssp126:
+  base_name: bio13
+  clean_name: Precipitation of Wettest Month
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio13_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Wettest Month' for scenario
+    'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio13_1996_ssp245:
+  base_name: bio13
+  clean_name: Precipitation of Wettest Month
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio13_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Wettest Month' for scenario
+    'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio13_1996_ssp585:
+  base_name: bio13
+  clean_name: Precipitation of Wettest Month
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio13_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Wettest Month' for scenario
+    'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio14_1996_ssp126:
+  base_name: bio14
+  clean_name: Precipitation of Driest Month
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio14_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Driest Month' for scenario
+    'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio14_1996_ssp245:
+  base_name: bio14
+  clean_name: Precipitation of Driest Month
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio14_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Driest Month' for scenario
+    'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio14_1996_ssp585:
+  base_name: bio14
+  clean_name: Precipitation of Driest Month
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio14_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Driest Month' for scenario
+    'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio15_1996_ssp126:
+  base_name: bio15
+  clean_name: Precipitation Seasonality
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio15_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation Seasonality' for scenario
+    'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio15_1996_ssp245:
+  base_name: bio15
+  clean_name: Precipitation Seasonality
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio15_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation Seasonality' for scenario
+    'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio15_1996_ssp585:
+  base_name: bio15
+  clean_name: Precipitation Seasonality
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio15_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation Seasonality' for scenario
+    'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio16_1996_ssp126:
+  base_name: bio16
+  clean_name: Precipitation of Wettest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio16_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Wettest Quarter' for
+    scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio16_1996_ssp245:
+  base_name: bio16
+  clean_name: Precipitation of Wettest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio16_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Wettest Quarter' for
+    scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio16_1996_ssp585:
+  base_name: bio16
+  clean_name: Precipitation of Wettest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio16_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Wettest Quarter' for
+    scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio17_1996_ssp126:
+  base_name: bio17
+  clean_name: Precipitation of Driest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio17_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Driest Quarter' for scenario
+    'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio17_1996_ssp245:
+  base_name: bio17
+  clean_name: Precipitation of Driest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio17_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Driest Quarter' for scenario
+    'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio17_1996_ssp585:
+  base_name: bio17
+  clean_name: Precipitation of Driest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio17_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Driest Quarter' for scenario
+    'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio18_1996_ssp126:
+  base_name: bio18
+  clean_name: Precipitation of Warmest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio18_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Warmest Quarter' for
+    scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio18_1996_ssp245:
+  base_name: bio18
+  clean_name: Precipitation of Warmest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio18_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Warmest Quarter' for
+    scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio18_1996_ssp585:
+  base_name: bio18
+  clean_name: Precipitation of Warmest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio18_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Warmest Quarter' for
+    scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio19_1996_ssp126:
+  base_name: bio19
+  clean_name: Precipitation of Coldest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio19_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Coldest Quarter' for
+    scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio19_1996_ssp245:
+  base_name: bio19
+  clean_name: Precipitation of Coldest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio19_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Coldest Quarter' for
+    scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio19_1996_ssp585:
+  base_name: bio19
+  clean_name: Precipitation of Coldest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio19_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation of Coldest Quarter' for
+    scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio2_1996_ssp126:
+  base_name: bio2
+  clean_name: Mean Diurnal Range
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio2_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Mean Diurnal Range' for scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio2_1996_ssp245:
+  base_name: bio2
+  clean_name: Mean Diurnal Range
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio2_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Mean Diurnal Range' for scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio2_1996_ssp585:
+  base_name: bio2
+  clean_name: Mean Diurnal Range
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio2_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Mean Diurnal Range' for scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio3_1996_ssp126:
+  base_name: bio3
+  clean_name: Isothermality
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio3_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Isothermality' for scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio3_1996_ssp245:
+  base_name: bio3
+  clean_name: Isothermality
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio3_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Isothermality' for scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio3_1996_ssp585:
+  base_name: bio3
+  clean_name: Isothermality
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio3_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Isothermality' for scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio4_1996_ssp126:
+  base_name: bio4
+  clean_name: Temperature Seasonality
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio4_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Temperature Seasonality' for scenario
+    'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio4_1996_ssp245:
+  base_name: bio4
+  clean_name: Temperature Seasonality
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio4_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Temperature Seasonality' for scenario
+    'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio4_1996_ssp585:
+  base_name: bio4
+  clean_name: Temperature Seasonality
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio4_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Temperature Seasonality' for scenario
+    'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio5_1996_ssp126:
+  base_name: bio5
+  clean_name: Max Temperature of Warmest Month
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio5_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Max Temperature of Warmest Month' for
+    scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio5_1996_ssp245:
+  base_name: bio5
+  clean_name: Max Temperature of Warmest Month
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio5_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Max Temperature of Warmest Month' for
+    scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio5_1996_ssp585:
+  base_name: bio5
+  clean_name: Max Temperature of Warmest Month
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio5_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Max Temperature of Warmest Month' for
+    scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio6_1996_ssp126:
+  base_name: bio6
+  clean_name: Min Temperature of Coldest Month
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio6_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Min Temperature of Coldest Month' for
+    scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio6_1996_ssp245:
+  base_name: bio6
+  clean_name: Min Temperature of Coldest Month
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio6_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Min Temperature of Coldest Month' for
+    scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio6_1996_ssp585:
+  base_name: bio6
+  clean_name: Min Temperature of Coldest Month
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio6_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Min Temperature of Coldest Month' for
+    scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio7_1996_ssp126:
+  base_name: bio7
+  clean_name: Temperature Annual Range
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio7_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Temperature Annual Range' for scenario
+    'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio7_1996_ssp245:
+  base_name: bio7
+  clean_name: Temperature Annual Range
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio7_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Temperature Annual Range' for scenario
+    'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio7_1996_ssp585:
+  base_name: bio7
+  clean_name: Temperature Annual Range
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio7_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Temperature Annual Range' for scenario
+    'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio8_1996_ssp126:
+  base_name: bio8
+  clean_name: Mean Temperature of Wettest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio8_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Mean Temperature of Wettest Quarter' for
+    scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio8_1996_ssp245:
+  base_name: bio8
+  clean_name: Mean Temperature of Wettest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio8_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Mean Temperature of Wettest Quarter' for
+    scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio8_1996_ssp585:
+  base_name: bio8
+  clean_name: Mean Temperature of Wettest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio8_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Mean Temperature of Wettest Quarter' for
+    scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio9_1996_ssp126:
+  base_name: bio9
+  clean_name: Mean Temperature of Driest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio9_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Mean Temperature of Driest Quarter' for
+    scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio9_1996_ssp245:
+  base_name: bio9
+  clean_name: Mean Temperature of Driest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio9_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Mean Temperature of Driest Quarter' for
+    scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+bio9_1996_ssp585:
+  base_name: bio9
+  clean_name: Mean Temperature of Driest Quarter
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/bio9_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Mean Temperature of Driest Quarter' for
+    scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+gdd_1996_ssp126:
+  base_name: gdd
+  clean_name: Growing Degree Days
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/gdd_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Growing Degree Days' for scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+gdd_1996_ssp245:
+  base_name: gdd
+  clean_name: Growing Degree Days
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/gdd_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Growing Degree Days' for scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+gdd_1996_ssp585:
+  base_name: gdd
+  clean_name: Growing Degree Days
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/gdd_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Growing Degree Days' for scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+pr_1996_ssp126:
+  base_name: pr
+  clean_name: Precipitation
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/pr_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation' for scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+pr_1996_ssp245:
+  base_name: pr
+  clean_name: Precipitation
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/pr_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation' for scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+pr_1996_ssp585:
+  base_name: pr
+  clean_name: Precipitation
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/pr_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Precipitation' for scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+tas_1996_ssp126:
+  base_name: tas
+  clean_name: Average Temperature
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/tas_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Average Temperature' for scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+tas_1996_ssp245:
+  base_name: tas
+  clean_name: Average Temperature
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/tas_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Average Temperature' for scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+tas_1996_ssp585:
+  base_name: tas
+  clean_name: Average Temperature
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/tas_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Average Temperature' for scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+tasmax_1996_ssp126:
+  base_name: tasmax
+  clean_name: Maximum Temperature
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/tasmax_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Maximum Temperature' for scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+tasmax_1996_ssp245:
+  base_name: tasmax
+  clean_name: Maximum Temperature
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/tasmax_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Maximum Temperature' for scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+tasmax_1996_ssp585:
+  base_name: tasmax
+  clean_name: Maximum Temperature
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/tasmax_1996_ssp585.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Maximum Temperature' for scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+tasmin_1996_ssp126:
+  base_name: tasmin
+  clean_name: Minimum Temperature
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp126
+  period: '1996'
+  path: predictors/prepared/layers/climatic/tasmin_1996_ssp126.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Minimum Temperature' for scenario 'ssp126'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+tasmin_1996_ssp245:
+  base_name: tasmin
+  clean_name: Minimum Temperature
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp245
+  period: '1996'
+  path: predictors/prepared/layers/climatic/tasmin_1996_ssp245.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Minimum Temperature' for scenario 'ssp245'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+tasmin_1996_ssp585:
+  base_name: tasmin
+  clean_name: Minimum Temperature
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ssp585
+  period: '1996'
+  path: predictors/prepared/layers/climatic/tasmin_1996_ssp585.tif
   intermediate_path: ~
   grouping: climatic
   description: Climatic predictor variable 'Minimum Temperature' for scenario 'ssp585'.

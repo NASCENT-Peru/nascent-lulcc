@@ -33,7 +33,7 @@ rm_ds <- function(path) {
 
 #' Process a single shapefile to compute distance raster
 #' @param shp_path Character. Path to input shapefile.
-#' @param out_basename Character. Base name for output raster (without extension).
+#' @param out_path Character. Full path for output distance raster (including .tif extension).
 #' @param log_file Character. Path to log file (optional).
 #' @param ref SpatRaster. Reference grid for spatial extent and resolution.
 #' @param tmp_dir Character. Temporary directory for intermediate files.
@@ -51,7 +51,7 @@ rm_ds <- function(path) {
 #' @return Character path to output raster, or NULL if failed.
 process_shapefile <- function(
   shp_path,
-  out_basename,
+  out_path,
   log_file = NULL,
   ref,
   tmp_dir,
@@ -72,21 +72,22 @@ process_shapefile <- function(
     return(NULL)
   }
 
-  out_dir <- dirname(shp_path)
-  out_dist_path <- file.path(out_dir, paste0(out_basename, ".tif"))
+  # Ensure output directory exists
+  out_dir <- dirname(out_path)
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
   # --- Early exit if output already exists -----------------------------------
-  if (file.exists(out_dist_path)) {
-    log_msg(paste("↷ Skipping (already exists):", out_dist_path), log_file)
+  if (file.exists(out_path)) {
+    log_msg(paste("↷ Skipping (already exists):", out_path), log_file)
     # Still show header so the run log lists what was used
-    print(tryCatch(terra::rast(out_dist_path), error = function(e) {
+    print(tryCatch(terra::rast(out_path), error = function(e) {
       paste("  (could not read:", e$message, ")")
     }))
-    return(out_dist_path)
+    return(out_path)
   }
 
   log_msg(
-    paste("\n=== Processing:", shp_path, "->", out_dist_path, "==="),
+    paste("\n=== Processing:", shp_path, "->", out_path, "==="),
     log_file
   )
 
@@ -95,6 +96,9 @@ process_shapefile <- function(
   if (!terra::same.crs(ref, v)) {
     v <- terra::project(v, terra::crs(ref))
   }
+
+  # Get base name for temporary files
+  out_basename <- tools::file_path_sans_ext(basename(out_path))
 
   # 1) Rasterize vector -> byte mask (WGS84)
   mask_path <- file.path(
@@ -221,7 +225,7 @@ process_shapefile <- function(
   }
 
   # 4) Warp meters back to exact WGS84 ref grid (keep integers)
-  rm_ds(out_dist_path)
+  rm_ds(out_path)
   ext_vals <- c(
     terra::xmin(ext_ref),
     terra::ymin(ext_ref),
@@ -249,7 +253,7 @@ process_shapefile <- function(
     "-dstnodata",
     nodata_u32,
     prox_metric_path_m,
-    out_dist_path,
+    out_path,
     "-co",
     co_heavy_int[1],
     "-co",
@@ -271,10 +275,10 @@ process_shapefile <- function(
   invisible(system2(gdalwarp, warp_back_args))
 
   # 5) Mask where ref == 0 -> NA (write UInt32 with NoData=nodata_u32)
-  tmpout <- paste0(out_dist_path, ".tmp.tif")
+  tmpout <- paste0(out_path, ".tmp.tif")
   rm_ds(tmpout)
 
-  dist_r <- terra::rast(out_dist_path)
+  dist_r <- terra::rast(out_path)
   masked <- terra::mask(
     dist_r,
     ref,
@@ -290,9 +294,9 @@ process_shapefile <- function(
   gc()
 
   # Atomic replace
-  rm_ds(out_dist_path)
-  if (!file.rename(tmpout, out_dist_path)) {
-    ok <- file.copy(tmpout, out_dist_path, overwrite = TRUE)
+  rm_ds(out_path)
+  if (!file.rename(tmpout, out_path)) {
+    ok <- file.copy(tmpout, out_path, overwrite = TRUE)
     rm_ds(tmpout)
     if (!ok) stop("Failed to move masked temp file into place.")
   }
@@ -302,7 +306,7 @@ process_shapefile <- function(
   rm_ds(mask_metric_vrt)
   rm_ds(prox_metric_path_m)
 
-  print(terra::rast(out_dist_path))
-  log_msg(paste("✓ Done:", out_dist_path), log_file)
-  invisible(out_dist_path)
+  print(terra::rast(out_path))
+  log_msg(paste("✓ Done:", out_path), log_file)
+  invisible(out_path)
 }

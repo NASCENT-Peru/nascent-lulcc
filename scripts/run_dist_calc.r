@@ -273,6 +273,18 @@ result <- tryCatch(
       USE.NAMES = TRUE
     )
 
+    # Get output paths for hydrological predictors
+    hydro_out_paths <- sapply(
+      hydro_predictors,
+      function(x) {
+        file.path(
+          config$data_basepath,
+          x$path
+        )
+      },
+      USE.NAMES = TRUE
+    )
+
     # extract socioeconomic predictors subsetting to only those where intermediate_path is not null
     socio_economic_predictors <- Filter(
       function(x) {
@@ -295,6 +307,18 @@ result <- tryCatch(
       USE.NAMES = TRUE
     )
 
+    # Get output paths for socioeconomic predictors
+    socio_econ_out_paths <- sapply(
+      socio_economic_predictors,
+      function(x) {
+        file.path(
+          config$data_basepath,
+          x$path
+        )
+      },
+      USE.NAMES = TRUE
+    )
+
     # seperate infrastructure predictors
     infra_predictors <- Filter(
       function(x) {
@@ -309,9 +333,20 @@ result <- tryCatch(
       infra_predictors,
       function(x) {
         file.path(
-          config$predictors_raw_dir,
-          x$raw_dir,
-          x$raw_filename
+          config$data_basepath,
+          x$intermediate_path
+        )
+      },
+      USE.NAMES = TRUE
+    )
+
+    # Get output paths for infrastructure predictors
+    infra_out_paths <- sapply(
+      infra_predictors,
+      function(x) {
+        file.path(
+          config$data_basepath,
+          x$path
         )
       },
       USE.NAMES = TRUE
@@ -320,16 +355,26 @@ result <- tryCatch(
     # subset to only airports as roads have been done already
     airport_path <- infra_paths[grepl("airport", names(infra_paths))]
 
-    # combine the sets of predictors
+    # combine the sets of predictors (input shapefiles)
     preds_list <- c(
       hydro_vect_paths,
       socio_econ_paths,
       infra_paths
     )
 
-    # convert to named vector
+    # combine the sets of output paths
+    preds_out_list <- c(
+      hydro_out_paths,
+      socio_econ_out_paths,
+      infra_out_paths
+    )
+
+    # convert to named vectors
     preds_to_process <- as.character(preds_list) # drop names for safety
     names(preds_to_process) <- names(preds_list) # preserve original names
+
+    preds_out_paths <- as.character(preds_out_list)
+    names(preds_out_paths) <- names(preds_out_list)
 
     log_msg("", log_file)
     log_msg(
@@ -341,6 +386,10 @@ result <- tryCatch(
 
     # -------- Run function for each named layer in parallel -------------------------------------------
     existing <- preds_to_process[file.exists(preds_to_process)]
+    existing_out_paths <- preds_out_paths[
+      names(preds_to_process) %in% names(existing)
+    ]
+
     if (length(existing) == 0L) {
       log_msg("ERROR: No shapefiles found", log_file)
       log_msg(
@@ -376,8 +425,16 @@ result <- tryCatch(
     terraOptions(threads = n_threads_per_worker)
 
     # Prepare objects for parallel workers
-    # SpatRaster objects don't serialize well, so pass the path instead
+    # SpatRaster objects and SpatExtent don't serialize well, so extract primitive values
     ref_path <- ref_grid_path
+    ext_vals <- c(
+      terra::xmin(ext_ref),
+      terra::ymin(ext_ref),
+      terra::xmax(ext_ref),
+      terra::ymax(ext_ref)
+    )
+    ref_ncol <- terra::ncol(ref)
+    ref_nrow <- terra::nrow(ref)
 
     # Process shapefiles in parallel
     results <- furrr::future_map(
@@ -389,11 +446,16 @@ result <- tryCatch(
         # Load reference grid in each worker
         ref_worker <- terra::rast(ref_path)
 
+        # Recreate extent object in worker
+        ext_ref_worker <- terra::ext(ext_vals)
+
         shp <- existing[[nm]]
+        out_path <- existing_out_paths[[nm]]
+
         tryCatch(
           process_shapefile(
             shp_path = shp,
-            out_basename = nm,
+            out_path = out_path,
             log_file = log_file,
             ref = ref_worker,
             tmp_dir = tmp_dir,
@@ -407,7 +469,7 @@ result <- tryCatch(
             calc_prefix = calc_prefix,
             has_geo_units = has_geo_units,
             pix_m = pix_m,
-            ext_ref = ext_ref
+            ext_ref = ext_ref_worker
           ),
           error = function(e) {
             log_msg(
