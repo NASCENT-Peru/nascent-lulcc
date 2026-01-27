@@ -1,4 +1,4 @@
-temp# HPC (Euler) configuration
+# HPC (Euler) configuration
 environment: "hpc"
 
 # Base paths
