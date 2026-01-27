@@ -169,4 +169,26 @@ region_prep <- function(config = get_config()) {
   )
 
   message("Completed conversion of regions shapefile to raster: ", outpath)
+
+  # LAZY RESAMPLING OF REGIONS RASTER TO MATCH AGGREGATED REFERENCE GRID
+  # # This section is commented out because the proper approach is to RE-RUN THE DISTANCE
+  # # CALCULATIONS using the aggregated reference grid from the start, rather than
+  # # resampling after the fact.
+  # # load final regions raster
+  # reg_rast <- rast(file.path(config[["reg_dir"]], "regions.tif"))
+
+  # # load aggregated reference grid
+  # ref_grid <- terra::rast(config[["ref_grid_agg_path"]])
+
+  # # perform resampling of regions raster to match aggregated reference grid
+  # reg_rast_resampled <- terra::resample(reg_rast, ref_grid, method = "modal")
+
+  # # save resampled regions raster
+  # out_dir <- "E:/nascent-lulcc-agg/regionalization"
+  # ensure_dir(out_dir)
+  # outpath_resampled <- file.path(out_dir, "regions.tif")
+  # write_raster(
+  #   reg_rast_resampled,
+  #   outpath_resampled
+  # )
 }

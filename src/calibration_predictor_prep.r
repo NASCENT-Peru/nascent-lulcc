@@ -58,8 +58,7 @@ calibration_predictor_prep <- function(
 
   # prepare topographical predictors
   terrain_pred_prep(
-    config = config,
-    refresh_cache = refresh_cache
+    config = config
   )
 
   # prepare soil predictors

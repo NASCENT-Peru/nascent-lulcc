@@ -1,4 +1,4 @@
-#!/bin/bash
+#regio#!/bin/bash
 # master_pipeline.sh
 # Master script to run the complete LULCC modelling pipeline
 
@@ -85,19 +85,110 @@ start_time=$(date)
 echo "Pipeline started at: $start_time"
 echo
 
-# Step 1: Data Preparation
+# Step 1: Data Preparation Pipeline
 echo "========================================="
-echo "Step 1: Data Preparation"
+echo "Step 1: Data Preparation Pipeline"
 echo "========================================="
 
-data_prep_job_id=$(sbatch --parsable "$SCRIPT_DIR/submit_data_preparation.sh")
+# Step 1a: Reference Grid Preparation
+echo
+echo "Step 1a: Reference Grid Preparation"
+echo "-------------------------------------------"
+ref_grid_job_id=$(sbatch --parsable "$SCRIPT_DIR/submit_ref_grid_prep.sh")
 if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to submit data preparation job"
+    echo "ERROR: Failed to submit reference grid preparation job"
     exit 1
 fi
+echo "Reference grid preparation job submitted with ID: $ref_grid_job_id"
+check_job_status $ref_grid_job_id "reference grid preparation"
 
-echo "Data preparation job submitted with ID: $data_prep_job_id"
-check_job_status $data_prep_job_id "data preparation"
+# Step 1b: LULC Data Preparation
+echo
+echo "Step 1b: LULC Data Preparation"
+echo "-------------------------------------------"
+lulc_job_id=$(sbatch --dependency=afterok:$ref_grid_job_id --parsable "$SCRIPT_DIR/submit_lulc_data_prep.sh")
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to submit LULC data preparation job"
+    exit 1
+fi
+echo "LULC data preparation job submitted with ID: $lulc_job_id"
+check_job_status $lulc_job_id "LULC data preparation"
+
+# Step 1c: Region Preparation
+echo
+echo "Step 1c: Region Preparation"
+echo "-------------------------------------------"
+region_job_id=$(sbatch --dependency=afterok:$lulc_job_id --parsable "$SCRIPT_DIR/submit_region_prep.sh")
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to submit region preparation job"
+    exit 1
+fi
+echo "Region preparation job submitted with ID: $region_job_id"
+check_job_status $region_job_id "region preparation"
+
+# Step 1d: Ancillary Data Preparation
+echo
+echo "Step 1d: Ancillary Data Preparation"
+echo "-------------------------------------------"
+ancillary_job_id=$(sbatch --dependency=afterok:$region_job_id --parsable "$SCRIPT_DIR/submit_ancillary_data_prep.sh")
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to submit ancillary data preparation job"
+    exit 1
+fi
+echo "Ancillary data preparation job submitted with ID: $ancillary_job_id"
+check_job_status $ancillary_job_id "ancillary data preparation"
+
+# Step 1e: Calibration Predictor Preparation
+echo
+echo "Step 1e: Calibration Predictor Preparation"
+echo "-------------------------------------------"
+cal_pred_job_id=$(sbatch --dependency=afterok:$ancillary_job_id --parsable "$SCRIPT_DIR/submit_calibration_predictor_prep.sh")
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to submit calibration predictor preparation job"
+    exit 1
+fi
+echo "Calibration predictor preparation job submitted with ID: $cal_pred_job_id"
+check_job_status $cal_pred_job_id "calibration predictor preparation"
+
+# Step 1f: Predictor Parquets Creation
+echo
+echo "Step 1f: Predictor Parquets Creation"
+echo "-------------------------------------------"
+parquet_job_id=$(sbatch --dependency=afterok:$cal_pred_job_id --parsable "$SCRIPT_DIR/submit_predictor_parquets.sh")
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to submit predictor parquets job"
+    exit 1
+fi
+echo "Predictor parquets job submitted with ID: $parquet_job_id"
+check_job_status $parquet_job_id "predictor parquets creation"
+
+# Step 1g: Transition Identification
+echo
+echo "Step 1g: Transition Identification"
+echo "-------------------------------------------"
+trans_id_job_id=$(sbatch --dependency=afterok:$parquet_job_id --parsable "$SCRIPT_DIR/submit_transition_identification.sh")
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to submit transition identification job"
+    exit 1
+fi
+echo "Transition identification job submitted with ID: $trans_id_job_id"
+check_job_status $trans_id_job_id "transition identification"
+
+# Step 1h: Transition Dataset Preparation
+echo
+echo "Step 1h: Transition Dataset Preparation"
+echo "-------------------------------------------"
+trans_data_job_id=$(sbatch --dependency=afterok:$trans_id_job_id --parsable "$SCRIPT_DIR/submit_transition_dataset_prep.sh")
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to submit transition dataset preparation job"
+    exit 1
+fi
+echo "Transition dataset preparation job submitted with ID: $trans_data_job_id"
+check_job_status $trans_data_job_id "transition dataset preparation"
+
+echo
+echo "✓ Data Preparation Pipeline Complete"
+echo
 
 # Step 2: Feature Selection (depends on data preparation)
 echo
@@ -105,7 +196,7 @@ echo "========================================="
 echo "Step 2: Feature Selection"
 echo "========================================="
 
-fs_job_id=$(sbatch --dependency=afterok:$data_prep_job_id --parsable "$SCRIPT_DIR/submit_feature_selection.sh")
+fs_job_id=$(sbatch --dependency=afterok:$trans_data_job_id --parsable "$SCRIPT_DIR/submit_feature_selection.sh")
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to submit feature selection job"
     exit 1
@@ -208,27 +299,51 @@ summary_file="$PROJECT_ROOT/logs/complete_pipeline_summary_$(date +%Y%m%d_%H%M%S
     echo "Ended: $end_time"
     echo
     echo "Job IDs:"
-    echo "  Data Preparation: $data_prep_job_id"
+    echo "  Data Preparation Pipeline:"
+    echo "    1a. Reference Grid Preparation: $ref_grid_job_id"
+    echo "    1b. LULC Data Preparation: $lulc_job_id"
+    echo "    1c. Region Preparation: $region_job_id"
+    echo "    1d. Ancillary Data Preparation: $ancillary_job_id"
+    echo "    1e. Calibration Predictor Preparation: $cal_pred_job_id"
+    echo "    1f. Predictor Parquets Creation: $parquet_job_id"
+    echo "    1g. Transition Identification: $trans_id_job_id"
+    echo "    1h. Transition Dataset Preparation: $trans_data_job_id"
     echo "  Feature Selection: $fs_job_id"
-    echo "  Transition modelling: $model_job_id"
+    echo "  Transition Modelling: $model_job_id"
     echo "  Model Finalization: $model_final_job_id"
     echo "  Scenario Preparation: $scenario_prep_job_id"
     echo "  Simulation Setup: $sim_setup_job_id"
     echo "  Dinamica Simulations: $dinamica_job_id"
     echo
     echo "Log files:"
-    echo "  Data Preparation: logs/data-prep-$data_prep_job_id.{out,err}"
+    echo "  Data Preparation Pipeline:"
+    echo "    1a. Reference Grid: logs/ref-grid-prep-$ref_grid_job_id.{out,err}"
+    echo "    1b. LULC Data: logs/lulc-data-prep-$lulc_job_id.{out,err}"
+    echo "    1c. Regions: logs/region-prep-$region_job_id.{out,err}"
+    echo "    1d. Ancillary Data: logs/ancillary-data-prep-$ancillary_job_id.{out,err}"
+    echo "    1e. Calibration Predictors: logs/calibration-predictor-prep-$cal_pred_job_id.{out,err}"
+    echo "    1f. Predictor Parquets: logs/predictor-parquets-$parquet_job_id.{out,err}"
+    echo "    1g. Transition Identification: logs/transition-identification-$trans_id_job_id.{out,err}"
+    echo "    1h. Transition Dataset: logs/transition-dataset-prep-$trans_data_job_id.{out,err}"
     echo "  Feature Selection: logs/feat-select-$fs_job_id.{out,err}"
-    echo "  Transition modelling: logs/trans-model-$model_job_id.{out,err}"
+    echo "  Transition Modelling: logs/trans-model-$model_job_id.{out,err}"
     echo "  Model Finalization: logs/model-final-$model_final_job_id.{out,err}"
     echo "  Scenario Preparation: logs/scenario-prep-$scenario_prep_job_id.{out,err}"
     echo "  Simulation Setup: logs/sim-setup-$sim_setup_job_id.{out,err}"
     echo "  Dinamica Simulations: logs/dinamica-sim-$dinamica_job_id.{out,err}"
     echo
     echo "Pipeline stages:"
-    echo "  1. Data Preparation: LULC data, regions, ancillary data, predictors, transitions"
+    echo "  1. Data Preparation Pipeline:"
+    echo "     1a. Reference grid preparation (spatial aggregation)"
+    echo "     1b. LULC data preparation"
+    echo "     1c. Region preparation"
+    echo "     1d. Ancillary data preparation"
+    echo "     1e. Calibration predictor preparation (terrain, soil, infrastructure, etc.)"
+    echo "     1f. Predictor parquet files creation"
+    echo "     1g. Transition identification"
+    echo "     1h. Transition dataset preparation"
     echo "  2. Feature Selection: Predictor variable selection with GRRF"
-    echo "  3. Transition modelling: Statistical modelling of LULC transitions"
+    echo "  3. Transition Modelling: Statistical modelling of LULC transitions"
     echo "  4. Model Finalization: Evaluation, specification selection, final training"
     echo "  5. Scenario Preparation: Transition tables and predictor data for scenarios"
     echo "  6. Simulation Setup: Calibration parameters and spatial interventions"

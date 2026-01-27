@@ -10,7 +10,7 @@ lulc_data_prep <- function(config = get_config(), refresh_cache = FALSE) {
   ensure_dir(config[["aggregated_lulc_dir"]])
 
   # Load in the grid to use use for re-projecting the CRS and extent of predictor data
-  Ref_grid <- terra::rast(config[["ref_grid_path"]])
+  ref_grid <- terra::rast(config[["ref_grid_agg_path"]])
 
   # Load JSON, disable simplification so nested lists remain lists
   scheme <- jsonlite::fromJSON(
@@ -73,15 +73,18 @@ lulc_data_prep <- function(config = get_config(), refresh_cache = FALSE) {
     r_agg <- terra::classify(r, rcl = rcl, others = NA)
 
     # Check that the raster has the correct extent, resolution, and CRS
-    if (!all(terra::ext(r_agg) == terra::ext(Ref_grid))) {
-      r_agg <- terra::crop(r_agg, Ref_grid)
-      r_agg <- terra::extend(r_agg, Ref_grid)
+    if (!all(terra::ext(r_agg) == terra::ext(ref_grid))) {
+      message(" Adjusting extent to match reference grid...")
+      r_agg <- terra::crop(r_agg, ref_grid)
+      r_agg <- terra::extend(r_agg, ref_grid)
     }
-    if (!all(terra::res(r_agg) == terra::res(Ref_grid))) {
-      r_agg <- terra::resample(r_agg, Ref_grid, method = "near")
+    if (!all(terra::res(r_agg) == terra::res(ref_grid))) {
+      message(" Adjusting resolution to match reference grid...")
+      r_agg <- terra::resample(r_agg, ref_grid, method = "modal")
     }
-    if (!all(terra::crs(r_agg) == terra::crs(Ref_grid))) {
-      r_agg <- terra::project(r_agg, Ref_grid, method = "near")
+    if (!all(terra::crs(r_agg) == terra::crs(ref_grid))) {
+      message(" Reprojecting to match reference grid CRS...")
+      r_agg <- terra::project(r_agg, ref_grid, method = "near")
     }
 
     # Write compressed GeoTIFF with an integer data type and explicit NA flag

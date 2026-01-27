@@ -271,7 +271,7 @@ lulcc_generatenhoodrasters_parallel <- function(
   # Set terra options for efficient disk use
   terraOptions(
     threads = ncores,
-    tempdir = temp_dir,
+    tempdir = temp_dir
   )
 
   # Loop over classes sequentially
@@ -290,7 +290,7 @@ lulcc_generatenhoodrasters_parallel <- function(
     )
 
     # Write to temp file to avoid keeping in memory if raster is large
-    tmpfile <- file.path(tmpdir(), paste0("active_class_", class_name, ".tif"))
+    tmpfile <- file.path(temp_dir, paste0("active_class_", class_name, ".tif"))
     writeRaster(active_class_raster, tmpfile, overwrite = TRUE)
 
     # Prepare matrices for parallel processing
@@ -318,7 +318,7 @@ lulcc_generatenhoodrasters_parallel <- function(
         )
 
         # Skip if already exists and refresh_cache is FALSE
-        if (file.exists(focal_full_path) | !isTRUE(refresh_cache)) {
+        if (file.exists(focal_full_path) & !isTRUE(refresh_cache)) {
           message(
             "  → Focal raster already exists, skipping: ",
             focal_full_path

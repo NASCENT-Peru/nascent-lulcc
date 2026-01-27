@@ -16,11 +16,11 @@ source "$SCRIPT_DIR/hpc_common.sh"
 # ----------------------------------------------------------
 # Setup environment
 # ----------------------------------------------------------
-ENV_NAME="feat_select_env"
+ENV_NAME="data_prep_env"
 ENV_PATH="$ENV_BASE_PATH/$ENV_NAME"
 
 echo "========================================="
-echo "Job: feat_select_env"
+echo "Job: Predictor Parquet Creation"
 echo "========================================="
 echo "Environment: $ENV_NAME"
 echo "Path: $ENV_PATH"

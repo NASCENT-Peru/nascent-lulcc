@@ -1,0 +1,31 @@
+name: data_prep_env
+channels:
+  - conda-forge
+dependencies:
+  # Core R
+  - r-base=4.3
+  
+  # Spatial libraries (required by terra and arrow)
+  - gdal
+  - libgdal-hdf5
+  - hdf5
+  - proj
+  - geos
+  
+  # Spatial data processing
+  - r-terra
+  
+  # Arrow for parquet file handling
+  - r-arrow
+  
+  # Data manipulation (tidyverse core)
+  - r-dplyr
+  - r-tibble
+  - r-stringr
+  
+  # File system operations
+  - r-fs
+  
+  # Configuration and data formats
+  - r-yaml
+  - r-jsonlite

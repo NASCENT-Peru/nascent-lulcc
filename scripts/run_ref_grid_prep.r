@@ -1,12 +1,12 @@
 #!/usr/bin/env Rscript
-# run_calibration_predictor_prep.r
-# Run calibration predictor preparation
+# run_ref_grid_prep.r
+# Run reference grid preparation
 
 # Capture start time
 start_time <- Sys.time()
 
 cat("\n========================================\n")
-cat("Starting Calibration Predictor Preparation\n")
+cat("Starting Reference Grid Preparation\n")
 cat("========================================\n\n")
 
 # Diagnostics: show R used and library paths
@@ -24,8 +24,7 @@ required_pkgs <- c(
   "stringr",
   "yaml",
   "jsonlite",
-  "terra",
-  "arrow"
+  "terra"
 )
 
 missing_pkgs <- setdiff(required_pkgs, rownames(installed.packages()))
@@ -86,14 +85,7 @@ cat(sprintf("Working directory set to: %s\n", getwd()))
 src_files <- c(
   "src/setup.r",
   "src/utils.r",
-  "src/calibration_predictor_prep.r",
-  "src/terrain_pred_prep.r",
-  "src/soil_pred_prep.r",
-  "src/nhood_predictor_prep.r",
-  "src/hydrological_pred_prep.r",
-  "src/infrastructure_pred_prep.r",
-  "src/socio_economic_pred_prep.r",
-  "src/climatic_pred_prep.r"
+  "src/ref_grid_prep.R"
 )
 
 for (src_file in src_files) {
@@ -125,18 +117,18 @@ config <- tryCatch(
 
 cat("Configuration loaded successfully.\n\n")
 
-# Run calibration predictor preparation
+# Run reference grid preparation
 cat("========================================\n")
-cat("Running Calibration Predictor Preparation\n")
+cat("Running Reference Grid Preparation\n")
 cat("========================================\n")
 
 result <- tryCatch(
   {
-    calibration_predictor_prep(config = config, refresh_cache = FALSE)
+    ref_grid_prep(config = config)
     list(status = "success", error = NA)
   },
   error = function(e) {
-    cat(sprintf("ERROR in Calibration Predictor Preparation: %s\n", e$message))
+    cat(sprintf("ERROR in Reference Grid Preparation: %s\n", e$message))
     list(status = "error", error = e$message)
   }
 )
@@ -146,7 +138,7 @@ end_time <- Sys.time()
 total_elapsed <- difftime(end_time, start_time, units = "mins")
 
 cat("\n========================================\n")
-cat("Calibration Predictor Preparation Summary\n")
+cat("Reference Grid Preparation Summary\n")
 cat("========================================\n")
 cat(sprintf("Total runtime: %.2f minutes\n", as.numeric(total_elapsed)))
 cat(sprintf("Status: %s\n", result$status))
@@ -159,7 +151,7 @@ if (result$status == "error" && !is.na(result$error)) {
 summary_file <- file.path(
   "logs",
   sprintf(
-    "calibration_predictor_prep_summary_%s.txt",
+    "ref_grid_prep_summary_%s.txt",
     Sys.getenv("SLURM_JOB_ID", unset = "local")
   )
 )
@@ -184,7 +176,7 @@ cat(sprintf("\nSummary saved to: %s\n", summary_file))
 # Exit with appropriate code
 exit_code <- ifelse(result$status == "error", 1, 0)
 cat(sprintf(
-  "\nCalibration predictor preparation completed with exit code: %d\n",
+  "\nReference grid preparation completed with exit code: %d\n",
   exit_code
 ))
 quit(status = exit_code)

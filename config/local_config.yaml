@@ -2,7 +2,7 @@
 environment: "local"
 
 # Base paths
-data_basepath: "E:/nascent-lulcc"
+data_basepath: "E:/nascent-lulcc-agg"
 historic_lulc_basepath: "lulc"
 
 # Main directories (relative to data_basepath)
@@ -20,9 +20,9 @@ preds_tools_dir: "predictors/tools"
 # Additional derived directories
 calibration_param_dir: "allocation_parameters/calibration"
 simulation_param_dir: "allocation_parameters/simulation"
-trans_rate_table_dir: "transition_rates"
+trans_rate_table_dir: "transition_tables"
 trans_rates_raw_dir: "outputs/transition_identification/raw_trans_rates"
-trans_rate_extrapol_dir: "transition_rates/extrapolations"
+trans_rate_extrapol_dir: "transition_tables/extrapolations"
 trans_pre_pred_filter_dir: "transition_datasets/pre_predictor_filtering"
 trans_post_pred_filter_dir: "transition_datasets/post_predictor_filtering"
 feature_selection_dir: "outputs/feature_selection"
@@ -60,10 +60,12 @@ scenario_area_mods_csv: "tools/simulation_lulc_areas_2060.csv"
 calibration_ctrl_tbl_path: "tools/calibration_control.csv"
 ctrl_tbl_path: "tools/simulation_control.csv"
 ancillary_data_table: "config/ancillary_data.yaml"  # Project root - resolved by R code
-ref_grid_path: "spatial_reference_grid/ref_grid.tif"
+ref_grid_path: "spatial_reference_grid/ref_grid_aggregated.tif"
+ref_grid_agg_path: "spatial_reference_grid/ref_grid_aggregated.tif"
+ref_grid_target_cellsize: 100  # in meters
 
 # Derived file paths (relative to data_basepath)
-best_trans_area_tables: "transition_rates/best_area_tables.rds"
+best_trans_area_tables: "transition_tables/best_area_tables.rds"
 pred_db_path: "predictors/prepared/predictor_database.duckdb"
 bioreg_zip_local: "regionalization/biogeographische_regionen.zip"
 

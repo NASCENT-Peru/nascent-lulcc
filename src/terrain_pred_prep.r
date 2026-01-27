@@ -1,5 +1,6 @@
 terrain_pred_prep <- function(config = get_config()) {
-  ensure_dir(config[["prepped_lyr_path"]])
+  terrain_dir <- file.path(config[["prepped_lyr_path"]], "terrain")
+  ensure_dir(terrain_dir)
 
   # Load existing DEM raster and predictor YAML
   pred_yaml_file <- config[["pred_table_path"]]
@@ -13,20 +14,20 @@ terrain_pred_prep <- function(config = get_config()) {
   ))
 
   # Align DEM raster to reference grid
-  DEM_raster_aligned <- align_raster_to_ref(
+  DEM_raster_aligned <- align_to_ref(
     DEM_raster,
-    config[["ref_grid_path"]]
+    config[["ref_grid_path"]],
+    method = "bilinear"
   )
 
   # Save aligned DEM raster
-  elevation_out_path <- file.path(config[["prepped_lyr_path"]], "elevation.tif")
+  elevation_out_path <- file.path(terrain_dir, "elevation.tif")
   write_raster(DEM_raster_aligned, filename = elevation_out_path)
 
   # Calculate terrain measures
   terrain_measures <- c("slope", "aspect", "TPI", "TRI", "roughness")
   terrain_paths <- file.path(
-    config[["prepped_lyr_path"]],
-    "terrain",
+    terrain_dir,
     paste0(terrain_measures, ".tif")
   )
 

@@ -207,6 +207,8 @@ build_full_config <- function(yaml_config) {
 
     # Spatial reference
     ref_grid_path = build_path(base_path, yaml_config$ref_grid_path),
+    ref_grid_agg_path = build_path(base_path, yaml_config$ref_grid_agg_path),
+    ref_grid_target_cellsize = yaml_config$ref_grid_target_cellsize,
 
     # Derived directory paths
     rasterized_lulc_dir = build_path(
@@ -290,17 +292,17 @@ build_full_config <- function(yaml_config) {
     # Transition directories
     trans_rate_table_dir = build_path(
       base_path,
-      "transition_rates",
+      "transition_tables",
       "prepared_trans_rates"
     ),
     trans_rates_raw_dir = build_path(
       base_path,
-      "transition_rates",
+      "transition_tables",
       "raw_trans_rates"
     ),
     trans_rate_extrapol_dir = build_path(
       base_path,
-      "transition_rates",
+      "transition_tables",
       "extrapolations"
     ),
     best_trans_area_tables = build_path(

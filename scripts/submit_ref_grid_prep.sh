@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=transition-identification
-#SBATCH --time=02:00:00
+#SBATCH --job-name=ref-grid-prep
+#SBATCH --time=01:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem-per-cpu=16G
-#SBATCH --output=logs/transition-identification-%j.out
-#SBATCH --error=logs/transition-identification-%j.err
+#SBATCH --output=logs/ref-grid-prep-%j.out
+#SBATCH --error=logs/ref-grid-prep-%j.err
 #SBATCH --profile=task
 
 # ----------------------------------------------------------
@@ -20,7 +20,7 @@ ENV_NAME="data_prep_env"
 ENV_PATH="$ENV_BASE_PATH/$ENV_NAME"
 
 echo "========================================="
-echo "Job: Transition Identification"
+echo "Job: Reference Grid Preparation"
 echo "========================================="
 echo "Environment: $ENV_NAME"
 echo "Path: $ENV_PATH"
@@ -40,16 +40,16 @@ if [ $? -ne 0 ]; then
 fi
 echo
 # ----------------------------------------------------------
-# un transition identification
+# Run reference grid preparation
 # ----------------------------------------------------------
-R_SCRIPT="$SLURM_SUBMIT_DIR/run_transition_identification.r"
+R_SCRIPT="$SLURM_SUBMIT_DIR/run_ref_grid_prep.r"
 
 if [ ! -f "$R_SCRIPT" ]; then
-    echo "ERROR: run_transition_identification.r not found at: $R_SCRIPT"
+    echo "ERROR: run_ref_grid_prep.r not found at: $R_SCRIPT"
     exit 1
 fi
 
-echo "✓ Running transition identification: $R_SCRIPT"
+echo "✓ Running reference grid preparation: $R_SCRIPT"
 "$RSCRIPT_BIN" --vanilla "$R_SCRIPT"
 EXIT_CODE=$?
 
