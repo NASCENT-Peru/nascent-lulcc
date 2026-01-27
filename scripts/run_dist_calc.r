@@ -22,7 +22,7 @@ print(.libPaths())
 cat("\n")
 
 # Load required packages
-required_pkgs <- c("terra", "yaml")
+required_pkgs <- c("terra", "yaml", "future", "furrr")
 
 missing_pkgs <- setdiff(required_pkgs, rownames(installed.packages()))
 if (length(missing_pkgs) > 0) {
@@ -154,17 +154,28 @@ result <- tryCatch(
     log_msg("", log_file)
 
     # -------- Env & threading -----------------------------------------------------
-    n_threads <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", "1"))
+    total_cpus <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", "1"))
     tmp_dir <- Sys.getenv("TMPDIR", unset = tempdir())
 
-    log_msg(paste("Threads available:", n_threads), log_file)
+    # Determine optimal parallelization strategy
+    # Since gdal_proximity is single-threaded, process multiple files in parallel
+    # with fewer threads per file
+    n_workers <- min(8, length(existing)) # Max 8 parallel workers
+    n_threads_per_worker <- max(1, floor(total_cpus / n_workers))
+
+    log_msg(paste("Total CPUs available:", total_cpus), log_file)
+    log_msg(paste("Parallel workers:", n_workers), log_file)
+    log_msg(paste("Threads per worker:", n_threads_per_worker), log_file)
     log_msg(paste("Temporary directory:", tmp_dir), log_file)
+
+    # Set up parallel backend
+    future::plan(future::multisession, workers = n_workers)
 
     terraOptions(
       tempdir = tmp_dir,
       memfrac = 0.2,
       todisk = TRUE,
-      threads = n_threads
+      threads = n_threads_per_worker
     )
 
     # Compression & datatype settings
@@ -341,7 +352,7 @@ result <- tryCatch(
     log_msg("========================================", log_file)
     log_msg("", log_file)
 
-    # -------- Run function for each named layer -------------------------------------------
+    # -------- Run function for each named layer in parallel -------------------------------------------
     existing <- preds_to_process[file.exists(preds_to_process)]
     if (length(existing) == 0L) {
       log_msg("ERROR: No shapefiles found", log_file)
@@ -361,33 +372,44 @@ result <- tryCatch(
     )
     log_msg("", log_file)
 
-    results <- lapply(names(existing), function(nm) {
-      shp <- existing[[nm]]
-      tryCatch(
-        process_shapefile(
-          shp_path = shp,
-          out_basename = nm,
-          log_file = log_file,
-          ref = ref,
-          tmp_dir = tmp_dir,
-          n_threads = n_threads,
-          co_heavy_int = co_heavy_int,
-          nodata_u32 = nodata_u32,
-          gdalwarp = gdalwarp,
-          gdal_prox = gdal_prox,
-          gdal_calc = gdal_calc,
-          prefix = prefix,
-          calc_prefix = calc_prefix,
-          has_geo_units = has_geo_units,
-          pix_m = pix_m,
-          ext_ref = ext_ref
-        ),
-        error = function(e) {
-          log_msg(paste("✗ Error on", shp, ":", conditionMessage(e)), log_file)
-          NULL
-        }
-      )
-    })
+    # Process shapefiles in parallel
+    results <- furrr::future_map(
+      names(existing),
+      function(nm) {
+        shp <- existing[[nm]]
+        tryCatch(
+          process_shapefile(
+            shp_path = shp,
+            out_basename = nm,
+            log_file = log_file,
+            ref = ref,
+            tmp_dir = tmp_dir,
+            n_threads = n_threads_per_worker,
+            co_heavy_int = co_heavy_int,
+            nodata_u32 = nodata_u32,
+            gdalwarp = gdalwarp,
+            gdal_prox = gdal_prox,
+            gdal_calc = gdal_calc,
+            prefix = prefix,
+            calc_prefix = calc_prefix,
+            has_geo_units = has_geo_units,
+            pix_m = pix_m,
+            ext_ref = ext_ref
+          ),
+          error = function(e) {
+            log_msg(
+              paste("✗ Error on", shp, ":", conditionMessage(e)),
+              log_file
+            )
+            NULL
+          }
+        )
+      },
+      .options = furrr::furrr_options(seed = TRUE)
+    )
+
+    # Clean up parallel backend
+    future::plan(future::sequential)
 
     log_msg("", log_file)
     log_msg("========================================", log_file)
