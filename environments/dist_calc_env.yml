@@ -27,4 +27,6 @@ dependencies:
   - r-devtools         # für devtools::install_git()
   - r-profvis
   - r-yaml
+  - r-future           # for parallel processing
+  - r-furrr            # for parallel mapping with future backend
 
