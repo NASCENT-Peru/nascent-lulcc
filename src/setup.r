@@ -297,8 +297,7 @@ build_full_config <- function(yaml_config) {
     ),
     trans_rates_raw_dir = build_path(
       base_path,
-      "transition_tables",
-      "raw_trans_rates"
+      yaml_config$trans_rates_raw_dir
     ),
     trans_rate_extrapol_dir = build_path(
       base_path,

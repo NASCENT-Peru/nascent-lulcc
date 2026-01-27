@@ -96,11 +96,20 @@ else
     exit 1
 fi
 
-# Create distance calculation environment (if exists)
+# Create distance calculation environment
 if [ -f "$ENVS_DIR/dist_calc_env.yml" ]; then
     create_env "$ENVS_DIR/dist_calc_env.yml" "dist_calc_env"
 else
-    echo "WARNING: dist_calc_env.yml not found, skipping"
+    echo "ERROR: dist_calc_env.yml not found"
+    exit 1
+fi
+
+# Create data preparation environment
+if [ -f "$ENVS_DIR/data_prep_env.yml" ]; then
+    create_env "$ENVS_DIR/data_prep_env.yml" "data_prep_env"
+else
+    echo "ERROR: data_prep_env.yml not found"
+    exit 1
 fi
 
 # Create climate data environment (if exists)
@@ -121,6 +130,8 @@ echo "To activate an environment, use:"
 echo "  micromamba activate $ENV_BASE_PATH/feat_select_env"
 echo "  micromamba activate $ENV_BASE_PATH/transition_model_env"
 echo "  micromamba activate $ENV_BASE_PATH/allocation_params_env"
+echo "  micromamba activate $ENV_BASE_PATH/dist_calc_env"
+echo "  micromamba activate $ENV_BASE_PATH/data_prep_env"
 echo
 
 echo "Done!"

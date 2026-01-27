@@ -157,25 +157,14 @@ result <- tryCatch(
     total_cpus <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", "1"))
     tmp_dir <- Sys.getenv("TMPDIR", unset = tempdir())
 
-    # Determine optimal parallelization strategy
-    # Since gdal_proximity is single-threaded, process multiple files in parallel
-    # with fewer threads per file
-    n_workers <- min(8, length(existing)) # Max 8 parallel workers
-    n_threads_per_worker <- max(1, floor(total_cpus / n_workers))
-
     log_msg(paste("Total CPUs available:", total_cpus), log_file)
-    log_msg(paste("Parallel workers:", n_workers), log_file)
-    log_msg(paste("Threads per worker:", n_threads_per_worker), log_file)
     log_msg(paste("Temporary directory:", tmp_dir), log_file)
-
-    # Set up parallel backend
-    future::plan(future::multisession, workers = n_workers)
 
     terraOptions(
       tempdir = tmp_dir,
       memfrac = 0.2,
       todisk = TRUE,
-      threads = n_threads_per_worker
+      threads = total_cpus
     )
 
     # Compression & datatype settings
@@ -371,6 +360,22 @@ result <- tryCatch(
       log_file
     )
     log_msg("", log_file)
+
+    # Determine optimal parallelization strategy
+    # Since gdal_proximity is single-threaded, process multiple files in parallel
+    # with fewer threads per file
+    n_workers <- min(8, length(existing)) # Max 8 parallel workers
+    n_threads_per_worker <- max(1, floor(total_cpus / n_workers))
+
+    log_msg(paste("Parallel workers:", n_workers), log_file)
+    log_msg(paste("Threads per worker:", n_threads_per_worker), log_file)
+    log_msg("", log_file)
+
+    # Set up parallel backend
+    future::plan(future::multisession, workers = n_workers)
+
+    # Update terra threading for per-worker allocation
+    terraOptions(threads = n_threads_per_worker)
 
     # Process shapefiles in parallel
     results <- furrr::future_map(
