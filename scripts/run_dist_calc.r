@@ -265,7 +265,6 @@ result <- tryCatch(
       hydro_predictors,
       function(x) {
         file.path(
-          config$data_basepath,
           config$predictors_raw_dir,
           x$raw_dir,
           x$raw_filename
@@ -310,7 +309,6 @@ result <- tryCatch(
       infra_predictors,
       function(x) {
         file.path(
-          config$data_basepath,
           config$predictors_raw_dir,
           x$raw_dir,
           x$raw_filename
@@ -377,17 +375,27 @@ result <- tryCatch(
     # Update terra threading for per-worker allocation
     terraOptions(threads = n_threads_per_worker)
 
+    # Prepare objects for parallel workers
+    # SpatRaster objects don't serialize well, so pass the path instead
+    ref_path <- ref_grid_path
+
     # Process shapefiles in parallel
     results <- furrr::future_map(
       names(existing),
       function(nm) {
+        # Load terra in each worker
+        library(terra)
+
+        # Load reference grid in each worker
+        ref_worker <- terra::rast(ref_path)
+
         shp <- existing[[nm]]
         tryCatch(
           process_shapefile(
             shp_path = shp,
             out_basename = nm,
             log_file = log_file,
-            ref = ref,
+            ref = ref_worker,
             tmp_dir = tmp_dir,
             n_threads = n_threads_per_worker,
             co_heavy_int = co_heavy_int,
