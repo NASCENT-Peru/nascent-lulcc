@@ -279,6 +279,14 @@ process_shapefile <- function(
   rm_ds(tmpout)
 
   dist_r <- terra::rast(out_path)
+
+  # Ensure exact alignment with reference grid before masking
+  # Use resample with 'near' method to avoid changing values
+  if (!terra::compareGeom(dist_r, ref, stopOnError = FALSE)) {
+    log_msg("  Aligning distance raster to reference grid...", log_file)
+    dist_r <- terra::resample(dist_r, ref, method = "near")
+  }
+
   masked <- terra::mask(
     dist_r,
     ref,
