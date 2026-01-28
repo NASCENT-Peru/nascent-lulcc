@@ -52,12 +52,6 @@ climatic_pred_prep <- function(
     )
   }
 
-  # stack and mask all files simultaneously
-  climatic_stack <- terra::rast(climatic_files)
-  start_time <- Sys.time()
-  climatic_stack <- terra::mask(climatic_stack, ref_grid)
-  end_time <- Sys.time()
-
   # vector some basic info to help create metadata
   ssps <- c("ssp126", "ssp245", "ssp585")
   modelling_periods <- c("2010_2014", "2014_2018", "2018_2022")
