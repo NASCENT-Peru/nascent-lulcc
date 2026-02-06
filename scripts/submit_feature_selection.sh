@@ -9,7 +9,7 @@
 # ----------------------------------------------------------
 # Load common HPC functions
 # ----------------------------------------------------------
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$SLURM_SUBMIT_DIR/scripts"
 source "$SCRIPT_DIR/hpc_common.sh"
 
 # ----------------------------------------------------------
