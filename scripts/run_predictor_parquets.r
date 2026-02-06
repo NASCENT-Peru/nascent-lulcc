@@ -79,6 +79,7 @@ if (length(script_path) > 0) {
     project_root <- dirname(project_root)
   }
 }
+
 setwd(project_root)
 cat(sprintf("Working directory set to: %s\n", getwd()))
 
@@ -86,7 +87,8 @@ cat(sprintf("Working directory set to: %s\n", getwd()))
 src_files <- c(
   "src/setup.r",
   "src/utils.r",
-  "src/create_predictor_parquets.r"
+  "src/create_predictor_parquets.r",
+  "src/extract_valid_cells_with_region.r"
 )
 
 for (src_file in src_files) {

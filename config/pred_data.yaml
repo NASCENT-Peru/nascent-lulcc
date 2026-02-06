@@ -214,1506 +214,1506 @@ dist_to_reservoirs:
   raw_filename: reservorios.shp
 low_intensity_agricultural_areas_nhood_n11_1:
   base_name: low_intensity_agricultural_areas_nhood_n11_1
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 1)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n11_1_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 1)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n11_2:
   base_name: low_intensity_agricultural_areas_nhood_n11_2
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 2)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n11_2_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 2)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n11_3:
   base_name: low_intensity_agricultural_areas_nhood_n11_3
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 3)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n11_3_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 3)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n11_4:
   base_name: low_intensity_agricultural_areas_nhood_n11_4
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 4)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n11_4_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 4)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n11_5:
   base_name: low_intensity_agricultural_areas_nhood_n11_5
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 5)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n11_5_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 5)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n9_1:
   base_name: low_intensity_agricultural_areas_nhood_n9_1
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 1)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n9_1_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 1)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n9_2:
   base_name: low_intensity_agricultural_areas_nhood_n9_2
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 2)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n9_2_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 2)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n9_3:
   base_name: low_intensity_agricultural_areas_nhood_n9_3
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 3)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n9_3_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 3)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n9_4:
   base_name: low_intensity_agricultural_areas_nhood_n9_4
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 4)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n9_4_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 4)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n9_5:
   base_name: low_intensity_agricultural_areas_nhood_n9_5
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 5)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n9_5_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 5)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n7_1:
   base_name: low_intensity_agricultural_areas_nhood_n7_1
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 1)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n7_1_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 1)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n7_2:
   base_name: low_intensity_agricultural_areas_nhood_n7_2
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 2)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n7_2_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 2)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n7_3:
   base_name: low_intensity_agricultural_areas_nhood_n7_3
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 3)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n7_3_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 3)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n7_4:
   base_name: low_intensity_agricultural_areas_nhood_n7_4
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 4)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n7_4_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 4)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n7_5:
   base_name: low_intensity_agricultural_areas_nhood_n7_5
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 5)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n7_5_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 5)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n5_1:
   base_name: low_intensity_agricultural_areas_nhood_n5_1
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 1)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n5_1_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 1)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n5_2:
   base_name: low_intensity_agricultural_areas_nhood_n5_2
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 2)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n5_2_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 2)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n5_3:
   base_name: low_intensity_agricultural_areas_nhood_n5_3
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 3)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n5_3_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 3)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n5_4:
   base_name: low_intensity_agricultural_areas_nhood_n5_4
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 4)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n5_4_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 4)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n5_5:
   base_name: low_intensity_agricultural_areas_nhood_n5_5
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 5)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n5_5_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 5)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n3_1:
   base_name: low_intensity_agricultural_areas_nhood_n3_1
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 1)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n3_1_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 1)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n3_2:
   base_name: low_intensity_agricultural_areas_nhood_n3_2
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 2)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n3_2_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 2)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n3_3:
   base_name: low_intensity_agricultural_areas_nhood_n3_3
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 3)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n3_3_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 3)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n3_4:
   base_name: low_intensity_agricultural_areas_nhood_n3_4
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 4)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n3_4_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 4)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 low_intensity_agricultural_areas_nhood_n3_5:
   base_name: low_intensity_agricultural_areas_nhood_n3_5
-  clean_name: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 5)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/low_intensity_agricultural_areas_nhood_n3_5_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'low_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'low_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 5)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n11_1:
   base_name: high_intensity_agricultural_areas_nhood_n11_1
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 1)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n11_1_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 1)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n11_2:
   base_name: high_intensity_agricultural_areas_nhood_n11_2
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 2)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n11_2_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 2)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n11_3:
   base_name: high_intensity_agricultural_areas_nhood_n11_3
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 3)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n11_3_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 3)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n11_4:
   base_name: high_intensity_agricultural_areas_nhood_n11_4
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 4)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n11_4_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 4)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n11_5:
   base_name: high_intensity_agricultural_areas_nhood_n11_5
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 5)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n11_5_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     11x11 cells; random central value and decay rate version: 5)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n9_1:
   base_name: high_intensity_agricultural_areas_nhood_n9_1
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 1)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n9_1_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 1)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n9_2:
   base_name: high_intensity_agricultural_areas_nhood_n9_2
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 2)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n9_2_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 2)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n9_3:
   base_name: high_intensity_agricultural_areas_nhood_n9_3
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 3)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n9_3_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 3)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n9_4:
   base_name: high_intensity_agricultural_areas_nhood_n9_4
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 4)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n9_4_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 4)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n9_5:
   base_name: high_intensity_agricultural_areas_nhood_n9_5
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 5)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n9_5_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     9x9 cells; random central value and decay rate version: 5)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n7_1:
   base_name: high_intensity_agricultural_areas_nhood_n7_1
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 1)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n7_1_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 1)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n7_2:
   base_name: high_intensity_agricultural_areas_nhood_n7_2
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 2)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n7_2_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 2)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n7_3:
   base_name: high_intensity_agricultural_areas_nhood_n7_3
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 3)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n7_3_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 3)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n7_4:
   base_name: high_intensity_agricultural_areas_nhood_n7_4
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 4)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n7_4_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 4)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n7_5:
   base_name: high_intensity_agricultural_areas_nhood_n7_5
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 5)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n7_5_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     7x7 cells; random central value and decay rate version: 5)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n5_1:
   base_name: high_intensity_agricultural_areas_nhood_n5_1
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 1)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n5_1_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 1)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n5_2:
   base_name: high_intensity_agricultural_areas_nhood_n5_2
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 2)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n5_2_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 2)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n5_3:
   base_name: high_intensity_agricultural_areas_nhood_n5_3
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 3)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n5_3_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 3)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n5_4:
   base_name: high_intensity_agricultural_areas_nhood_n5_4
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 4)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n5_4_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 4)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n5_5:
   base_name: high_intensity_agricultural_areas_nhood_n5_5
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 5)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n5_5_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     5x5 cells; random central value and decay rate version: 5)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n3_1:
   base_name: high_intensity_agricultural_areas_nhood_n3_1
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 1)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n3_1_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 1)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n3_2:
   base_name: high_intensity_agricultural_areas_nhood_n3_2
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 2)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n3_2_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 2)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n3_3:
   base_name: high_intensity_agricultural_areas_nhood_n3_3
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 3)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n3_3_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 3)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n3_4:
   base_name: high_intensity_agricultural_areas_nhood_n3_4
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 4)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n3_4_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 4)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 high_intensity_agricultural_areas_nhood_n3_5:
   base_name: high_intensity_agricultural_areas_nhood_n3_5
-  clean_name: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  clean_name: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 5)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/high_intensity_agricultural_areas_nhood_n3_5_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'high_intensity_agricultural_areas neighbourhood effect matrix (size:
+  description: 'high_intensity_agricultural_areas Neighbourhood effect matrix (size:
     3x3 cells; random central value and decay rate version: 5)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n11_1:
   base_name: built_up_and_barren_lands_nhood_n11_1
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 11x11
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 11x11
     cells; random central value and decay rate version: 1)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n11_1_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 11x11
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 11x11
     cells; random central value and decay rate version: 1)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n11_2:
   base_name: built_up_and_barren_lands_nhood_n11_2
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 11x11
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 11x11
     cells; random central value and decay rate version: 2)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n11_2_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 11x11
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 11x11
     cells; random central value and decay rate version: 2)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n11_3:
   base_name: built_up_and_barren_lands_nhood_n11_3
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 11x11
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 11x11
     cells; random central value and decay rate version: 3)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n11_3_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 11x11
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 11x11
     cells; random central value and decay rate version: 3)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n11_4:
   base_name: built_up_and_barren_lands_nhood_n11_4
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 11x11
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 11x11
     cells; random central value and decay rate version: 4)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n11_4_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 11x11
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 11x11
     cells; random central value and decay rate version: 4)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n11_5:
   base_name: built_up_and_barren_lands_nhood_n11_5
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 11x11
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 11x11
     cells; random central value and decay rate version: 5)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n11_5_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 11x11
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 11x11
     cells; random central value and decay rate version: 5)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n9_1:
   base_name: built_up_and_barren_lands_nhood_n9_1
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 9x9 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 9x9 cells;
     random central value and decay rate version: 1)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n9_1_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 9x9 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 9x9 cells;
     random central value and decay rate version: 1)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n9_2:
   base_name: built_up_and_barren_lands_nhood_n9_2
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 9x9 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 9x9 cells;
     random central value and decay rate version: 2)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n9_2_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 9x9 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 9x9 cells;
     random central value and decay rate version: 2)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n9_3:
   base_name: built_up_and_barren_lands_nhood_n9_3
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 9x9 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 9x9 cells;
     random central value and decay rate version: 3)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n9_3_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 9x9 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 9x9 cells;
     random central value and decay rate version: 3)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n9_4:
   base_name: built_up_and_barren_lands_nhood_n9_4
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 9x9 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 9x9 cells;
     random central value and decay rate version: 4)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n9_4_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 9x9 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 9x9 cells;
     random central value and decay rate version: 4)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n9_5:
   base_name: built_up_and_barren_lands_nhood_n9_5
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 9x9 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 9x9 cells;
     random central value and decay rate version: 5)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n9_5_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 9x9 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 9x9 cells;
     random central value and decay rate version: 5)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n7_1:
   base_name: built_up_and_barren_lands_nhood_n7_1
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 7x7 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 7x7 cells;
     random central value and decay rate version: 1)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n7_1_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 7x7 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 7x7 cells;
     random central value and decay rate version: 1)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n7_2:
   base_name: built_up_and_barren_lands_nhood_n7_2
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 7x7 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 7x7 cells;
     random central value and decay rate version: 2)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n7_2_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 7x7 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 7x7 cells;
     random central value and decay rate version: 2)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n7_3:
   base_name: built_up_and_barren_lands_nhood_n7_3
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 7x7 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 7x7 cells;
     random central value and decay rate version: 3)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n7_3_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 7x7 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 7x7 cells;
     random central value and decay rate version: 3)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n7_4:
   base_name: built_up_and_barren_lands_nhood_n7_4
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 7x7 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 7x7 cells;
     random central value and decay rate version: 4)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n7_4_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 7x7 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 7x7 cells;
     random central value and decay rate version: 4)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n7_5:
   base_name: built_up_and_barren_lands_nhood_n7_5
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 7x7 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 7x7 cells;
     random central value and decay rate version: 5)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n7_5_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 7x7 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 7x7 cells;
     random central value and decay rate version: 5)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n5_1:
   base_name: built_up_and_barren_lands_nhood_n5_1
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 5x5 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 5x5 cells;
     random central value and decay rate version: 1)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n5_1_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 5x5 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 5x5 cells;
     random central value and decay rate version: 1)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n5_2:
   base_name: built_up_and_barren_lands_nhood_n5_2
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 5x5 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 5x5 cells;
     random central value and decay rate version: 2)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n5_2_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 5x5 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 5x5 cells;
     random central value and decay rate version: 2)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n5_3:
   base_name: built_up_and_barren_lands_nhood_n5_3
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 5x5 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 5x5 cells;
     random central value and decay rate version: 3)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n5_3_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 5x5 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 5x5 cells;
     random central value and decay rate version: 3)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n5_4:
   base_name: built_up_and_barren_lands_nhood_n5_4
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 5x5 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 5x5 cells;
     random central value and decay rate version: 4)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n5_4_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 5x5 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 5x5 cells;
     random central value and decay rate version: 4)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n5_5:
   base_name: built_up_and_barren_lands_nhood_n5_5
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 5x5 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 5x5 cells;
     random central value and decay rate version: 5)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n5_5_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 5x5 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 5x5 cells;
     random central value and decay rate version: 5)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n3_1:
   base_name: built_up_and_barren_lands_nhood_n3_1
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 3x3 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 3x3 cells;
     random central value and decay rate version: 1)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n3_1_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 3x3 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 3x3 cells;
     random central value and decay rate version: 1)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n3_2:
   base_name: built_up_and_barren_lands_nhood_n3_2
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 3x3 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 3x3 cells;
     random central value and decay rate version: 2)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n3_2_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 3x3 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 3x3 cells;
     random central value and decay rate version: 2)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n3_3:
   base_name: built_up_and_barren_lands_nhood_n3_3
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 3x3 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 3x3 cells;
     random central value and decay rate version: 3)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n3_3_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 3x3 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 3x3 cells;
     random central value and decay rate version: 3)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n3_4:
   base_name: built_up_and_barren_lands_nhood_n3_4
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 3x3 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 3x3 cells;
     random central value and decay rate version: 4)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n3_4_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 3x3 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 3x3 cells;
     random central value and decay rate version: 4)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 built_up_and_barren_lands_nhood_n3_5:
   base_name: built_up_and_barren_lands_nhood_n3_5
-  clean_name: 'built_up_and_barren_lands neighbourhood effect matrix (size: 3x3 cells;
+  clean_name: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 3x3 cells;
     random central value and decay rate version: 5)'
-  pred_category: neighbourhood
+  pred_category: =neighbourhood
   static_or_dynamic: dynamic
   metadata: ~
   scenario_variant: .na.character
-  period: 2018_2022
+  period: '2018'
   path: predictors/prepared/layers/neighbourhood/built_up_and_barren_lands_nhood_n3_5_2018_2022.tif
   intermediate_path: ~
   grouping: neighbourhood
-  description: 'built_up_and_barren_lands neighbourhood effect matrix (size: 3x3 cells;
+  description: 'built_up_and_barren_lands Neighbourhood effect matrix (size: 3x3 cells;
     random central value and decay rate version: 5)'
   method: Generated using random decay rate matrices applied to historical LULC data.
-  date: 20388.0
+  date: 20490.0
   author: Your Name
   sources: ~
   raw_dir: ~
   raw_filename: ~
 dist_to_primary_roads:
-  base_name: ~
+  base_name: dist_to_primary_roads
   clean_name: distance to primary roads
   pred_category: suitability
   static_or_dynamic: static
@@ -1727,13 +1727,13 @@ dist_to_primary_roads:
     Network updated by PROVÍAS NACIONAL as of July 2022, according to the Route Classifier
     approved by Supreme Decree 011-2016-MTC and its amendments.
   method: rasterized vector data and performed euclidean distance calculation
-  date: 20480.0
+  date: 20490.0
   author: Ministry of Transport and Communications, Peru
   sources: https://geosdot.servicios.gob.pe/visor/#
   raw_dir: infrastructure/national_road
   raw_filename: red_vial_nacional_dic18.shp
 dist_to_secondary_roads:
-  base_name: ~
+  base_name: dist_to_secondary_roads
   clean_name: distance to secondary roads
   pred_category: suitability
   static_or_dynamic: static
@@ -1748,7 +1748,7 @@ dist_to_secondary_roads:
     approved by Supreme Decree 011-2016-MTC and its amendments.
   method: combined vector layers of departmental and neighbourhood roads, rasterized
     and performed euclidean distance calculation
-  date: 20480.0
+  date: 20490.0
   author: Ministry of Transport and Communications, Peru
   sources: add download URL here
   raw_dir:
@@ -1758,7 +1758,7 @@ dist_to_secondary_roads:
   - red_vial_departamental_dic18.shp
   - red_vial_vecinal_dic18.shp
 dist_to_airports:
-  base_name: ~
+  base_name: dist_to_airports
   clean_name: distance to airports
   pred_category: suitability
   static_or_dynamic: static
@@ -1771,7 +1771,7 @@ dist_to_airports:
   description: Point locations of airports in Peru updated to 2022, prepared by the
     Ministry of Transport and Communications.
   method: rasterized vector data and performed euclidean distance calculation
-  date: 20480.0
+  date: 20490.0
   author: Ministry of Transport and Communications, Peru
   sources:
   - https://geosdot.servicios.gob.pe/geoserver/geoportal/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=geoportal%3Aaerodromo_2022&maxFeatures=50&outputFormat=SHAPE-ZIP
@@ -1779,7 +1779,7 @@ dist_to_airports:
   raw_dir: infrastructure/airports
   raw_filename: aerodromo_2022.shp
 bdod_0-5cm_mean:
-  base_name: ~
+  base_name: bdod_0-5cm_mean
   clean_name: bdod 0-5cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -1791,13 +1791,13 @@ bdod_0-5cm_mean:
   grouping: soil
   description: bdod 0-5cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/bulk_density
   raw_filename: bdod_0-5cm_mean.tif
 bdod_5-15cm_mean:
-  base_name: ~
+  base_name: bdod_5-15cm_mean
   clean_name: bdod 5-15cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -1809,13 +1809,13 @@ bdod_5-15cm_mean:
   grouping: soil
   description: bdod 5-15cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/bulk_density
   raw_filename: bdod_5-15cm_mean.tif
 bdod_15-30cm_mean:
-  base_name: ~
+  base_name: bdod_15-30cm_mean
   clean_name: bdod 15-30cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -1827,13 +1827,13 @@ bdod_15-30cm_mean:
   grouping: soil
   description: bdod 15-30cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/bulk_density
   raw_filename: bdod_15-30cm_mean.tif
 bdod_30-60cm_mean:
-  base_name: ~
+  base_name: bdod_30-60cm_mean
   clean_name: bdod 30-60cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -1845,13 +1845,13 @@ bdod_30-60cm_mean:
   grouping: soil
   description: bdod 30-60cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/bulk_density
   raw_filename: bdod_30-60cm_mean.tif
 bdod_60-100cm_mean:
-  base_name: ~
+  base_name: bdod_60-100cm_mean
   clean_name: bdod 60-100cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -1863,13 +1863,13 @@ bdod_60-100cm_mean:
   grouping: soil
   description: bdod 60-100cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/bulk_density
   raw_filename: bdod_60-100cm_mean.tif
 bdod_100-200cm_mean:
-  base_name: ~
+  base_name: bdod_100-200cm_mean
   clean_name: bdod 100-200cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -1881,13 +1881,13 @@ bdod_100-200cm_mean:
   grouping: soil
   description: bdod 100-200cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/bulk_density
   raw_filename: bdod_100-200cm_mean.tif
 cec_0-5cm_mean:
-  base_name: ~
+  base_name: cec_0-5cm_mean
   clean_name: cec 0-5cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -1899,13 +1899,13 @@ cec_0-5cm_mean:
   grouping: soil
   description: cec 0-5cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/cation_exchange_capacity
   raw_filename: cec_0-5cm_mean.tif
 cec_5-15cm_mean:
-  base_name: ~
+  base_name: cec_5-15cm_mean
   clean_name: cec 5-15cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -1917,13 +1917,13 @@ cec_5-15cm_mean:
   grouping: soil
   description: cec 5-15cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/cation_exchange_capacity
   raw_filename: cec_5-15cm_mean.tif
 cec_15-30cm_mean:
-  base_name: ~
+  base_name: cec_15-30cm_mean
   clean_name: cec 15-30cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -1935,13 +1935,13 @@ cec_15-30cm_mean:
   grouping: soil
   description: cec 15-30cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/cation_exchange_capacity
   raw_filename: cec_15-30cm_mean.tif
 cec_30-60cm_mean:
-  base_name: ~
+  base_name: cec_30-60cm_mean
   clean_name: cec 30-60cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -1953,13 +1953,13 @@ cec_30-60cm_mean:
   grouping: soil
   description: cec 30-60cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/cation_exchange_capacity
   raw_filename: cec_30-60cm_mean.tif
 cec_60-100cm_mean:
-  base_name: ~
+  base_name: cec_60-100cm_mean
   clean_name: cec 60-100cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -1971,13 +1971,13 @@ cec_60-100cm_mean:
   grouping: soil
   description: cec 60-100cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/cation_exchange_capacity
   raw_filename: cec_60-100cm_mean.tif
 cec_100-200cm_mean:
-  base_name: ~
+  base_name: cec_100-200cm_mean
   clean_name: cec 100-200cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -1989,13 +1989,13 @@ cec_100-200cm_mean:
   grouping: soil
   description: cec 100-200cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/cation_exchange_capacity
   raw_filename: cec_100-200cm_mean.tif
 clay_0-5cm_mean:
-  base_name: ~
+  base_name: clay_0-5cm_mean
   clean_name: clay 0-5cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2007,13 +2007,13 @@ clay_0-5cm_mean:
   grouping: soil
   description: clay 0-5cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/clay_content
   raw_filename: clay_0-5cm_mean.tif
 clay_5-15cm_mean:
-  base_name: ~
+  base_name: clay_5-15cm_mean
   clean_name: clay 5-15cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2025,13 +2025,13 @@ clay_5-15cm_mean:
   grouping: soil
   description: clay 5-15cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/clay_content
   raw_filename: clay_5-15cm_mean.tif
 clay_15-30cm_mean:
-  base_name: ~
+  base_name: clay_15-30cm_mean
   clean_name: clay 15-30cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2043,13 +2043,13 @@ clay_15-30cm_mean:
   grouping: soil
   description: clay 15-30cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/clay_content
   raw_filename: clay_15-30cm_mean.tif
 clay_30-60cm_mean:
-  base_name: ~
+  base_name: clay_30-60cm_mean
   clean_name: clay 30-60cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2061,13 +2061,13 @@ clay_30-60cm_mean:
   grouping: soil
   description: clay 30-60cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/clay_content
   raw_filename: clay_30-60cm_mean.tif
 clay_60-100cm_mean:
-  base_name: ~
+  base_name: clay_60-100cm_mean
   clean_name: clay 60-100cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2079,13 +2079,13 @@ clay_60-100cm_mean:
   grouping: soil
   description: clay 60-100cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/clay_content
   raw_filename: clay_60-100cm_mean.tif
 clay_100-200cm_mean:
-  base_name: ~
+  base_name: clay_100-200cm_mean
   clean_name: clay 100-200cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2097,13 +2097,13 @@ clay_100-200cm_mean:
   grouping: soil
   description: clay 100-200cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/clay_content
   raw_filename: clay_100-200cm_mean.tif
 cfvo_0-5cm_mean:
-  base_name: ~
+  base_name: cfvo_0-5cm_mean
   clean_name: cfvo 0-5cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2115,13 +2115,13 @@ cfvo_0-5cm_mean:
   grouping: soil
   description: cfvo 0-5cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/coarse_fragments_volumetric
   raw_filename: cfvo_0-5cm_mean.tif
 cfvo_5-15cm_mean:
-  base_name: ~
+  base_name: cfvo_5-15cm_mean
   clean_name: cfvo 5-15cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2133,13 +2133,13 @@ cfvo_5-15cm_mean:
   grouping: soil
   description: cfvo 5-15cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/coarse_fragments_volumetric
   raw_filename: cfvo_5-15cm_mean.tif
 cfvo_15-30cm_mean:
-  base_name: ~
+  base_name: cfvo_15-30cm_mean
   clean_name: cfvo 15-30cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2151,13 +2151,13 @@ cfvo_15-30cm_mean:
   grouping: soil
   description: cfvo 15-30cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/coarse_fragments_volumetric
   raw_filename: cfvo_15-30cm_mean.tif
 cfvo_30-60cm_mean:
-  base_name: ~
+  base_name: cfvo_30-60cm_mean
   clean_name: cfvo 30-60cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2169,13 +2169,13 @@ cfvo_30-60cm_mean:
   grouping: soil
   description: cfvo 30-60cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/coarse_fragments_volumetric
   raw_filename: cfvo_30-60cm_mean.tif
 cfvo_60-100cm_mean:
-  base_name: ~
+  base_name: cfvo_60-100cm_mean
   clean_name: cfvo 60-100cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2187,13 +2187,13 @@ cfvo_60-100cm_mean:
   grouping: soil
   description: cfvo 60-100cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/coarse_fragments_volumetric
   raw_filename: cfvo_60-100cm_mean.tif
 cfvo_100-200cm_mean:
-  base_name: ~
+  base_name: cfvo_100-200cm_mean
   clean_name: cfvo 100-200cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2205,13 +2205,13 @@ cfvo_100-200cm_mean:
   grouping: soil
   description: cfvo 100-200cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/coarse_fragments_volumetric
   raw_filename: cfvo_100-200cm_mean.tif
 nitrogen_0-5cm_mean:
-  base_name: ~
+  base_name: nitrogen_0-5cm_mean
   clean_name: nitrogen 0-5cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2223,13 +2223,13 @@ nitrogen_0-5cm_mean:
   grouping: soil
   description: nitrogen 0-5cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/nitrogen
   raw_filename: nitrogen_0-5cm_mean.tif
 nitrogen_5-15cm_mean:
-  base_name: ~
+  base_name: nitrogen_5-15cm_mean
   clean_name: nitrogen 5-15cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2241,13 +2241,13 @@ nitrogen_5-15cm_mean:
   grouping: soil
   description: nitrogen 5-15cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/nitrogen
   raw_filename: nitrogen_5-15cm_mean.tif
 nitrogen_15-30cm_mean:
-  base_name: ~
+  base_name: nitrogen_15-30cm_mean
   clean_name: nitrogen 15-30cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2259,13 +2259,13 @@ nitrogen_15-30cm_mean:
   grouping: soil
   description: nitrogen 15-30cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/nitrogen
   raw_filename: nitrogen_15-30cm_mean.tif
 nitrogen_30-60cm_mean:
-  base_name: ~
+  base_name: nitrogen_30-60cm_mean
   clean_name: nitrogen 30-60cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2277,13 +2277,13 @@ nitrogen_30-60cm_mean:
   grouping: soil
   description: nitrogen 30-60cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/nitrogen
   raw_filename: nitrogen_30-60cm_mean.tif
 nitrogen_60-100cm_mean:
-  base_name: ~
+  base_name: nitrogen_60-100cm_mean
   clean_name: nitrogen 60-100cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2295,13 +2295,13 @@ nitrogen_60-100cm_mean:
   grouping: soil
   description: nitrogen 60-100cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/nitrogen
   raw_filename: nitrogen_60-100cm_mean.tif
 nitrogen_100-200cm_mean:
-  base_name: ~
+  base_name: nitrogen_100-200cm_mean
   clean_name: nitrogen 100-200cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2313,13 +2313,13 @@ nitrogen_100-200cm_mean:
   grouping: soil
   description: nitrogen 100-200cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/nitrogen
   raw_filename: nitrogen_100-200cm_mean.tif
 ocd_0-5cm_mean:
-  base_name: ~
+  base_name: ocd_0-5cm_mean
   clean_name: ocd 0-5cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2331,13 +2331,13 @@ ocd_0-5cm_mean:
   grouping: soil
   description: ocd 0-5cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/organic_carbon_density
   raw_filename: ocd_0-5cm_mean.tif
 ocd_5-15cm_mean:
-  base_name: ~
+  base_name: ocd_5-15cm_mean
   clean_name: ocd 5-15cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2349,13 +2349,13 @@ ocd_5-15cm_mean:
   grouping: soil
   description: ocd 5-15cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/organic_carbon_density
   raw_filename: ocd_5-15cm_mean.tif
 ocd_15-30cm_mean:
-  base_name: ~
+  base_name: ocd_15-30cm_mean
   clean_name: ocd 15-30cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2367,13 +2367,13 @@ ocd_15-30cm_mean:
   grouping: soil
   description: ocd 15-30cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/organic_carbon_density
   raw_filename: ocd_15-30cm_mean.tif
 ocd_30-60cm_mean:
-  base_name: ~
+  base_name: ocd_30-60cm_mean
   clean_name: ocd 30-60cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2385,13 +2385,13 @@ ocd_30-60cm_mean:
   grouping: soil
   description: ocd 30-60cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/organic_carbon_density
   raw_filename: ocd_30-60cm_mean.tif
 ocd_60-100cm_mean:
-  base_name: ~
+  base_name: ocd_60-100cm_mean
   clean_name: ocd 60-100cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2403,13 +2403,13 @@ ocd_60-100cm_mean:
   grouping: soil
   description: ocd 60-100cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/organic_carbon_density
   raw_filename: ocd_60-100cm_mean.tif
 ocd_100-200cm_mean:
-  base_name: ~
+  base_name: ocd_100-200cm_mean
   clean_name: ocd 100-200cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2421,13 +2421,13 @@ ocd_100-200cm_mean:
   grouping: soil
   description: ocd 100-200cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/organic_carbon_density
   raw_filename: ocd_100-200cm_mean.tif
 ocs_0-30cm_mean:
-  base_name: ~
+  base_name: ocs_0-30cm_mean
   clean_name: ocs 0-30cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2439,13 +2439,13 @@ ocs_0-30cm_mean:
   grouping: soil
   description: ocs 0-30cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/organic_carbon_stock
   raw_filename: ocs_0-30cm_mean.tif
 sand_0-5cm_mean:
-  base_name: ~
+  base_name: sand_0-5cm_mean
   clean_name: sand 0-5cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2457,13 +2457,13 @@ sand_0-5cm_mean:
   grouping: soil
   description: sand 0-5cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/sand_content
   raw_filename: sand_0-5cm_mean.tif
 sand_5-15cm_mean:
-  base_name: ~
+  base_name: sand_5-15cm_mean
   clean_name: sand 5-15cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2475,13 +2475,13 @@ sand_5-15cm_mean:
   grouping: soil
   description: sand 5-15cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/sand_content
   raw_filename: sand_5-15cm_mean.tif
 sand_15-30cm_mean:
-  base_name: ~
+  base_name: sand_15-30cm_mean
   clean_name: sand 15-30cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2493,13 +2493,13 @@ sand_15-30cm_mean:
   grouping: soil
   description: sand 15-30cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/sand_content
   raw_filename: sand_15-30cm_mean.tif
 sand_30-60cm_mean:
-  base_name: ~
+  base_name: sand_30-60cm_mean
   clean_name: sand 30-60cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2511,13 +2511,13 @@ sand_30-60cm_mean:
   grouping: soil
   description: sand 30-60cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/sand_content
   raw_filename: sand_30-60cm_mean.tif
 sand_60-100cm_mean:
-  base_name: ~
+  base_name: sand_60-100cm_mean
   clean_name: sand 60-100cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2529,13 +2529,13 @@ sand_60-100cm_mean:
   grouping: soil
   description: sand 60-100cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/sand_content
   raw_filename: sand_60-100cm_mean.tif
 sand_100-200cm_mean:
-  base_name: ~
+  base_name: sand_100-200cm_mean
   clean_name: sand 100-200cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2547,13 +2547,13 @@ sand_100-200cm_mean:
   grouping: soil
   description: sand 100-200cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/sand_content
   raw_filename: sand_100-200cm_mean.tif
 silt_0-5cm_mean:
-  base_name: ~
+  base_name: silt_0-5cm_mean
   clean_name: silt 0-5cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2565,13 +2565,13 @@ silt_0-5cm_mean:
   grouping: soil
   description: silt 0-5cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/silt_content
   raw_filename: silt_0-5cm_mean.tif
 silt_5-15cm_mean:
-  base_name: ~
+  base_name: silt_5-15cm_mean
   clean_name: silt 5-15cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2583,13 +2583,13 @@ silt_5-15cm_mean:
   grouping: soil
   description: silt 5-15cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/silt_content
   raw_filename: silt_5-15cm_mean.tif
 silt_15-30cm_mean:
-  base_name: ~
+  base_name: silt_15-30cm_mean
   clean_name: silt 15-30cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2601,13 +2601,13 @@ silt_15-30cm_mean:
   grouping: soil
   description: silt 15-30cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/silt_content
   raw_filename: silt_15-30cm_mean.tif
 silt_30-60cm_mean:
-  base_name: ~
+  base_name: silt_30-60cm_mean
   clean_name: silt 30-60cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2619,13 +2619,13 @@ silt_30-60cm_mean:
   grouping: soil
   description: silt 30-60cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/silt_content
   raw_filename: silt_30-60cm_mean.tif
 silt_60-100cm_mean:
-  base_name: ~
+  base_name: silt_60-100cm_mean
   clean_name: silt 60-100cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2637,13 +2637,13 @@ silt_60-100cm_mean:
   grouping: soil
   description: silt 60-100cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/silt_content
   raw_filename: silt_60-100cm_mean.tif
 silt_100-200cm_mean:
-  base_name: ~
+  base_name: silt_100-200cm_mean
   clean_name: silt 100-200cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2655,13 +2655,13 @@ silt_100-200cm_mean:
   grouping: soil
   description: silt 100-200cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/silt_content
   raw_filename: silt_100-200cm_mean.tif
 soc_0-5cm_mean:
-  base_name: ~
+  base_name: soc_0-5cm_mean
   clean_name: soc 0-5cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2673,13 +2673,13 @@ soc_0-5cm_mean:
   grouping: soil
   description: soc 0-5cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/soil_organic_carbon_content
   raw_filename: soc_0-5cm_mean.tif
 soc_5-15cm_mean:
-  base_name: ~
+  base_name: soc_5-15cm_mean
   clean_name: soc 5-15cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2691,13 +2691,13 @@ soc_5-15cm_mean:
   grouping: soil
   description: soc 5-15cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/soil_organic_carbon_content
   raw_filename: soc_5-15cm_mean.tif
 soc_15-30cm_mean:
-  base_name: ~
+  base_name: soc_15-30cm_mean
   clean_name: soc 15-30cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2709,13 +2709,13 @@ soc_15-30cm_mean:
   grouping: soil
   description: soc 15-30cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/soil_organic_carbon_content
   raw_filename: soc_15-30cm_mean.tif
 soc_30-60cm_mean:
-  base_name: ~
+  base_name: soc_30-60cm_mean
   clean_name: soc 30-60cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2727,13 +2727,13 @@ soc_30-60cm_mean:
   grouping: soil
   description: soc 30-60cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/soil_organic_carbon_content
   raw_filename: soc_30-60cm_mean.tif
 soc_60-100cm_mean:
-  base_name: ~
+  base_name: soc_60-100cm_mean
   clean_name: soc 60-100cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2745,13 +2745,13 @@ soc_60-100cm_mean:
   grouping: soil
   description: soc 60-100cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/soil_organic_carbon_content
   raw_filename: soc_60-100cm_mean.tif
 soc_100-200cm_mean:
-  base_name: ~
+  base_name: soc_100-200cm_mean
   clean_name: soc 100-200cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2763,13 +2763,13 @@ soc_100-200cm_mean:
   grouping: soil
   description: soc 100-200cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/soil_organic_carbon_content
   raw_filename: soc_100-200cm_mean.tif
 ph_0-5cm_mean:
-  base_name: ~
+  base_name: ph_0-5cm_mean
   clean_name: ph 0-5cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2781,13 +2781,13 @@ ph_0-5cm_mean:
   grouping: soil
   description: ph 0-5cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/soil_ph
   raw_filename: ph_0-5cm_mean.tif
 ph_5-15cm_mean:
-  base_name: ~
+  base_name: ph_5-15cm_mean
   clean_name: ph 5-15cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2799,13 +2799,13 @@ ph_5-15cm_mean:
   grouping: soil
   description: ph 5-15cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/soil_ph
   raw_filename: ph_5-15cm_mean.tif
 ph_15-30cm_mean:
-  base_name: ~
+  base_name: ph_15-30cm_mean
   clean_name: ph 15-30cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2817,13 +2817,13 @@ ph_15-30cm_mean:
   grouping: soil
   description: ph 15-30cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/soil_ph
   raw_filename: ph_15-30cm_mean.tif
 ph_30-60cm_mean:
-  base_name: ~
+  base_name: ph_30-60cm_mean
   clean_name: ph 30-60cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2835,13 +2835,13 @@ ph_30-60cm_mean:
   grouping: soil
   description: ph 30-60cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/soil_ph
   raw_filename: ph_30-60cm_mean.tif
 ph_60-100cm_mean:
-  base_name: ~
+  base_name: ph_60-100cm_mean
   clean_name: ph 60-100cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2853,13 +2853,13 @@ ph_60-100cm_mean:
   grouping: soil
   description: ph 60-100cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/soil_ph
   raw_filename: ph_60-100cm_mean.tif
 ph_100-200cm_mean:
-  base_name: ~
+  base_name: ph_100-200cm_mean
   clean_name: ph 100-200cm mean
   pred_category: suitability
   static_or_dynamic: static
@@ -2871,13 +2871,13 @@ ph_100-200cm_mean:
   grouping: soil
   description: ph 100-200cm mean – derived from SoilGrids dataset.
   method: Aligned to reference grid.
-  date: 20479.0
+  date: 20490.0
   author: Your Name
   sources: https://www.soilgrids.org
   raw_dir: soil/soil_ph
   raw_filename: ph_100-200cm_mean.tif
 gross_added_value:
-  base_name: ~
+  base_name: gross_added_value
   clean_name: Gross Added Value
   pred_category: suitability
   static_or_dynamic: static
@@ -2905,7 +2905,7 @@ gross_added_value:
   - ccpp150_vab_lima.shp
   - ccpp150_vab_total.shp
 trav_time_to_dept_cap:
-  base_name: ~
+  base_name: trav_time_to_dept_cap
   clean_name: Travel Time to Departmental Capital
   pred_category: suitability
   static_or_dynamic: static
@@ -2936,6 +2936,7 @@ trav_time_to_dept_cap:
   raw_dir: socio_economic/travel_time_to_nearest_departmental_capital
   raw_filename: tiempo_deplazamiento_capital_cercano.shp
 financial_services_density:
+  base_name: financial_services_density
   clean_name: financial services density
   pred_category: suitability
   static_or_dynamic: static
@@ -2958,6 +2959,7 @@ financial_services_density:
   raw_filename: densidad_servicio_financiero.shp
   sources: https://geosdot.servicios.gob.pe/geoserver/geoportal/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=geoportal%3Adensidad_servicio_financiero&maxFeatures=50&outputFormat=SHAPE-ZIP
 market_density:
+  base_name: market_density
   clean_name: market density
   pred_category: suitability
   static_or_dynamic: static
@@ -2980,7 +2982,7 @@ market_density:
   raw_filename: densidad_mercado.shp
   sources: https://geosdot.servicios.gob.pe/geoserver/geoportal/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=geoportal%3Adensidad_mercado&maxFeatures=50&outputFormat=SHAPE-ZIP
 pop_growth_density:
-  base_name: ~
+  base_name: pop_growth_density
   clean_name: Population Growth Density
   pred_category: suitability
   static_or_dynamic: static
@@ -3006,6 +3008,7 @@ pop_growth_density:
   raw_dir: socio_economic/population_growth_density
   raw_filename: densidad_crecimiento_poblacional.shp
 commercial_density:
+  base_name: commercial_density
   clean_name: commercial density
   pred_category: suitability
   static_or_dynamic: static
@@ -3028,6 +3031,7 @@ commercial_density:
   raw_filename: densidad_comercio.shp
   sources: https://geosdot.servicios.gob.pe/geoserver/geoportal/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=geoportal%3Adensidad_comercio&maxFeatures=50&outputFormat=SHAPE-ZIP
 market_density_low_density:
+  base_name: market_density_low_density
   clean_name: Market Density - low_density
   pred_category: suitability
   static_or_dynamic: static
@@ -3052,6 +3056,7 @@ market_density_low_density:
   raw_dir: socio_economic/market_density
   raw_filename: densidad_mercado.shp
 market_density_high_density:
+  base_name: market_density_high_density
   clean_name: Market Density - high_density
   pred_category: suitability
   static_or_dynamic: static
@@ -3076,7 +3081,7 @@ market_density_high_density:
   raw_dir: socio_economic/market_density
   raw_filename: densidad_mercado.shp
 dist_to_low_market_density_region:
-  base_name: ~
+  base_name: dist_to_low_market_density_region
   clean_name: Distance to  low market density region
   pred_category: suitability
   static_or_dynamic: static
@@ -3101,7 +3106,7 @@ dist_to_low_market_density_region:
   raw_dir: socio_economic/market_density
   raw_filename: densidad_mercado.shp
 dist_to_high_market_density_region:
-  base_name: ~
+  base_name: dist_to_high_market_density_region
   clean_name: Distance to  high market density region
   pred_category: suitability
   static_or_dynamic: static
@@ -3126,7 +3131,7 @@ dist_to_high_market_density_region:
   raw_dir: socio_economic/market_density
   raw_filename: densidad_mercado.shp
 dist_to_low_density_commercial_regions:
-  base_name: ~
+  base_name: dist_to_low_density_commercial_regions
   clean_name: Distance to  low density commercial regions
   pred_category: suitability
   static_or_dynamic: static
@@ -3151,7 +3156,7 @@ dist_to_low_density_commercial_regions:
   raw_dir: socio_economic/commercial_density
   raw_filename: densidad_comercio.shp
 dist_to_high_density_commercial_regions:
-  base_name: ~
+  base_name: dist_to_high_density_commercial_regions
   clean_name: Distance to  high density commercial regions
   pred_category: suitability
   static_or_dynamic: static
@@ -3176,7 +3181,7 @@ dist_to_high_density_commercial_regions:
   raw_dir: socio_economic/commercial_density
   raw_filename: densidad_comercio.shp
 dist_to_low_density_financial_services_region:
-  base_name: ~
+  base_name: dist_to_low_density_financial_services_region
   clean_name: Distance to  low density financial services region
   pred_category: suitability
   static_or_dynamic: static
@@ -3201,7 +3206,7 @@ dist_to_low_density_financial_services_region:
   raw_dir: socio_economic/financial_services_density
   raw_filename: densidad_servicio_financiero.shp
 dist_to_high_density_financial_services_region:
-  base_name: ~
+  base_name: dist_to_high_density_financial_services_region
   clean_name: Distance to  high density financial services region
   pred_category: suitability
   static_or_dynamic: static
@@ -22647,6 +22652,46 @@ tasmin_1996_ssp585:
   intermediate_path: ~
   grouping: climatic
   description: Climatic predictor variable 'Minimum Temperature' for scenario 'ssp585'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+et0_2010:
+  base_name: et0
+  clean_name: Evapotranspiration
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ~
+  period: '2010'
+  path: predictors/prepared/layers/climatic/et0_2010.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Evapotranspirationhistoric'.
+  method: Aligned to reference grid.
+  date: '2025'
+  author: CHELSA
+  sources: https://envicloud.wsl.ch/#/?bucket=https%3A%2F%2Fos.zhdk.cloud.switch.ch%2Fchelsav2%2F&prefix=GLOBAL%2Fclimatologies%2F
+  raw_dir: ~
+  raw_filename: ~
+et0_2014:
+  base_name: et0
+  clean_name: Evapotranspiration
+  pred_category: suitability
+  static_or_dynamic: dynamic
+  metadata: Karger, D.N., Schmatz, D., Detttling, D., Zimmermann, N.E. (2020) High
+    resolution monthly precipitation and temperature timeseries for the period 2006-2100.
+    Scientific Data. https://doi.org/10.1038/s41597-020-00587-y
+  scenario_variant: ~
+  period: '2014'
+  path: predictors/prepared/layers/climatic/et0_2014.tif
+  intermediate_path: ~
+  grouping: climatic
+  description: Climatic predictor variable 'Evapotranspirationhistoric'.
   method: Aligned to reference grid.
   date: '2025'
   author: CHELSA

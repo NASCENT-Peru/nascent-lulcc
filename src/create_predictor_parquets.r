@@ -79,9 +79,9 @@ create_predictor_parquets <- function(
   static_rasters <- extract_static_variables(pred_config)
 
   # Temporarily remove problematic variables
-  static_rasters[["dist_to_airports"]] <- NULL
-  static_rasters[["aspect"]] <- NULL
-  static_rasters[["slope"]] <- NULL
+  #static_rasters[["dist_to_airports"]] <- NULL
+  #static_rasters[["aspect"]] <- NULL
+  #static_rasters[["slope"]] <- NULL
 
   start_time <- Sys.time()
   if (length(static_rasters) > 0) {
@@ -105,11 +105,10 @@ create_predictor_parquets <- function(
   # Process dynamic variables (PARTITIONED BY SCENARIO AND REGION)
   cat("Step 3: Creating dynamic predictors by time period (partitioned)\n")
 
+  # Get dynamic variables organized by period
   period_structure <- reorganize_by_period(pred_config = pred_config)
 
-  # Subset to only 2018 (remove to process all periods)
-  period_structure <- period_structure["2018_2022"]
-
+  # Get time periods
   time_periods <- names(period_structure)
 
   cat(sprintf(

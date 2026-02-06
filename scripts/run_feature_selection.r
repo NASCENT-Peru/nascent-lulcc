@@ -91,47 +91,44 @@ for (p in required_pkgs) {
 
 cat("All required packages loaded successfully.\n\n")
 
-# Source setup script
-cat("Sourcing ../src/setup.r...\n")
-tryCatch(
-  {
-    source("../src/setup.r")
-    cat("setup.r sourced successfully.\n\n")
-  },
-  error = function(e) {
-    cat(sprintf("ERROR sourcing setup.r: %s\n", e$message))
-    quit(status = 1)
+# Set working directory to project root
+# Get script directory from command line args or current working directory
+script_path <- commandArgs(trailingOnly = FALSE)
+script_path <- script_path[grepl("--file=", script_path)]
+if (length(script_path) > 0) {
+  script_dir <- dirname(sub("--file=", "", script_path))
+  project_root <- dirname(script_dir)
+} else {
+  # Fallback: assume we're running from scripts directory
+  project_root <- getwd()
+  if (basename(project_root) == "scripts") {
+    project_root <- dirname(project_root)
   }
+}
+setwd(project_root)
+cat(sprintf("Working directory set to: %s\n", getwd()))
+
+# Source all required functions from src/
+src_files <- c(
+  "src/setup.r",
+  "src/utils.r",
+  "src/transition_feature_selection.r"
 )
 
-# Source utils.r
-cat("Sourcing ../src/utils.r...\n")
-tryCatch(
-  {
-    source("../src/utils.r")
-    cat("utils.r sourced successfully.\n\n")
-  },
-  error = function(e) {
-    cat(sprintf("ERROR sourcing utils.r: %s\n", e$message))
-    quit(status = 1)
-  }
-)
-
-# Source feature selection functions
-cat("Sourcing ../src/transition_feature_selection.r...\n")
-tryCatch(
-  {
-    source("../src/transition_feature_selection.r")
-    cat("transition_feature_selection.r sourced successfully.\n\n")
-  },
-  error = function(e) {
-    cat(sprintf(
-      "ERROR sourcing transition_feature_selection.r: %s\n",
-      e$message
-    ))
-    quit(status = 1)
-  }
-)
+for (src_file in src_files) {
+  cat(sprintf("Sourcing %s...\n", src_file))
+  tryCatch(
+    {
+      source(src_file)
+      cat(sprintf("%s sourced successfully.\n", src_file))
+    },
+    error = function(e) {
+      cat(sprintf("ERROR sourcing %s: %s\n", src_file, e$message))
+      quit(status = 1)
+    }
+  )
+}
+cat("\n")
 
 # Get configuration
 cat("Loading configuration...\n")

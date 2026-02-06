@@ -45,6 +45,18 @@ climatic_pred_prep <- function(
       new_name <- gsub("_historical", "", f)
       file.rename(f, new_name)
     }
+
+    # The et0 files currently have ET0 in uppercase convert to lower
+    et0_files <- list.files(
+      climatic_pred_dir,
+      pattern = "ET0",
+      full.names = TRUE
+    )
+    for (f in et0_files) {
+      new_name <- gsub("ET0", "et0", f)
+      file.rename(f, new_name)
+    }
+
     climatic_files <- list.files(
       climatic_pred_dir,
       pattern = "\\.tif$",

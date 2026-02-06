@@ -20,8 +20,8 @@ transition_feature_selection <- function(
   message("Starting Feature Selection Pipeline")
   message("========================================\n")
 
-  periods_to_process <- config[["data_periods"]]
-  periods_to_process <- periods_to_process[3]
+  periods_to_process <- list(config[["data_periods"]])
+  #periods_to_process <- periods_to_process[3]
 
   message(sprintf(
     "Processing %d periods",
@@ -61,6 +61,26 @@ transition_feature_selection <- function(
   future::plan(sequential)
 
   return(final_summary)
+}
+
+#' Extract names by group type from predictor table
+#' @param tbl Predictor table list
+#' @param group Grouping type to extract
+#' @return Character vector of predictor base names
+get_preds <- function(tbl, group) {
+  purrr::map_chr(
+    tbl,
+    ~ {
+      if (
+        !is.null(.x$grouping) && !is.null(.x$base_name) && .x$grouping == group
+      ) {
+        .x$base_name
+      } else {
+        NA_character_
+      }
+    }
+  ) |>
+    purrr::discard(is.na)
 }
 
 #' Perform feature selection for a single period
@@ -127,8 +147,11 @@ perform_feature_selection <- function(
   })]
 
   # get period specific predictors
+
+  # extract first year from period string
+  period_start_year <- as.integer(stringr::str_extract(period, "^[0-9]{4}"))
   period_preds <- pred_table_raw[sapply(pred_table_raw, function(x) {
-    x$period == period
+    x$period == period_start_year
   })]
 
   # get static predictors
@@ -138,15 +161,6 @@ perform_feature_selection <- function(
 
   # Combine predictor lists
   pred_table <- c(static_preds, period_preds)
-
-  # Extract names by group type
-  get_preds <- function(tbl, group) {
-    purrr::map_chr(
-      tbl,
-      ~ if (.x$grouping == group) .x$base_name else NA_character_
-    ) |>
-      purrr::discard(is.na)
-  }
 
   soil_preds <- get_preds(pred_table, "soil")
   nhood_preds <- get_preds(pred_table, "neighbourhood")
@@ -171,7 +185,7 @@ perform_feature_selection <- function(
     ~ {
       if (
         .x$pred_category == "suitability" &&
-          !.x$grouping %in% c("neighbourhood", "climatic")
+          !.x$grouping %in% c("neighbourhood", "climatic", "soil")
       ) {
         .x$base_name
       } else {
@@ -185,7 +199,8 @@ perform_feature_selection <- function(
   pred_categories <- c(
     setNames(rep("suitability", length(suitability_preds)), suitability_preds),
     setNames(rep("climatic", length(climate_preds)), climate_preds),
-    #unlist(imap(soil_groups, ~ setNames(rep(.y, length(.x)), .x))),
+    purrr::imap(soil_groups, ~ setNames(rep(.y, length(.x)), .x)) %>%
+      purrr::reduce(c),
     purrr::imap(nhood_groups, ~ setNames(rep(.y, length(.x)), .x)) %>%
       purrr::reduce(c)
   )
@@ -210,7 +225,7 @@ perform_feature_selection <- function(
     config[["predictors_prepped_dir"]],
     "parquet_data",
     "dynamic",
-    period
+    period_start_year
   )
 
   # Verify files exist
@@ -222,10 +237,11 @@ perform_feature_selection <- function(
 
   # --- Set up regions ---
   if (use_regions) {
-    regions <- jsonlite::fromJSON(file.path(
-      config[["reg_dir"]],
-      "regions.json"
-    ))
+    regions_path <- file.path(config[["reg_dir"]], "regions.json")
+    if (!file.exists(regions_path)) {
+      stop(sprintf("Regions file not found at: %s", regions_path))
+    }
+    regions <- jsonlite::fromJSON(regions_path)
     region_names <- regions$label
     message(sprintf(
       "Processing %d regions: %s\n",
@@ -465,10 +481,11 @@ process_single_transition <- function(
   # Resolve region_value if requested
   region_value <- NULL
   if (use_regions) {
-    regions <- jsonlite::fromJSON(file.path(
-      config[["reg_dir"]],
-      "regions.json"
-    ))
+    regions_path <- file.path(config[["reg_dir"]], "regions.json")
+    if (!file.exists(regions_path)) {
+      stop(sprintf("Regions file not found at: %s", regions_path))
+    }
+    regions <- jsonlite::fromJSON(regions_path)
     region_value <- as.integer(regions$value[match(region, regions$label)])
     if (is.na(region_value) || length(region_value) != 1) {
       stop(sprintf("Invalid region mapping for region '%s'", region))

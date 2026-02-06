@@ -52,22 +52,22 @@ soil_pred_prep <- function(
       message(paste("Saving to", out_path))
     }
 
-    start_time <- Sys.time()
-    # align the raster to the reference grid
-    align_to_ref(
-      x = soil_pred_paths[f],
-      ref = config[["ref_grid_path"]],
-      filename = out_path,
-      tempdir = terra_temp
-    )
-    end_time <- Sys.time()
-    message(paste(
-      "Processed",
-      out_name,
-      "in",
-      round(difftime(end_time, start_time, units = "mins"), 2),
-      "minutes"
-    ))
+    # start_time <- Sys.time()
+    # # align the raster to the reference grid
+    # align_to_ref(
+    #   x = soil_pred_paths[f],
+    #   ref = config[["ref_grid_path"]],
+    #   filename = out_path,
+    #   tempdir = terra_temp
+    # )
+    # end_time <- Sys.time()
+    # message(paste(
+    #   "Processed",
+    #   out_name,
+    #   "in",
+    #   round(difftime(end_time, start_time, units = "mins"), 2),
+    #   "minutes"
+    # ))
 
     # extract metadata for YAML update
     pred_name <- names(soil_pred_paths)[f]
@@ -81,6 +81,7 @@ soil_pred_prep <- function(
     # update YAML
     update_predictor_yaml(
       yaml_file = pred_yaml_file,
+      base_name = pred_name,
       pred_name = pred_name,
       clean_name = clean_name,
       pred_category = "suitability",

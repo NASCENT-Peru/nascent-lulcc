@@ -130,6 +130,7 @@ infrastructure_pred_prep <- function(
     update_predictor_yaml(
       yaml_file = pred_yaml_file,
       pred_name = pred_name,
+      base_name = pred_name,
       clean_name = pred_entry$clean_name,
       pred_category = pred_entry$pred_category,
       static_or_dynamic = pred_entry$static_or_dynamic,

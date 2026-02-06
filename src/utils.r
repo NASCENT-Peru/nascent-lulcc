@@ -790,6 +790,7 @@ distance_from_shapefile <- function(
 #'
 #' @param yaml_file Path to the YAML file to update.
 #' @param pred_name Name to use as the YAML key (required).
+#' @param base_name Base name of the predictor i.e. excluding time periods or scenario configurations (default NULL)
 #' @param clean_name Clean name of the predictor (default NULL)
 #' @param pred_category Predictor category (default NULL)
 #' @param static_or_dynamic "Static" or "Dynamic" (default NULL)

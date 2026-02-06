@@ -150,7 +150,7 @@ nhood_predictor_prep <- function(
   })
   Active_classes <- Active_classes[!is.na(Active_classes)]
 
-  # namee the active classes with their pixel values from the value field
+  # name the active classes with their pixel values from the value field
   names(Active_classes) <- lapply(
     Active_classes,
     function(x) {
@@ -179,19 +179,19 @@ nhood_predictor_prep <- function(
   # )
 
   # parrallel alternative
-  mapply(
-    lulcc_generatenhoodrasters_parallel,
-    lulc_raster = LULC_rasters,
-    data_period = data_periods,
-    MoreArgs = list(
-      neighbourhood_matrices = All_matrices,
-      active_lulc_classes = Active_classes,
-      nhood_folder_path = Nhood_folder_path,
-      ncores = parallel::detectCores() - 4,
-      refresh = refresh_cache,
-      temp_dir = terra_temp
-    )
-  )
+  # mapply(
+  #   lulcc_generatenhoodrasters_parallel,
+  #   lulc_raster = LULC_rasters,
+  #   data_period = data_periods,
+  #   MoreArgs = list(
+  #     neighbourhood_matrices = All_matrices,
+  #     active_lulc_classes = Active_classes,
+  #     nhood_folder_path = Nhood_folder_path,
+  #     ncores = parallel::detectCores() - 4,
+  #     refresh = refresh_cache,
+  #     temp_dir = terra_temp
+  #   )
+  # )
 
   # D - Manage file names/details for neighbourhood layers ####
 
@@ -319,6 +319,7 @@ nhood_predictor_prep <- function(
     Focal_details$period,
     function(x) stringr::str_split(x, "_")[[1]][1]
   )
+
   Focal_details$Data_citation <- NA
   Focal_details$URL <- NA
   Focal_details$period <- Focal_details$period
@@ -348,6 +349,7 @@ nhood_predictor_prep <- function(
     update_predictor_yaml(
       yaml_file = config[["pred_table_path"]],
       pred_name = row["pred_name"],
+      base_name = row["pred_name"],
       clean_name = clean_name,
       pred_category = "=neighbourhood",
       static_or_dynamic = "dynamic",

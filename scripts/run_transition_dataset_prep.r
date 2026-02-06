@@ -86,7 +86,8 @@ cat(sprintf("Working directory set to: %s\n", getwd()))
 src_files <- c(
   "src/setup.r",
   "src/utils.r",
-  "src/transition_dataset_prep.r"
+  "src/transition_dataset_prep.r",
+  "src/lulcc.testrastercompatibility.r"
 )
 
 for (src_file in src_files) {
