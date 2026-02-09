@@ -41,7 +41,7 @@ echo
 # ----------------------------------------------------------
 # un your R pipeline script
 # ----------------------------------------------------------
-R_SCRIPT="$SLURM_SUBMIT_DIR/run_feature_selection.r"
+R_SCRIPT="$SLURM_SUBMIT_DIR/scripts/run_feature_selection.r"
 
 if [ ! -f "$R_SCRIPT" ]; then
     echo "ERROR: run_feature_selection.r not found at: $R_SCRIPT"

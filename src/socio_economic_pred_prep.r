@@ -82,6 +82,7 @@ socio_economic_pred_prep <- function(
   update_predictor_yaml(
     yaml_file = pred_yaml_file,
     pred_name = "gross_added_value",
+    base_name = "gross_added_value",
     clean_name = "Gross Added Value",
     pred_category = gav_pred$pred_category,
     static_or_dynamic = gav_pred$static_or_dynamic,
@@ -173,6 +174,7 @@ socio_economic_pred_prep <- function(
   update_predictor_yaml(
     yaml_file = pred_yaml_file,
     pred_name = "pop_growth_density",
+    base_name = "pop_growth_density",
     clean_name = "Population Growth Density",
     pred_category = pop_pred$pred_category,
     static_or_dynamic = pop_pred$static_or_dynamic,
@@ -260,6 +262,7 @@ socio_economic_pred_prep <- function(
     update_predictor_yaml(
       yaml_file = pred_yaml_file,
       pred_name = paste0("dist_to_", group_name),
+      base_name = paste0("dist_to_", group_name),
       clean_name = paste("Distance to ", gsub("_", " ", group_name)),
       pred_category = market_pred$pred_category,
       static_or_dynamic = market_pred$static_or_dynamic,
@@ -351,6 +354,7 @@ socio_economic_pred_prep <- function(
     update_predictor_yaml(
       yaml_file = pred_yaml_file,
       pred_name = paste0("dist_to_", group_name),
+      base_name = paste0("dist_to_", group_name),
       clean_name = paste("Distance to ", gsub("_", " ", group_name)),
       pred_category = commercial_pred$pred_category,
       static_or_dynamic = commercial_pred$static_or_dynamic,
@@ -449,6 +453,7 @@ socio_economic_pred_prep <- function(
     update_predictor_yaml(
       yaml_file = pred_yaml_file,
       pred_name = paste0("dist_to_", group_name),
+      base_name = paste0("dist_to_", group_name),
       clean_name = paste("Distance to ", gsub("_", " ", group_name)),
       pred_category = financial_pred$pred_category,
       static_or_dynamic = financial_pred$static_or_dynamic,
@@ -545,6 +550,7 @@ socio_economic_pred_prep <- function(
   update_predictor_yaml(
     yaml_file = pred_yaml_file,
     pred_name = "trav_time_to_dept_cap",
+    base_name = "trav_time_to_dept_cap",
     clean_name = "Travel Time to Departmental Capital",
     pred_category = travel_time_pred$pred_category,
     static_or_dynamic = travel_time_pred$static_or_dynamic,

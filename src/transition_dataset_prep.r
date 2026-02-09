@@ -36,13 +36,6 @@ transition_dataset_prep <- function(
   ### B- Load data and dplyr::filter for each time period
   ### =========================================================================
 
-  # The predictor data table is used to identify the file names of variables that
-  # are to be included in the stack for each time period
-
-  # Load existing DEM raster and predictor YAML
-  pred_yaml_file <- config[["pred_table_path"]]
-  pred_table <- yaml::yaml.load_file(pred_yaml_file)
-
   # Create data frame of LULC file paths for each period and combine with the regions path
   lulc_raster_paths <- data.frame(matrix(ncol = 2, nrow = 4))
   colnames(lulc_raster_paths) <- c("File_name", "Layer_name")
@@ -159,9 +152,7 @@ transition_dataset_prep <- function(
   cat("Verifying mask cell ID consistency...\n")
   verify_mask_cell_ids_transitions(mask_raster_path, valid_cell_data)
 
-  periods <- config[["data_periods"]]
-  # Subset to specific period if needed (remove this line to process all)
-  periods <- periods[3]
+  periods <- list(config[["data_periods"]])
 
   # Apply function to prepare parquet files for each period
   message("Starting data extraction for each transition period")
@@ -415,7 +406,7 @@ process_period_transitions <- function(
   valid_cell_data,
   mask_raster_path,
   verify_alignment = FALSE,
-  chunk_size = 1e6
+  chunk_size = 2e6
 ) {
   library(terra)
   library(arrow)
