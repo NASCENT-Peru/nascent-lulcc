@@ -143,14 +143,21 @@ create_predictor_parquets <- function(
   list_output_files(output_dir)
 
   message("\nStep 5: Computing NA counts for each dataset\n")
+  # Create metadata directory for NA count files
+  metadata_dir <- file.path(output_dir, "_metadata")
+  ensure_dir(metadata_dir)
+
   # checking for NAs across datasets
-  ds_static <- arrow::open_dataset(file.path(output_dir, "static"))
+  ds_static <- arrow::open_dataset(
+    file.path(output_dir, "static"),
+    format = "parquet"
+  )
   na_static <- compute_na_counts_streaming(ds_static, "Static predictors")
 
-  # save
+  # save to _metadata directory to avoid Arrow trying to read it
   saveRDS(
     na_static,
-    file.path(output_dir, "static", "na_counts_static_predictors.rds")
+    file.path(metadata_dir, "na_counts_static_predictors.rds")
   )
 
   # loop over periods
@@ -162,16 +169,16 @@ create_predictor_parquets <- function(
         "dynamic",
         period
       ),
+      format = "parquet",
       partitioning = hive_partition(region = int32(), scenario = utf8())
     )
     na_dynamic <- compute_na_counts_streaming(ds_dynamic, "Dynamic predictors")
-    # save
+
+    # save to _metadata directory to avoid Arrow trying to read it
     saveRDS(
       na_dynamic,
       file.path(
-        output_dir,
-        "dynamic",
-        period,
+        metadata_dir,
         sprintf("na_counts_dynamic_predictors_%s.rds", period)
       )
     )

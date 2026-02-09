@@ -637,13 +637,22 @@ process_period_transitions <- function(
     }
   )
 
-  # save results
+  # Save results to a separate _checks directory to avoid Arrow reading it as parquet
+  checks_dir <- file.path(
+    config[["trans_pre_pred_filter_dir"]],
+    "_checks"
+  )
+  ensure_dir(checks_dir)
+
   sanity_output_path <- file.path(
-    out_dir,
+    checks_dir,
     paste0("check_transitions_", period, ".csv")
   )
   readr::write_csv(parquet_check, sanity_output_path)
-  message("✓ Sanity check complete\n")
+  message(sprintf(
+    "✓ Sanity check complete (saved to %s)\n",
+    sanity_output_path
+  ))
 }
 
 

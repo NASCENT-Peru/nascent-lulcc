@@ -235,6 +235,31 @@ perform_feature_selection <- function(
     file.exists(dynamic_preds_pq_path)
   )
 
+  # Check contents of transitions directory
+  trans_files <- list.files(transitions_pq_path, recursive = FALSE)
+  message(sprintf(
+    "Files in transitions directory: %s",
+    paste(trans_files, collapse = ", ")
+  ))
+
+  # Check for parquet files specifically
+  parquet_files <- list.files(
+    transitions_pq_path,
+    pattern = "\\.parquet$",
+    recursive = TRUE
+  )
+  if (length(parquet_files) == 0) {
+    stop(sprintf(
+      "No parquet files found in %s. Found files: %s",
+      transitions_pq_path,
+      paste(trans_files, collapse = ", ")
+    ))
+  }
+  message(sprintf(
+    "Found %d parquet files in transitions directory",
+    length(parquet_files)
+  ))
+
   # --- Set up regions ---
   if (use_regions) {
     regions_path <- file.path(config[["reg_dir"]], "regions.json")
@@ -271,65 +296,240 @@ perform_feature_selection <- function(
 
   # Determine number of cores from SLURM or fallback
   n_cores <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", "4"))
-  message(sprintf(
-    "Using up to %d parallel workers for transition processing",
-    n_cores
-  ))
 
-  # Use furrr for parallel map
-  future::plan(multisession, workers = n_cores)
+  if (n_cores == 1) {
+    message("Running sequentially (for debugging)")
+    message("Beginning processing of transitions...")
+  } else {
+    message(sprintf(
+      "Using up to %d parallel workers for transition processing",
+      n_cores
+    ))
+    # Use furrr for parallel map
+    future::plan(multisession, workers = n_cores)
+    options(future.rng.onMisuse = "ignore")
+    message("Beginning parallel processing of transitions...")
+  }
 
-  options(future.rng.onMisuse = "ignore")
-  message("Beginning parallel processing of transitions...")
+  # Process transitions - use purrr for sequential, furrr for parallel
+  results <- if (n_cores == 1) {
+    # Sequential processing with better error messages
+    purrr::map_dfr(
+      seq_len(nrow(task_grid)),
+      function(i) {
+        row <- task_grid[i, ]
 
-  # Parallel over transitions regions
-  furrr::future_map_dfr(
-    seq_len(nrow(task_grid)),
-    function(i) {
-      row <- task_grid[i, ]
-
-      log_file <- initialize_worker_log(
-        file.path(period_dir, "worker_logs"),
-        paste0(row$transition, "_", row$region)
-      )
-
-      # Open datasets inside worker (safe, parallel-friendly)
-      ds_transitions <- arrow::open_dataset(
-        transitions_pq_path,
-        partitioning = arrow::hive_partition(region = arrow::int32())
-      )
-      ds_static <- arrow::open_dataset(
-        static_preds_pq_path,
-        partitioning = arrow::hive_partition(region = arrow::int32())
-      )
-      ds_dynamic <- arrow::open_dataset(
-        dynamic_preds_pq_path,
-        partitioning = arrow::hive_partition(
-          scenario = arrow::utf8(),
-          region = arrow::int32()
+        log_file <- initialize_worker_log(
+          file.path(period_dir, "worker_logs"),
+          paste0(row$transition, "_", row$region)
         )
-      )
 
-      process_single_transition(
-        transition_name = row$transition,
-        region = row$region,
-        use_regions = use_regions,
-        ds_transitions = ds_transitions,
-        ds_static = ds_static,
-        ds_dynamic = ds_dynamic,
-        pred_categories = pred_categories,
-        period = period,
-        config = config,
-        period_dir = period_dir,
-        save_debug = save_debug,
-        do_collinearity = do_collinearity,
-        do_grrf = do_grrf,
-        refresh_cache = refresh_cache,
-        log_file = log_file
-      )
-    },
-    .options = furrr::furrr_options(seed = TRUE)
-  )
+        # Wrap in tryCatch for better error reporting
+        tryCatch(
+          {
+            # Open datasets inside worker (safe, parallel-friendly)
+            ds_transitions <- arrow::open_dataset(
+              transitions_pq_path,
+              format = "parquet",
+              partitioning = arrow::hive_partition(region = arrow::int32())
+            )
+            ds_static <- arrow::open_dataset(
+              static_preds_pq_path,
+              format = "parquet",
+              partitioning = arrow::hive_partition(region = arrow::int32())
+            )
+            ds_dynamic <- arrow::open_dataset(
+              dynamic_preds_pq_path,
+              format = "parquet",
+              partitioning = arrow::hive_partition(
+                scenario = arrow::utf8(),
+                region = arrow::int32()
+              )
+            )
+
+            process_single_transition(
+              transition_name = row$transition,
+              region = row$region,
+              use_regions = use_regions,
+              ds_transitions = ds_transitions,
+              ds_static = ds_static,
+              ds_dynamic = ds_dynamic,
+              pred_categories = pred_categories,
+              period = period,
+              config = config,
+              period_dir = period_dir,
+              save_debug = save_debug,
+              do_collinearity = do_collinearity,
+              do_grrf = do_grrf,
+              refresh_cache = refresh_cache,
+              log_file = log_file
+            )
+          },
+          error = function(e) {
+            # Print detailed error to console
+            cat(sprintf(
+              "\n\n========================================\n"
+            ))
+            cat(sprintf(
+              "ERROR processing %s | %s\n",
+              row$transition,
+              row$region
+            ))
+            cat(sprintf("========================================\n"))
+            cat(sprintf("Error message: %s\n", e$message))
+            cat(sprintf("Call: %s\n", paste(deparse(e$call), collapse = " ")))
+            cat("\nTraceback:\n")
+            print(rlang::trace_back())
+            cat("\n========================================\n\n")
+
+            # Also log to file
+            error_log_file <- file.path(
+              period_dir,
+              "worker_logs",
+              paste0(row$transition, "_", row$region, "_ERROR.log")
+            )
+            dir.create(
+              dirname(error_log_file),
+              recursive = TRUE,
+              showWarnings = FALSE
+            )
+            cat(
+              sprintf(
+                "Error: %s\nCall: %s\n\nTraceback:\n%s",
+                e$message,
+                paste(deparse(e$call), collapse = " "),
+                paste(capture.output(rlang::trace_back()), collapse = "\n")
+              ),
+              file = error_log_file
+            )
+
+            # Return error summary row
+            create_summary_row(
+              period = period,
+              region = row$region,
+              transition_name = row$transition,
+              n_observations = 0,
+              n_transitions = 0,
+              n_initial_predictors = length(pred_categories),
+              status = "worker_error",
+              error_details = e$message,
+              period_dir = period_dir,
+              debug_path = NULL,
+              save_debug = FALSE
+            )
+          }
+        )
+      }
+    )
+  } else {
+    # Parallel processing with furrr
+    furrr::future_map_dfr(
+      seq_len(nrow(task_grid)),
+      function(i) {
+        row <- task_grid[i, ]
+
+        # Wrap entire worker in tryCatch to capture any errors
+        tryCatch(
+          {
+            log_file <- initialize_worker_log(
+              file.path(period_dir, "worker_logs"),
+              paste0(row$transition, "_", row$region)
+            )
+
+            # Open datasets inside worker (safe, parallel-friendly)
+            ds_transitions <- arrow::open_dataset(
+              transitions_pq_path,
+              format = "parquet",
+              partitioning = arrow::hive_partition(region = arrow::int32())
+            )
+            ds_static <- arrow::open_dataset(
+              static_preds_pq_path,
+              format = "parquet",
+              partitioning = arrow::hive_partition(region = arrow::int32())
+            )
+            ds_dynamic <- arrow::open_dataset(
+              dynamic_preds_pq_path,
+              format = "parquet",
+              partitioning = arrow::hive_partition(
+                scenario = arrow::utf8(),
+                region = arrow::int32()
+              )
+            )
+
+            process_single_transition(
+              transition_name = row$transition,
+              region = row$region,
+              use_regions = use_regions,
+              ds_transitions = ds_transitions,
+              ds_static = ds_static,
+              ds_dynamic = ds_dynamic,
+              pred_categories = pred_categories,
+              period = period,
+              config = config,
+              period_dir = period_dir,
+              save_debug = save_debug,
+              do_collinearity = do_collinearity,
+              do_grrf = do_grrf,
+              refresh_cache = refresh_cache,
+              log_file = log_file
+            )
+          },
+          error = function(e) {
+            # Create error summary row
+            error_msg <- sprintf(
+              "Worker error for %s | %s: %s\nCall: %s",
+              row$transition,
+              row$region,
+              e$message,
+              paste(deparse(e$call), collapse = " ")
+            )
+
+            # Try to log to file if possible
+            tryCatch(
+              {
+                log_file <- file.path(
+                  period_dir,
+                  "worker_logs",
+                  paste0(row$transition, "_", row$region, "_error.log")
+                )
+                dir.create(
+                  dirname(log_file),
+                  recursive = TRUE,
+                  showWarnings = FALSE
+                )
+                cat(error_msg, file = log_file, append = TRUE)
+                cat("\n\nFull traceback:\n", file = log_file, append = TRUE)
+                cat(
+                  paste(capture.output(traceback()), collapse = "\n"),
+                  file = log_file,
+                  append = TRUE
+                )
+              },
+              error = function(e2) {
+                # Silently fail if logging fails
+              }
+            )
+
+            # Return error summary row
+            create_summary_row(
+              period = period,
+              region = row$region,
+              transition_name = row$transition,
+              n_observations = 0,
+              n_transitions = 0,
+              n_initial_predictors = length(pred_categories),
+              status = "worker_error",
+              error_details = e$message,
+              period_dir = period_dir,
+              debug_path = NULL,
+              save_debug = FALSE
+            )
+          }
+        )
+      },
+      .options = furrr::furrr_options(seed = TRUE)
+    )
+  }
 
   # Return to sequential plan after this period
   future::plan(future::sequential)
