@@ -183,11 +183,15 @@ perform_transition_modelling <- function(
     "parquet_data",
     "static"
   )
+
+  # Extract first year from period string for dynamic predictors
+  period_start_year <- as.integer(stringr::str_extract(period, "^[0-9]{4}"))
+
   dynamic_preds_pq_path <- file.path(
     config[["predictors_prepped_dir"]],
     "parquet_data",
     "dynamic",
-    period
+    period_start_year
   )
 
   # Verify files exist
