@@ -40,9 +40,6 @@ transition_modelling <- function(
   # read the model_specs yaml file
   models_specs <- yaml::yaml.load_file(model_specs_path)
 
-  # subset to period 3 for testing
-  periods_to_process <- periods_to_process[3]
-
   message(sprintf(
     "Processing %d periods: %s\n",
     length(periods_to_process),
