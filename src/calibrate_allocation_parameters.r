@@ -474,7 +474,9 @@ process_single_region <- function(
     yr2_masked_path = yr2_masked_path,
     region_label = region_label,
     debug_dir = debug_dir,
-    period_name = period_name
+    period_name = period_name,
+    temp_dir = temp_dir,
+    config = config
   )
 
   # Clean up temporary files
@@ -513,7 +515,9 @@ process_region_transitions <- function(
   yr2_masked_path,
   region_label,
   debug_dir,
-  period_name
+  period_name,
+  temp_dir,
+  config
 ) {
   # Create worker_logs directory
   worker_log_dir <- file.path(debug_dir, "worker_logs")
@@ -530,7 +534,9 @@ process_region_transitions <- function(
       log_dir,
       period_name,
       trans_dir,
-      region_val
+      region_val,
+      temp_dir_path,
+      cfg
     ) {
       # Initialize worker log file (once per worker)
       trans_name <- paste0(
@@ -554,7 +560,9 @@ process_region_transitions <- function(
         yr2_masked_path = yr2_path,
         region_label = region_label,
         log_file = log_file,
-        period_name = period_name
+        period_name = period_name,
+        temp_dir = temp_dir_path,
+        config = cfg
       )
     },
     yr1_path = yr1_masked_path,
@@ -564,7 +572,9 @@ process_region_transitions <- function(
     log_dir = worker_log_dir,
     period_name = period_name,
     trans_dir = transitions_dir,
-    region_val = region_val
+    region_val = region_val,
+    temp_dir_path = temp_dir,
+    cfg = config
   )
 }
 
@@ -579,6 +589,8 @@ process_region_transitions <- function(
 #' @param region_label label of the region
 #' @param log_file path to log file for this worker
 #' @param period_name name of the time period
+#' @param temp_dir directory for temporary files
+#' @param config configuration list
 calculate_single_transition_params <- function(
   i,
   region_transitions,
@@ -589,7 +601,9 @@ calculate_single_transition_params <- function(
   yr2_masked_path,
   region_label,
   log_file = NULL,
-  period_name
+  period_name,
+  temp_dir,
+  config
 ) {
   from_val <- region_transitions[["From."]][i]
   to_val <- region_transitions[["To."]][i]
@@ -687,15 +701,11 @@ calculate_single_transition_params <- function(
     # Classify transition cells as expanders or patchers
     # neighbor_count now has values everywhere (0 where no neighbors, >=1 where neighbors exist)
     # trans_cells is 1 where transition occurred, NA elsewhere
-    #expansion_or_new <- trans_cells
     is_expander <- (trans_cells == 1) & (neighbor_count >= 1)
     is_patcher <- (trans_cells == 1) & (neighbor_count == 0)
 
-    #terra::values(expansion_or_new)[terra::values(is_expander)] <- 10
-    #terra::values(expansion_or_new)[terra::values(is_patcher)] <- 5
-
     # Free memory from cached rasters
-    rm(post_class_patches, neighbor_count, expansion_or_new)
+    rm(post_class_patches, neighbor_count)
     gc(verbose = FALSE)
 
     # Calculate percentages
