@@ -273,7 +273,7 @@ end_time <- Sys.time()
 elapsed <- difftime(end_time, start_time, units = "hours")
 
 cat("\n========================================\n")
-cat("Pipeline Completed Successfully\n")
+cat("Estimation of Allocation Parameters Completed Successfully\n")
 cat("========================================\n")
 cat(sprintf("Total runtime: %.2f hours\n", as.numeric(elapsed)))
 

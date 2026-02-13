@@ -465,7 +465,8 @@ process_single_region <- function(
   # --- Step 3: Parallelize over transitions WITHIN this region ---
   message("  [4/4] Processing transitions in parallel...")
   message("        (Each worker loads only its specific transition data)")
-  process_region_transitions(
+
+  results <- process_region_transitions(
     region_transitions = region_transitions,
     transitions_dir = transitions_dir,
     region_val = region_val,
@@ -514,6 +515,9 @@ process_region_transitions <- function(
   debug_dir,
   period_name
 ) {
+  # Create worker_logs directory
+  worker_log_dir <- file.path(debug_dir, "worker_logs")
+
   furrr::future_map_dfr(
     seq_len(nrow(region_transitions)),
     .options = furrr::furrr_options(seed = TRUE),
@@ -523,30 +527,31 @@ process_region_transitions <- function(
       yr2_path,
       region_label,
       transitions,
-      debug_dir_path,
+      log_dir,
       period_name,
       trans_dir,
       region_val
     ) {
-      # Create log file for this transition (inside parallel worker)
+      # Initialize worker log file (once per worker)
       trans_name <- paste0(
         transitions[["Initial_class"]][i],
         "-",
         transitions[["Final_class"]][i]
       )
-      log_file <- file.path(
-        debug_dir,
-        sprintf("log_%s_%s.txt", region_label, trans_name)
+
+      log_file <- initialize_worker_log(
+        log_dir,
+        paste0(region_label, "_", trans_name)
       )
 
       calculate_single_transition_params(
         i = i,
-        region_transitions = region_transitions,
-        transitions_dir = transitions_dir,
+        region_transitions = transitions,
+        transitions_dir = trans_dir,
         region_val = region_val,
         trans_name = trans_name,
-        yr1_path = yr1_path,
-        yr2_path = yr2_path,
+        yr1_masked_path = yr1_path,
+        yr2_masked_path = yr2_path,
         region_label = region_label,
         log_file = log_file,
         period_name = period_name
@@ -555,10 +560,10 @@ process_region_transitions <- function(
     yr1_path = yr1_masked_path,
     yr2_path = yr2_masked_path,
     region_label = region_label,
-    region_transitions = region_transitions,
-    debug_dir = debug_dir,
+    transitions = region_transitions,
+    log_dir = worker_log_dir,
     period_name = period_name,
-    transitions_dir = transitions_dir,
+    trans_dir = transitions_dir,
     region_val = region_val
   )
 }
@@ -603,7 +608,6 @@ calculate_single_transition_params <- function(
   )
 
   # Load rasters for the two years
-  # Note: These rasters are already trimmed to region extent in process_single_region
   lulc_ant <- terra::rast(yr1_masked_path)
   lulc_post <- terra::rast(yr2_masked_path)
 
