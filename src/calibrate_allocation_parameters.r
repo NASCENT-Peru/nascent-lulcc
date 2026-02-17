@@ -810,9 +810,7 @@ process_region_transitions <- function(
       refresh
     ) {
       # Load terra in this worker (required for raster operations)
-      if (!requireNamespace("terra", quietly = TRUE)) {
-        stop("terra package not available in worker")
-      }
+      library(terra)
 
       # Ensure paths are character strings (not factors or other types)
       yr1_path <- as.character(yr1_path)
