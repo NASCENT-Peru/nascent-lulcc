@@ -723,8 +723,8 @@ calculate_single_transition_params <- function(
   trans_cells <- (lulc_ant == from_val) & (lulc_post == to_val)
   trans_cells[trans_cells == 0] <- NA
 
-  # Keep lulc_ant for neighbor analysis (to find existing patches)
-  rm(lulc_post)
+  # Keep lulc_post for neighbor analysis (need to see final state)
+  rm(lulc_ant)
   gc(verbose = FALSE)
 
   # Count total transition cells
@@ -764,10 +764,9 @@ calculate_single_transition_params <- function(
     if (file.exists(post_class_patches_path)) {
       post_class_patches <- terra::rast(post_class_patches_path)
     } else {
-      # Use lulc_ant (initial year) to identify EXISTING patches of destination class
-      # Expanders are cells that expand existing patches (patches that existed at t1)
-      # By definition, transition cells were NOT the destination class at t1
-      post_class_patches <- lulc_ant == to_val
+      # Use lulc_post (final year) to identify ALL cells of destination class at t2
+      # This includes both cells that were already the class AND cells that transitioned
+      post_class_patches <- lulc_post == to_val
 
       # Convert FALSE to NA for focal operation
       post_class_patches[post_class_patches == 0] <- NA
@@ -800,17 +799,22 @@ calculate_single_transition_params <- function(
     # (in case cache was created with old code)
     neighbor_count[is.na(neighbor_count)] <- 0
 
+    # Subtract 1 from neighbor_count at transition cells
+    # because focal sum includes the cell itself (center of 3x3 window)
+    # We want to know if there are OTHER cells of the destination class nearby
+    neighbor_count_at_trans <- neighbor_count * trans_cells
+    neighbor_count_at_trans[!is.na(neighbor_count_at_trans)] <-
+      neighbor_count_at_trans[!is.na(neighbor_count_at_trans)] - 1
+
     # Classify transition cells as expanders or patchers
-    # neighbor_count now has values everywhere: 0 where no neighbors, >=1 where neighbors exist
-    # trans_cells is 1 where transition occurred, NA elsewhere
-    is_expander <- (trans_cells == 1) & (neighbor_count >= 1)
-    is_patcher <- (trans_cells == 1) & (neighbor_count == 0)
+    # Expander: has at least 1 OTHER cell of destination class as neighbor (neighbor_count >= 1 after subtracting self)
+    # Patcher: has no other cells of destination class as neighbors (neighbor_count == 0 after subtracting self)
+    is_expander <- (trans_cells == 1) & (neighbor_count_at_trans >= 1)
+    is_patcher <- (trans_cells == 1) & (neighbor_count_at_trans == 0)
 
-    # Free memory from cached rasters and lulc_ant
-    rm(post_class_patches, neighbor_count, lulc_ant)
-    gc(verbose = FALSE)
-
-    # Calculate percentages
+    # Free memory from cached rasters and lulc_post
+    rm(post_class_patches, neighbor_count, neighbor_count_at_trans, lulc_post)
+    gc(verbose = FALSE) # Calculate percentages
     n_expanders_result <- terra::global(is_expander, "sum", na.rm = TRUE)
     n_expanders <- as.numeric(n_expanders_result[1, 1])
     n_patchers_result <- terra::global(is_patcher, "sum", na.rm = TRUE)
