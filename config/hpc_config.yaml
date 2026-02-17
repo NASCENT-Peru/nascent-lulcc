@@ -76,6 +76,26 @@ regionalization: true
 inclusion_threshold: 0.5
 scenario_names: ["BAU", "EI-NAT", "EI-CUL", "EI-SOC", "GR-EX"]
 
+# Simulation transition rates preparation configuration
+simulation_trans_rates:
+  margin: 0.50
+  stay_min: 0.10
+  stay_max: 0.999
+  eps_ridge: 1.0e-8
+  solver_eps: 1.0e-5
+  monotone_tol: 1.0e-3
+  lambda: 0.001
+  eta_pref: 0.001
+  rho: 100
+  mu: 5
+  fair_weight: 5
+  kappa_zero: 0.1
+  zero_hist_thresh: 1.0e-5
+  beta_dev: 1.0
+  rel_guard: 0.05
+  forbid_inflow: []
+  num_workers: 6
+
 # System configuration
 reference_crs: "epsg:2056"
 temp_dir: "temp"

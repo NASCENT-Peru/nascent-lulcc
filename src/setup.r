@@ -357,6 +357,9 @@ build_full_config <- function(yaml_config) {
     regionalization = yaml_config$regionalization,
     inclusion_threshold = yaml_config$inclusion_threshold,
 
+    # Simulation transition rates configuration
+    simulation_trans_rates = yaml_config$simulation_trans_rates,
+
     # System configuration
     reference_crs = yaml_config$reference_crs,
 

@@ -1,0 +1,49 @@
+name: trans_rate_estimation_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Base R environment
+  - r-base=4.4.1
+  
+  # Core data manipulation packages
+  - r-dplyr
+  - r-tidyr
+  - r-purrr
+  - r-tibble
+  - r-stringr
+  - r-tidyselect
+  
+  # Data I/O packages
+  - r-readxl
+  - r-readr
+  - r-openxlsx
+  - r-yaml
+  - r-jsonlite
+  - r-arrow
+  
+  # Convex optimization (CVXR and dependencies)
+  - r-cvxr
+  - r-matrix
+  - r-slam
+  
+  # Parallel processing
+  - r-future
+  - r-future.apply
+  - r-furrr
+  
+  # Visualization packages
+  - r-ggplot2
+  - r-scales
+  
+  # Utility packages
+  - r-data.table
+  
+  # System dependencies for CVXR
+  - libgfortran5
+  - openblas
+  
+  # Optional: For enhanced optimization solvers
+  # Note: Some commercial solvers may need separate installation
+  # - r-rcplex  # IBM CPLEX (if available and licensed)
+  # - r-gurobi  # Gurobi (if available and licensed)

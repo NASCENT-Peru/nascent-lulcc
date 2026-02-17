@@ -194,12 +194,54 @@ perform_transition_modelling <- function(
     period_start_year
   )
 
-  # Verify files exist
-  stopifnot(
-    file.exists(transitions_pq_path),
-    file.exists(static_preds_pq_path),
-    file.exists(dynamic_preds_pq_path)
-  )
+  # Verify files exist with informative error messages
+  missing_paths <- c()
+
+  if (!file.exists(transitions_pq_path)) {
+    missing_paths <- c(
+      missing_paths,
+      sprintf(
+        "Transitions: %s",
+        transitions_pq_path
+      )
+    )
+  }
+
+  if (!file.exists(static_preds_pq_path)) {
+    missing_paths <- c(
+      missing_paths,
+      sprintf(
+        "Static predictors: %s",
+        static_preds_pq_path
+      )
+    )
+  }
+
+  if (!file.exists(dynamic_preds_pq_path)) {
+    missing_paths <- c(
+      missing_paths,
+      sprintf(
+        "Dynamic predictors: %s",
+        dynamic_preds_pq_path
+      )
+    )
+  }
+
+  if (length(missing_paths) > 0) {
+    error_msg <- sprintf(
+      "Required parquet data directories not found:\n  %s\n\nPlease ensure data preparation steps have been completed.",
+      paste(missing_paths, collapse = "\n  ")
+    )
+    message(error_msg)
+    stop(error_msg)
+  }
+
+  message(sprintf(
+    "Data paths verified:\n  Transitions: %s\n  Static: %s\n  Dynamic: %s",
+    transitions_pq_path,
+    static_preds_pq_path,
+    dynamic_preds_pq_path
+  ))
 
   # --- Set up regions ---
   if (use_regions) {

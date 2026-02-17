@@ -1,26 +1,26 @@
 #!/bin/bash
-#SBATCH --job-name=simulation-trans-rates-prep
+#SBATCH --job-name=sim-trans-rates-prep
 #SBATCH --time=04:00:00
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=6
 #SBATCH --mem-per-cpu=16G
-#SBATCH --output=logs/simulation-trans-rates-prep-%j.out
-#SBATCH --error=logs/simulation-trans-rates-prep-%j.err
+#SBATCH --output=logs/sim-trans-rates-prep-%j.out
+#SBATCH --error=logs/sim-trans-rates-prep-%j.err
 #SBATCH --profile=task
 
 # ----------------------------------------------------------
 # Load common HPC functions
 # ----------------------------------------------------------
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$SLURM_SUBMIT_DIR/scripts"
 source "$SCRIPT_DIR/hpc_common.sh"
 
 # ----------------------------------------------------------
 # Setup environment
 # ----------------------------------------------------------
-ENV_NAME="feat_select_env"
+ENV_NAME="trans_rate_estimation_env"
 ENV_PATH="$ENV_BASE_PATH/$ENV_NAME"
 
 echo "========================================="
-echo "Job: feat_select_env"
+echo "Simulation Transition Rates Preparation"
 echo "========================================="
 echo "Environment: $ENV_NAME"
 echo "Path: $ENV_PATH"
@@ -39,10 +39,11 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 echo
+
 # ----------------------------------------------------------
-# un simulation transition rates preparation
+# Run simulation transition rates preparation
 # ----------------------------------------------------------
-R_SCRIPT="$SLURM_SUBMIT_DIR/run_simulation_trans_rates_prep.r"
+R_SCRIPT="$SCRIPT_DIR/run_simulation_trans_rates_prep.r"
 
 if [ ! -f "$R_SCRIPT" ]; then
     echo "ERROR: run_simulation_trans_rates_prep.r not found at: $R_SCRIPT"

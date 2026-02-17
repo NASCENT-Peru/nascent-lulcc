@@ -1,12 +1,12 @@
 #!/usr/bin/env Rscript
 # run_simulation_trans_rates_prep.r
-# Run simulation transition rates preparation
+# Run simulation transition rates preparation pipeline. Assumes environment activated and R from that env is used.
 
 # Capture start time
 start_time <- Sys.time()
 
 cat("\n========================================\n")
-cat("Starting Simulation Transition Rates Preparation\n")
+cat("Starting Simulation Transition Rates Preparation Pipeline\n")
 cat("========================================\n\n")
 
 # Diagnostics: show R used and library paths
@@ -18,17 +18,38 @@ cat(".libPaths():\n")
 print(.libPaths())
 cat("\n")
 
+cat("Checking CVXR installation...\n")
+
+install_if_missing <- function(pkg) {
+  if (!require(pkg, character.only = TRUE, quietly = TRUE)) {
+    cat(sprintf("Installing %s...\n", pkg))
+    install.packages(pkg, repos = "https://cloud.r-project.org/")
+  } else {
+    cat(sprintf("%s already installed.\n", pkg))
+  }
+}
+
+# Install CVXR first (needed for convex optimization)
+install_if_missing("CVXR")
+
 # Load required packages (fail fast with informative messages)
 required_pkgs <- c(
   "dplyr",
   "stringr",
+  "future",
+  "future.apply",
   "yaml",
   "jsonlite",
   "arrow",
   "tibble",
   "tidyselect",
   "tidyr",
-  "purrr"
+  "purrr",
+  "readxl",
+  "readr",
+  "ggplot2",
+  "scales",
+  "CVXR"
 )
 
 missing_pkgs <- setdiff(required_pkgs, rownames(installed.packages()))
@@ -68,44 +89,112 @@ for (p in required_pkgs) {
 
 cat("All required packages loaded successfully.\n\n")
 
-# Set working directory to project root
-# Get script directory from command line args or current working directory
-script_path <- commandArgs(trailingOnly = FALSE)
-script_path <- script_path[grepl("--file=", script_path)]
-if (length(script_path) > 0) {
-  script_dir <- dirname(sub("--file=", "", script_path))
-  project_root <- dirname(script_dir)
-} else {
-  # Fallback: assume we're running from scripts directory
-  project_root <- getwd()
-  if (basename(project_root) == "scripts") {
-    project_root <- dirname(project_root)
-  }
-}
-setwd(project_root)
-cat(sprintf("Working directory set to: %s\n", getwd()))
-
-# Source all required functions from src/
-src_files <- c(
-  "src/setup.r",
-  "src/utils.r",
-  "src/simulation_trans_rates_prep.r"
+# Source setup script
+# Try multiple possible paths for setup.r
+setup_paths <- c(
+  "../src/setup.r", # Expected path when run from scripts/
+  "src/setup.r", # If run from project root
+  file.path(dirname(dirname(getwd())), "src", "setup.r"), # Alternative
+  file.path(Sys.getenv("SLURM_SUBMIT_DIR", "."), "src", "setup.r") # Using SLURM submit dir
 )
 
-for (src_file in src_files) {
-  cat(sprintf("Sourcing %s...\n", src_file))
-  tryCatch(
-    {
-      source(src_file)
-      cat(sprintf("%s sourced successfully.\n", src_file))
-    },
-    error = function(e) {
-      cat(sprintf("ERROR sourcing %s: %s\n", src_file, e$message))
-      quit(status = 1)
-    }
-  )
+setup_found <- FALSE
+for (setup_path in setup_paths) {
+  if (file.exists(setup_path)) {
+    cat(sprintf("Sourcing %s...\n", setup_path))
+    tryCatch(
+      {
+        source(setup_path)
+        cat("setup.r sourced successfully.\n\n")
+        setup_found <- TRUE
+        break
+      },
+      error = function(e) {
+        cat(sprintf("ERROR sourcing %s: %s\n", setup_path, e$message))
+      }
+    )
+  }
 }
-cat("\n")
+
+if (!setup_found) {
+  cat("ERROR: Could not find or source setup.r in any expected location.\n")
+  cat("Working directory:", getwd(), "\n")
+  cat("SLURM_SUBMIT_DIR:", Sys.getenv("SLURM_SUBMIT_DIR", "not set"), "\n")
+  quit(status = 1)
+}
+
+# Source utils.r (optional, may not exist)
+utils_paths <- c(
+  "../src/utils.r",
+  "src/utils.r",
+  file.path(dirname(dirname(getwd())), "src", "utils.r"),
+  file.path(Sys.getenv("SLURM_SUBMIT_DIR", "."), "src", "utils.r")
+)
+
+utils_found <- FALSE
+for (utils_path in utils_paths) {
+  if (file.exists(utils_path)) {
+    cat(sprintf("Sourcing %s...\n", utils_path))
+    tryCatch(
+      {
+        source(utils_path)
+        cat("utils.r sourced successfully.\n\n")
+        utils_found <- TRUE
+        break
+      },
+      error = function(e) {
+        cat(sprintf("WARNING sourcing utils.r: %s\n", e$message))
+      }
+    )
+  }
+}
+
+if (!utils_found) {
+  cat("utils.r not found in any expected location (skipping)\n\n")
+}
+
+# Source simulation transition rates preparation functions
+sim_trans_paths <- c(
+  "../src/simulation_trans_rates_prep.r",
+  "src/simulation_trans_rates_prep.r",
+  file.path(
+    dirname(dirname(getwd())),
+    "src",
+    "simulation_trans_rates_prep.r"
+  ),
+  file.path(
+    Sys.getenv("SLURM_SUBMIT_DIR", "."),
+    "src",
+    "simulation_trans_rates_prep.r"
+  )
+)
+
+sim_trans_found <- FALSE
+for (sim_trans_path in sim_trans_paths) {
+  if (file.exists(sim_trans_path)) {
+    cat(sprintf("Sourcing %s...\n", sim_trans_path))
+    tryCatch(
+      {
+        source(sim_trans_path)
+        cat("simulation_trans_rates_prep.r sourced successfully.\n\n")
+        sim_trans_found <- TRUE
+        break
+      },
+      error = function(e) {
+        cat(sprintf("ERROR sourcing %s: %s\n", sim_trans_path, e$message))
+      }
+    )
+  }
+}
+
+if (!sim_trans_found) {
+  cat(
+    "ERROR: Could not find or source simulation_trans_rates_prep.r in any expected location.\n"
+  )
+  cat("Working directory:", getwd(), "\n")
+  cat("SLURM_SUBMIT_DIR:", Sys.getenv("SLURM_SUBMIT_DIR", "not set"), "\n")
+  quit(status = 1)
+}
 
 # Get configuration
 cat("Loading configuration...\n")
@@ -119,71 +208,73 @@ config <- tryCatch(
   }
 )
 
-cat("Configuration loaded successfully.\n\n")
+cat("Configuration loaded successfully.\n")
+cat(sprintf(
+  "  Regionalization: %s\n",
+  ifelse(isTRUE(config[["regionalization"]]), "ENABLED", "DISABLED")
+))
+cat(sprintf(
+  "  Transition rate table dir: %s\n",
+  config[["trans_rate_table_dir"]]
+))
+cat(sprintf(
+  "  Scenario names: %s\n\n",
+  paste(config[["scenario_names"]], collapse = ", ")
+))
 
-# Run simulation transition rates preparation
-cat("========================================\n")
-cat("Running Simulation Transition Rates Preparation\n")
-cat("========================================\n")
-
-result <- tryCatch(
+# Run simulation transition rates preparation pipeline
+cat("Starting simulation transition rates preparation...\n\n")
+tryCatch(
   {
     simulation_trans_rates_prep(config = config)
-    list(status = "success", error = NA)
   },
   error = function(e) {
     cat(sprintf(
-      "ERROR in Simulation Transition Rates Preparation: %s\n",
+      "\n\nERROR in simulation transition rates preparation: %s\n",
       e$message
     ))
-    list(status = "error", error = e$message)
+    cat("Traceback:\n")
+    traceback()
+    quit(status = 1)
   }
 )
 
 # Report results
 end_time <- Sys.time()
-total_elapsed <- difftime(end_time, start_time, units = "mins")
+elapsed <- difftime(end_time, start_time, units = "hours")
 
 cat("\n========================================\n")
-cat("Simulation Transition Rates Preparation Summary\n")
+cat("Pipeline Completed Successfully\n")
 cat("========================================\n")
-cat(sprintf("Total runtime: %.2f minutes\n", as.numeric(total_elapsed)))
-cat(sprintf("Status: %s\n", result$status))
+cat(sprintf("Total runtime: %.2f hours\n", as.numeric(elapsed)))
 
-if (result$status == "error" && !is.na(result$error)) {
-  cat(sprintf("Error: %s\n", result$error))
-}
-
-# Save summary
+# Save summary statistics
 summary_file <- file.path(
-  "logs",
-  sprintf(
-    "simulation_trans_rates_prep_summary_%s.txt",
-    Sys.getenv("SLURM_JOB_ID", unset = "local")
-  )
+  config[["trans_rate_table_dir"]],
+  sprintf("run_summary_%s.txt", Sys.getenv("SLURM_JOB_ID", unset = "local"))
 )
 
-if (!dir.exists("logs")) {
-  dir.create("logs", recursive = TRUE)
+# Create directory if ensure_dir function is available, otherwise use dir.create
+if (exists("ensure_dir", mode = "function")) {
+  ensure_dir(dirname(summary_file))
+} else {
+  if (!dir.exists(dirname(summary_file))) {
+    dir.create(dirname(summary_file), recursive = TRUE, showWarnings = FALSE)
+  }
 }
 
 sink(summary_file)
 cat(sprintf("Job ID: %s\n", Sys.getenv("SLURM_JOB_ID", unset = "local")))
 cat(sprintf("Start time: %s\n", start_time))
 cat(sprintf("End time: %s\n", end_time))
-cat(sprintf("Runtime: %.2f minutes\n", as.numeric(total_elapsed)))
-cat(sprintf("Status: %s\n", result$status))
-if (result$status == "error" && !is.na(result$error)) {
-  cat(sprintf("Error: %s\n", result$error))
-}
+cat(sprintf("Runtime: %.2f hours\n", as.numeric(elapsed)))
+cat(sprintf(
+  "Transition rate tables saved to: %s\n",
+  config[["trans_rate_table_dir"]]
+))
 sink()
 
 cat(sprintf("\nSummary saved to: %s\n", summary_file))
+cat("\nDone!\n")
 
-# Exit with appropriate code
-exit_code <- ifelse(result$status == "error", 1, 0)
-cat(sprintf(
-  "\nSimulation transition rates preparation completed with exit code: %d\n",
-  exit_code
-))
-quit(status = exit_code)
+quit(status = 0)
