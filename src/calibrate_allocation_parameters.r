@@ -503,6 +503,10 @@ process_single_region <- function(
   # Pre-compute cache files in parallel (one worker per destination class)
   furrr::future_walk(
     unique_to_classes,
+    .options = furrr::furrr_options(
+      seed = TRUE,
+      packages = c("terra") # Explicitly load terra in workers
+    ),
     function(
       to_val,
       temp_dir,
@@ -512,6 +516,10 @@ process_single_region <- function(
       yr2_path,
       refresh
     ) {
+      # Ensure paths are character strings
+      yr2_path <- as.character(yr2_path)
+      temp_dir <- as.character(temp_dir)
+
       post_class_patches_path <- file.path(
         temp_dir,
         sprintf(
@@ -537,6 +545,11 @@ process_single_region <- function(
           !file.exists(post_class_patches_path) ||
           !file.exists(neighbor_count_path)
       ) {
+        # Verify yr2 raster file exists
+        if (!file.exists(yr2_path)) {
+          stop(sprintf("yr2 masked raster not found: %s", yr2_path))
+        }
+
         # Each worker loads its own copy of the rasters
         yr2_worker <- terra::rast(yr2_path)
 
@@ -570,13 +583,12 @@ process_single_region <- function(
         gc(verbose = FALSE)
       }
     },
-    temp_dir = temp_dir,
-    region_label = region_label,
-    period_name = period_name,
-    yr1_path = yr1_masked_path,
-    yr2_path = yr2_masked_path,
-    refresh = refresh_cache,
-    .options = furrr::furrr_options(seed = TRUE)
+    temp_dir = as.character(temp_dir),
+    region_label = as.character(region_label),
+    period_name = as.character(period_name),
+    yr1_path = as.character(yr1_masked_path),
+    yr2_path = as.character(yr2_masked_path),
+    refresh = refresh_cache
   )
 
   # Reset to sequential before next parallel section
