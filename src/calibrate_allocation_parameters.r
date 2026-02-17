@@ -621,20 +621,20 @@ process_region_transitions <- function(
 
   # Determine parallel strategy
   if (n_cores > 1) {
-    # Use multicore on HPC (faster, shares memory)
-    # Use multisession on Windows (separate R sessions)
-    if (.Platform$OS.type == "unix") {
-      future::plan(future::multicore, workers = n_cores)
-      strategy <- "multicore"
-    } else {
-      future::plan(future::multisession, workers = n_cores)
-      strategy <- "multisession"
-    }
+    # ALWAYS use multisession (even on Unix/HPC)
+    # multicore uses forking which can cause OOM issues on HPC clusters
+    # multisession creates separate R sessions with isolated memory
+    future::plan(future::multisession, workers = n_cores)
+    strategy <- "multisession"
+
     message(sprintf(
       "    ✓ Parallel processing ENABLED: %d workers using %s strategy",
       n_cores,
       strategy
     ))
+    message(
+      "      (Using multisession for HPC compatibility and memory isolation)"
+    )
   } else {
     future::plan(future::sequential)
     message(

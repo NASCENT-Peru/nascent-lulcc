@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=calibrate-allocation-params
 #SBATCH --time=06:00:00
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=6
 #SBATCH --mem-per-cpu=16G
 #SBATCH --output=logs/calibrate-allocation-params-%j.out
 #SBATCH --error=logs/calibrate-allocation-params-%j.err
