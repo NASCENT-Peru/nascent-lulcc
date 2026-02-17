@@ -387,53 +387,53 @@ process_single_region <- function(
     region_val
   ))
 
-  # # --- Step 1: Create region-specific masked rasters ---
-  # message("  [1/4] Creating region-specific masked rasters...")
+  # --- Step 1: Create region-specific masked rasters ---
+  message("  [1/4] Creating region-specific masked rasters...")
 
-  # # Create region mask (cells in region = 1, outside = NA)
-  # region_mask <- terra::ifel(region_rast == region_val, 1L, NA)
+  # Create region mask (cells in region = 1, outside = NA)
+  region_mask <- terra::ifel(region_rast == region_val, 1L, NA)
 
-  # # Mask the LULC rasters to this region only (outside region = NA)
-  # yr1_region <- terra::mask(yr1, region_mask)
-  # yr2_region <- terra::mask(yr2, region_mask)
+  # Mask the LULC rasters to this region only (outside region = NA)
+  yr1_region <- terra::mask(yr1, region_mask)
+  yr2_region <- terra::mask(yr2, region_mask)
 
-  # # OPTIMIZATION: Trim to bounding box of non-NA cells
-  # # This reduces file size and all subsequent I/O operations
-  # # Both rasters share the same NA pattern (region mask), so trimming is safe
-  # yr1_region <- terra::trim(yr1_region, padding = 0)
-  # yr2_region <- terra::trim(yr2_region, padding = 0)
+  # OPTIMIZATION: Trim to bounding box of non-NA cells
+  # This reduces file size and all subsequent I/O operations
+  # Both rasters share the same NA pattern (region mask), so trimming is safe
+  yr1_region <- terra::trim(yr1_region, padding = 0)
+  yr2_region <- terra::trim(yr2_region, padding = 0)
 
-  # # Save to temporary files (required for future package compatibility)
-  # yr1_masked_path <- file.path(
-  #   temp_dir,
-  #   sprintf("yr1_region_%d_%s.tif", region_val, period_name)
-  # )
-  # yr2_masked_path <- file.path(
-  #   temp_dir,
-  #   sprintf("yr2_region_%d_%s.tif", region_val, period_name)
-  # )
+  # Save to temporary files (required for future package compatibility)
+  yr1_masked_path <- file.path(
+    temp_dir,
+    sprintf("yr1_region_%d_%s.tif", region_val, period_name)
+  )
+  yr2_masked_path <- file.path(
+    temp_dir,
+    sprintf("yr2_region_%d_%s.tif", region_val, period_name)
+  )
 
-  # terra::writeRaster(
-  #   yr1_region,
-  #   yr1_masked_path,
-  #   overwrite = TRUE,
-  #   wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
-  # )
-  # terra::writeRaster(
-  #   yr2_region,
-  #   yr2_masked_path,
-  #   overwrite = TRUE,
-  #   wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
-  # )
+  terra::writeRaster(
+    yr1_region,
+    yr1_masked_path,
+    overwrite = TRUE,
+    wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
+  )
+  terra::writeRaster(
+    yr2_region,
+    yr2_masked_path,
+    overwrite = TRUE,
+    wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
+  )
 
-  # message(sprintf(
-  #   "        ✓ Rasters masked for region %s (cell IDs preserved)",
-  #   region_label
-  # ))
+  message(sprintf(
+    "        ✓ Rasters masked for region %s (cell IDs preserved)",
+    region_label
+  ))
 
-  # # Clean up in-memory rasters
-  # rm(yr1_region, yr2_region, region_mask)
-  # gc(verbose = FALSE)
+  # Clean up in-memory rasters
+  rm(yr1_region, yr2_region, region_mask)
+  gc(verbose = FALSE)
 
   # --- Step 2: Prepare for transition-specific data loading ---
   message("  [2/4] Preparing transition data access...")
@@ -462,35 +462,35 @@ process_single_region <- function(
   message("  [4/4] Processing transitions in parallel...")
   message("        (Each worker loads only its specific transition data)")
 
-  # results <- process_region_transitions(
-  #   region_transitions = region_transitions,
-  #   transitions_dir = transitions_dir,
-  #   region_val = region_val,
-  #   yr1_masked_path = yr1_masked_path,
-  #   yr2_masked_path = yr2_masked_path,
-  #   region_label = region_label,
-  #   debug_dir = debug_dir,
-  #   period_name = period_name,
-  #   temp_dir = temp_dir,
-  #   config = config
-  # )
+  results <- process_region_transitions(
+    region_transitions = region_transitions,
+    transitions_dir = transitions_dir,
+    region_val = region_val,
+    yr1_masked_path = yr1_masked_path,
+    yr2_masked_path = yr2_masked_path,
+    region_label = region_label,
+    debug_dir = debug_dir,
+    period_name = period_name,
+    temp_dir = temp_dir,
+    config = config
+  )
 
-  # # Clean up temporary files
-  # gc(verbose = FALSE)
+  # Clean up temporary files
+  gc(verbose = FALSE)
 
-  # # Clean up temporary raster files
-  # if (file.exists(yr1_masked_path)) {
-  #   unlink(yr1_masked_path)
-  # }
-  # if (file.exists(yr2_masked_path)) {
-  #   unlink(yr2_masked_path)
-  # }
+  # Clean up temporary raster files
+  if (file.exists(yr1_masked_path)) {
+    unlink(yr1_masked_path)
+  }
+  if (file.exists(yr2_masked_path)) {
+    unlink(yr2_masked_path)
+  }
 
-  # message(sprintf(
-  #   "  ✓ Completed region %s (%d transitions processed)\n",
-  #   region_label,
-  #   nrow(region_transitions)
-  # ))
+  message(sprintf(
+    "  ✓ Completed region %s (%d transitions processed)\n",
+    region_label,
+    nrow(region_transitions)
+  ))
 
   # Combine RDS files for all transitions and create CSV
   combine_region_params_to_csv(
