@@ -794,16 +794,7 @@ process_region_transitions <- function(
 
   results <- furrr::future_map_dfr(
     seq_len(nrow(region_transitions)),
-    .options = furrr::furrr_options(
-      seed = TRUE,
-      packages = c("terra", "dplyr"), # Explicitly load packages in workers
-      globals = c(
-        "calculate_single_transition_params",
-        "initialize_worker_log",
-        "log_msg",
-        "calculate_class_stats_cpp"
-      )
-    ),
+    .options = furrr::furrr_options(seed = TRUE),
     function(
       i,
       yr1_path,
@@ -817,6 +808,11 @@ process_region_transitions <- function(
       temp_dir_path,
       cfg
     ) {
+      # Load terra in this worker (required for raster operations)
+      if (!requireNamespace("terra", quietly = TRUE)) {
+        stop("terra package not available in worker")
+      }
+
       # Ensure paths are character strings (not factors or other types)
       yr1_path <- as.character(yr1_path)
       yr2_path <- as.character(yr2_path)
