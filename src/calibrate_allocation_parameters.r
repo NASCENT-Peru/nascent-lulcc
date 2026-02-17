@@ -796,7 +796,13 @@ process_region_transitions <- function(
     seq_len(nrow(region_transitions)),
     .options = furrr::furrr_options(
       seed = TRUE,
-      packages = c("terra", "dplyr") # Explicitly load packages in workers
+      packages = c("terra", "dplyr"), # Explicitly load packages in workers
+      globals = c(
+        "calculate_single_transition_params",
+        "initialize_worker_log",
+        "log_msg",
+        "calculate_class_stats_cpp"
+      )
     ),
     function(
       i,
