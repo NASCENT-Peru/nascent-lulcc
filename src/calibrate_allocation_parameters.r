@@ -806,7 +806,8 @@ process_region_transitions <- function(
       trans_dir,
       region_val,
       temp_dir_path,
-      cfg
+      cfg,
+      refresh
     ) {
       # Load terra in this worker (required for raster operations)
       if (!requireNamespace("terra", quietly = TRUE)) {
