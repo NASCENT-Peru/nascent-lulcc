@@ -809,8 +809,30 @@ process_region_transitions <- function(
       cfg,
       refresh
     ) {
-      # Load terra in this worker (required for raster operations)
+      # Load required packages in this worker
       library(terra)
+      library(Rcpp)
+
+      # Compile C++ functions in this worker (required for calculate_class_stats_cpp)
+      # Find the patch_stats.cpp file
+      cpp_paths <- c(
+        file.path(cfg[["project_root"]], "src", "patch_stats.cpp"),
+        "../src/patch_stats.cpp",
+        "src/patch_stats.cpp"
+      )
+
+      cpp_found <- FALSE
+      for (cpp_path in cpp_paths) {
+        if (file.exists(cpp_path)) {
+          Rcpp::sourceCpp(cpp_path)
+          cpp_found <- TRUE
+          break
+        }
+      }
+
+      if (!cpp_found) {
+        stop("Could not find patch_stats.cpp for worker compilation")
+      }
 
       # Ensure paths are character strings (not factors or other types)
       yr1_path <- as.character(yr1_path)
