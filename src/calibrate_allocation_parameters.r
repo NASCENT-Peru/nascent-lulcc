@@ -17,7 +17,8 @@
 #' @author Ben Black
 
 calibrate_allocation_parameters <- function(
-  config = get_config()
+  config = get_config(),
+  refresh_cache = FALSE
 ) {
   #### A - Calculate allocation parameters for all time periods ####
   # vector years of lulc data
@@ -62,7 +63,10 @@ calibrate_allocation_parameters <- function(
     calculate_allocation_params_for_periods,
     comparison_years = lulc_change_periods,
     period_name = names(lulc_change_periods),
-    MoreArgs = list(lulc_rasters = lulc_rasters),
+    MoreArgs = list(
+      lulc_rasters = lulc_rasters,
+      refresh_cache = refresh_cache
+    ),
     SIMPLIFY = FALSE
   )
 
@@ -162,7 +166,8 @@ calculate_allocation_params_for_periods <- function(
   lulc_rasters,
   period_name,
   use_regions = isTRUE(config[["regionalization"]]),
-  temp_dir = config[["temp_dir"]]
+  temp_dir = config[["temp_dir"]],
+  refresh_cache = FALSE
 ) {
   # Handle both list and vector input for comparison_years
   # (mapply passes vectors, but manual calls might pass lists)
@@ -303,7 +308,8 @@ calculate_allocation_params_for_periods <- function(
     transitions_dir = transitions_dir,
     period_name = period_name,
     temp_dir = temp_dir,
-    debug_dir = debug_dir
+    debug_dir = debug_dir,
+    refresh_cache = refresh_cache
   )
 
   message(
@@ -323,6 +329,7 @@ calculate_allocation_params_for_periods <- function(
 #' @param period_name name of the time period
 #' @param temp_dir directory for temporary files
 #' @param debug_dir directory for debug/log files
+#' @param refresh_cache if TRUE, overwrite all cached files; if FALSE, reuse existing caches
 process_all_regions <- function(
   region_names,
   regions,
@@ -333,7 +340,8 @@ process_all_regions <- function(
   transitions_dir,
   period_name,
   temp_dir,
-  debug_dir
+  debug_dir,
+  refresh_cache = FALSE
 ) {
   lapply(seq_along(region_names), function(region_idx) {
     process_single_region(
@@ -347,7 +355,8 @@ process_all_regions <- function(
       transitions_dir = transitions_dir,
       period_name = period_name,
       temp_dir = temp_dir,
-      debug_dir = debug_dir
+      debug_dir = debug_dir,
+      refresh_cache = refresh_cache
     )
   })
 }
@@ -374,7 +383,8 @@ process_single_region <- function(
   transitions_dir,
   period_name,
   temp_dir,
-  debug_dir
+  debug_dir,
+  refresh_cache = FALSE
 ) {
   region_label <- region_names[region_idx]
   region_val <- as.integer(regions$value[region_idx])
@@ -390,19 +400,6 @@ process_single_region <- function(
   # --- Step 1: Create region-specific masked rasters ---
   message("  [1/4] Creating region-specific masked rasters...")
 
-  # Create region mask (cells in region = 1, outside = NA)
-  region_mask <- terra::ifel(region_rast == region_val, 1L, NA)
-
-  # Mask the LULC rasters to this region only (outside region = NA)
-  yr1_region <- terra::mask(yr1, region_mask)
-  yr2_region <- terra::mask(yr2, region_mask)
-
-  # OPTIMIZATION: Trim to bounding box of non-NA cells
-  # This reduces file size and all subsequent I/O operations
-  # Both rasters share the same NA pattern (region mask), so trimming is safe
-  yr1_region <- terra::trim(yr1_region, padding = 0)
-  yr2_region <- terra::trim(yr2_region, padding = 0)
-
   # Save to temporary files (required for future package compatibility)
   yr1_masked_path <- file.path(
     temp_dir,
@@ -413,27 +410,52 @@ process_single_region <- function(
     sprintf("yr2_region_%d_%s.tif", region_val, period_name)
   )
 
-  terra::writeRaster(
-    yr1_region,
-    yr1_masked_path,
-    overwrite = TRUE,
-    wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
-  )
-  terra::writeRaster(
-    yr2_region,
-    yr2_masked_path,
-    overwrite = TRUE,
-    wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
-  )
+  # Check if cached files exist and handle based on refresh_cache
+  if (
+    !refresh_cache &&
+      file.exists(yr1_masked_path) &&
+      file.exists(yr2_masked_path)
+  ) {
+    message(sprintf(
+      "        ✓ Using cached region masked rasters for %s",
+      region_label
+    ))
+  } else {
+    # Create region mask (cells in region = 1, outside = NA)
+    region_mask <- terra::ifel(region_rast == region_val, 1L, NA)
 
-  message(sprintf(
-    "        ✓ Rasters masked for region %s (cell IDs preserved)",
-    region_label
-  ))
+    # Mask the LULC rasters to this region only (outside region = NA)
+    yr1_region <- terra::mask(yr1, region_mask)
+    yr2_region <- terra::mask(yr2, region_mask)
 
-  # Clean up in-memory rasters
-  rm(yr1_region, yr2_region, region_mask)
-  gc(verbose = FALSE)
+    # OPTIMIZATION: Trim to bounding box of non-NA cells
+    # This reduces file size and all subsequent I/O operations
+    # Both rasters share the same NA pattern (region mask), so trimming is safe
+    yr1_region <- terra::trim(yr1_region, padding = 0)
+    yr2_region <- terra::trim(yr2_region, padding = 0)
+
+    terra::writeRaster(
+      yr1_region,
+      yr1_masked_path,
+      overwrite = TRUE,
+      wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
+    )
+    terra::writeRaster(
+      yr2_region,
+      yr2_masked_path,
+      overwrite = TRUE,
+      wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
+    )
+
+    message(sprintf(
+      "        ✓ Rasters masked for region %s (cell IDs preserved)",
+      region_label
+    ))
+
+    # Clean up in-memory rasters
+    rm(yr1_region, yr2_region, region_mask)
+    gc(verbose = FALSE)
+  }
 
   # --- Step 2: Prepare for transition-specific data loading ---
   message("  [2/4] Preparing transition data access...")
@@ -481,7 +503,15 @@ process_single_region <- function(
   # Pre-compute cache files in parallel (one worker per destination class)
   furrr::future_walk(
     unique_to_classes,
-    function(to_val, temp_dir, region_label, period_name, yr1_path, yr2_path) {
+    function(
+      to_val,
+      temp_dir,
+      region_label,
+      period_name,
+      yr1_path,
+      yr2_path,
+      refresh
+    ) {
       post_class_patches_path <- file.path(
         temp_dir,
         sprintf(
@@ -501,9 +531,10 @@ process_single_region <- function(
         )
       )
 
-      # Only create if doesn't exist
+      # Create if doesn't exist OR if refresh_cache is TRUE
       if (
-        !file.exists(post_class_patches_path) ||
+        refresh ||
+          !file.exists(post_class_patches_path) ||
           !file.exists(neighbor_count_path)
       ) {
         # Each worker loads its own copy of the rasters
@@ -544,6 +575,7 @@ process_single_region <- function(
     period_name = period_name,
     yr1_path = yr1_masked_path,
     yr2_path = yr2_masked_path,
+    refresh = refresh_cache,
     .options = furrr::furrr_options(seed = TRUE)
   )
 
@@ -566,7 +598,8 @@ process_single_region <- function(
     debug_dir = debug_dir,
     period_name = period_name,
     temp_dir = temp_dir,
-    config = config
+    config = config,
+    refresh_cache = refresh_cache
   )
 
   # Clean up temporary files
@@ -693,6 +726,9 @@ combine_region_params_to_csv <- function(
 #' @param region_label label of the region
 #' @param debug_dir directory for debug/log files
 #' @param period_name name of the time period
+#' @param temp_dir directory for temporary files
+#' @param config configuration list
+#' @param refresh_cache if TRUE, overwrite all cached files; if FALSE, reuse existing caches
 #' @return results data frame
 process_region_transitions <- function(
   region_transitions,
@@ -704,7 +740,8 @@ process_region_transitions <- function(
   debug_dir,
   period_name,
   temp_dir,
-  config
+  config,
+  refresh_cache = FALSE
 ) {
   # Set up parallel processing
   # Use number of cores from SLURM or default to half of available cores
@@ -745,7 +782,10 @@ process_region_transitions <- function(
 
   results <- furrr::future_map_dfr(
     seq_len(nrow(region_transitions)),
-    .options = furrr::furrr_options(seed = TRUE),
+    .options = furrr::furrr_options(
+      seed = TRUE,
+      packages = c("terra", "dplyr") # Explicitly load packages in workers
+    ),
     function(
       i,
       yr1_path,
@@ -759,6 +799,10 @@ process_region_transitions <- function(
       temp_dir_path,
       cfg
     ) {
+      # Ensure paths are character strings (not factors or other types)
+      yr1_path <- as.character(yr1_path)
+      yr2_path <- as.character(yr2_path)
+
       # Initialize trans_name and log file BEFORE error handling
       trans_name <- paste0(
         transitions[["Initial_class"]][i],
@@ -786,7 +830,8 @@ process_region_transitions <- function(
             log_file = log_file,
             period_name = period_name,
             temp_dir = temp_dir_path,
-            config = cfg
+            config = cfg,
+            refresh_cache = refresh
           )
         },
         error = function(e) {
@@ -815,16 +860,17 @@ process_region_transitions <- function(
         }
       )
     },
-    yr1_path = yr1_masked_path,
-    yr2_path = yr2_masked_path,
-    region_label = region_label,
+    yr1_path = as.character(yr1_masked_path),
+    yr2_path = as.character(yr2_masked_path),
+    region_label = as.character(region_label),
     transitions = region_transitions,
-    log_dir = worker_log_dir,
-    period_name = period_name,
-    trans_dir = transitions_dir,
+    log_dir = as.character(worker_log_dir),
+    period_name = as.character(period_name),
+    trans_dir = as.character(transitions_dir),
     region_val = region_val,
-    temp_dir_path = temp_dir,
-    cfg = config
+    temp_dir_path = as.character(temp_dir),
+    cfg = config,
+    refresh = refresh_cache
   )
 
   # Reset to sequential plan after parallel processing
@@ -846,6 +892,7 @@ process_region_transitions <- function(
 #' @param period_name name of the time period
 #' @param temp_dir directory for temporary files
 #' @param config configuration list
+#' @param refresh_cache if TRUE, overwrite all cached files; if FALSE, reuse existing caches
 calculate_single_transition_params <- function(
   i,
   region_transitions,
@@ -858,7 +905,8 @@ calculate_single_transition_params <- function(
   log_file = NULL,
   period_name,
   temp_dir,
-  config
+  config,
+  refresh_cache = FALSE
 ) {
   from_val <- region_transitions[["From."]][i]
   to_val <- region_transitions[["To."]][i]
@@ -875,6 +923,14 @@ calculate_single_transition_params <- function(
     ),
     log_file
   )
+
+  # Verify file paths are valid before attempting to load
+  if (!file.exists(yr1_masked_path)) {
+    stop(sprintf("yr1 masked raster not found: %s", yr1_masked_path))
+  }
+  if (!file.exists(yr2_masked_path)) {
+    stop(sprintf("yr2 masked raster not found: %s", yr2_masked_path))
+  }
 
   # Load rasters for the two years
   lulc_ant <- terra::rast(yr1_masked_path)
