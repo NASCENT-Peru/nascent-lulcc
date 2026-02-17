@@ -42,7 +42,7 @@ calibrate_allocation_parameters <- function(
 
   # create folders for results
   ensure_dir(config[["simulation_param_dir"]])
-  ensure_dir(file.path(config[["calibration_param_dir"]], "periodic"))
+  ensure_dir(config[["calibration_param_dir"]])
 
   # loop over config$data_periods to create list of raster combinations
   lulc_change_periods <- lapply(
@@ -66,88 +66,88 @@ calibrate_allocation_parameters <- function(
     SIMPLIFY = FALSE
   )
 
-  # load the similarity values produced from the validation process inside Dinamica
-  # for each simulation
-  calibration_results <-
-    fs::dir_ls(
-      path = work_dir,
-      glob = "**/similarity_value*.csv", # grandparent folder is simulation_id
-      recurse = TRUE
-    ) |>
-    rlang::set_names(\(x) stringr::str_split_i(x, "/", -3)) |> # get simulation_id from folder name
-    purrr::map(
-      readr::read_csv, # these files are actually just a float without header
-      col_names = "similarity_value",
-      col_types = "d"
-    ) |>
-    dplyr::bind_rows(.id = "simulation_id") |>
-    dplyr::filter(simulation_id != "summary")
+  # # load the similarity values produced from the validation process inside Dinamica
+  # # for each simulation
+  # calibration_results <-
+  #   fs::dir_ls(
+  #     path = work_dir,
+  #     glob = "**/similarity_value*.csv", # grandparent folder is simulation_id
+  #     recurse = TRUE
+  #   ) |>
+  #   rlang::set_names(\(x) stringr::str_split_i(x, "/", -3)) |> # get simulation_id from folder name
+  #   purrr::map(
+  #     readr::read_csv, # these files are actually just a float without header
+  #     col_names = "similarity_value",
+  #     col_types = "d"
+  #   ) |>
+  #   dplyr::bind_rows(.id = "simulation_id") |>
+  #   dplyr::filter(simulation_id != "summary")
 
-  # summary statistics
-  calibration_summary <- data.frame(
-    Mean = mean(calibration_results[["similarity_value"]]),
-    `Standard Deviation` = sd(calibration_results[["similarity_value"]]),
-    Minimum = min(calibration_results[["similarity_value"]]),
-    Maximum = max(calibration_results[["similarity_value"]]),
-    n = length(calibration_results[["similarity_value"]])
-  )
+  # # summary statistics
+  # calibration_summary <- data.frame(
+  #   Mean = mean(calibration_results[["similarity_value"]]),
+  #   `Standard Deviation` = sd(calibration_results[["similarity_value"]]),
+  #   Minimum = min(calibration_results[["similarity_value"]]),
+  #   Maximum = max(calibration_results[["similarity_value"]]),
+  #   n = length(calibration_results[["similarity_value"]])
+  # )
 
-  # save summary statistics
-  readr::write_csv(
-    calibration_summary,
-    file.path(work_dir, "validation_summary.csv")
-  )
+  # # save summary statistics
+  # readr::write_csv(
+  #   calibration_summary,
+  #   file.path(work_dir, "validation_summary.csv")
+  # )
 
-  # select best performing simulation_ID
-  best_sim_ID <- calibration_results[
-    which.max(calibration_results[["similarity_value"]]),
-  ][["simulation_id"]]
+  # # select best performing simulation_ID
+  # best_sim_ID <- calibration_results[
+  #   which.max(calibration_results[["similarity_value"]]),
+  # ][["simulation_id"]]
 
-  # Use this sim ID to create parameter tables for all simulation time points
-  # in the Simulation folder
+  # # Use this sim ID to create parameter tables for all simulation time points
+  # # in the Simulation folder
 
-  # get exemplar table
-  param_table <- read.csv(
-    list.files(
-      file.path(config[["calibration_param_dir"]], best_sim_ID),
-      full.names = TRUE,
-      pattern = "2020"
-    )
-  )
-  colnames(param_table) <- c(
-    "From*",
-    "To*",
-    " Mean_Patch_Size",
-    "Patch_Size_Variance",
-    "Patch_Isometry",
-    "Perc_expander",
-    "Perc_patcher"
-  )
+  # # get exemplar table
+  # param_table <- read.csv(
+  #   list.files(
+  #     file.path(config[["calibration_param_dir"]], best_sim_ID),
+  #     full.names = TRUE,
+  #     pattern = "2020"
+  #   )
+  # )
+  # colnames(param_table) <- c(
+  #   "From*",
+  #   "To*",
+  #   " Mean_Patch_Size",
+  #   "Patch_Size_Variance",
+  #   "Patch_Isometry",
+  #   "Perc_expander",
+  #   "Perc_patcher"
+  # )
 
-  # get simulation start and end times from control table
-  simulation_control <- readr::read_csv(config[["ctrl_tbl_path"]])
-  simulation_start <- min(simulation_control$scenario_start.real)
-  simulation_end <- max(simulation_control$scenario_end.real)
-  scenario_IDs <- unique(simulation_control$scenario_id.string)
+  # # get simulation start and end times from control table
+  # simulation_control <- readr::read_csv(config[["ctrl_tbl_path"]])
+  # simulation_start <- min(simulation_control$scenario_start.real)
+  # simulation_end <- max(simulation_control$scenario_end.real)
+  # scenario_IDs <- unique(simulation_control$scenario_id.string)
 
-  # loop over scenario IDs and simulation time points creating allocation param tables
-  sapply(
-    scenario_IDs,
-    function(scenario_id) {
-      sapply(
-        seq(simulation_start, simulation_end, step_length),
-        function(simulation_year) {
-          save_dir <- file.path(config[["simulation_param_dir"]], scenario_id)
-          ensure_dir(save_dir)
-          file_name <- file.path(
-            save_dir,
-            paste0("allocation_param_table_", simulation_year, ".csv")
-          )
-          readr::write_csv(param_table, file = file_name)
-        }
-      )
-    }
-  )
+  # # loop over scenario IDs and simulation time points creating allocation param tables
+  # sapply(
+  #   scenario_IDs,
+  #   function(scenario_id) {
+  #     sapply(
+  #       seq(simulation_start, simulation_end, step_length),
+  #       function(simulation_year) {
+  #         save_dir <- file.path(config[["simulation_param_dir"]], scenario_id)
+  #         ensure_dir(save_dir)
+  #         file_name <- file.path(
+  #           save_dir,
+  #           paste0("allocation_param_table_", simulation_year, ".csv")
+  #         )
+  #         readr::write_csv(param_table, file = file_name)
+  #       }
+  #     )
+  #   }
+  # )
 }
 
 #' Main function to calculate allocation parameters for a given time period
@@ -306,13 +306,10 @@ calculate_allocation_params_for_periods <- function(
     debug_dir = debug_dir
   )
 
-  message("\n✓ COMPLETED ALLOCATION PARAMETER CALCULATION")
+  message(
+    "\n✓ COMPLETED ALLOCATION PARAMETER ESTIMATION FOR ALL TRANSITIONS, REGIONS, AND TIME PERIODS"
+  )
   message(paste(rep("=", 80), collapse = ""))
-
-  message(sprintf(
-    "Results saved to: allocation_parameters_%s.csv",
-    period_name
-  ))
 }
 
 #' Process all regions sequentially
@@ -354,7 +351,6 @@ process_all_regions <- function(
     )
   })
 }
-
 #' Process a single region
 #' @param region_idx index of the region
 #' @param region_names vector of region names
@@ -391,53 +387,53 @@ process_single_region <- function(
     region_val
   ))
 
-  # --- Step 1: Create region-specific masked rasters ---
-  message("  [1/4] Creating region-specific masked rasters...")
+  # # --- Step 1: Create region-specific masked rasters ---
+  # message("  [1/4] Creating region-specific masked rasters...")
 
-  # Create region mask (cells in region = 1, outside = NA)
-  region_mask <- terra::ifel(region_rast == region_val, 1L, NA)
+  # # Create region mask (cells in region = 1, outside = NA)
+  # region_mask <- terra::ifel(region_rast == region_val, 1L, NA)
 
-  # Mask the LULC rasters to this region only (outside region = NA)
-  yr1_region <- terra::mask(yr1, region_mask)
-  yr2_region <- terra::mask(yr2, region_mask)
+  # # Mask the LULC rasters to this region only (outside region = NA)
+  # yr1_region <- terra::mask(yr1, region_mask)
+  # yr2_region <- terra::mask(yr2, region_mask)
 
-  # OPTIMIZATION: Trim to bounding box of non-NA cells
-  # This reduces file size and all subsequent I/O operations
-  # Both rasters share the same NA pattern (region mask), so trimming is safe
-  yr1_region <- terra::trim(yr1_region, padding = 0)
-  yr2_region <- terra::trim(yr2_region, padding = 0)
+  # # OPTIMIZATION: Trim to bounding box of non-NA cells
+  # # This reduces file size and all subsequent I/O operations
+  # # Both rasters share the same NA pattern (region mask), so trimming is safe
+  # yr1_region <- terra::trim(yr1_region, padding = 0)
+  # yr2_region <- terra::trim(yr2_region, padding = 0)
 
-  # Save to temporary files (required for future package compatibility)
-  yr1_masked_path <- file.path(
-    temp_dir,
-    sprintf("yr1_region_%d_%s.tif", region_val, period_name)
-  )
-  yr2_masked_path <- file.path(
-    temp_dir,
-    sprintf("yr2_region_%d_%s.tif", region_val, period_name)
-  )
+  # # Save to temporary files (required for future package compatibility)
+  # yr1_masked_path <- file.path(
+  #   temp_dir,
+  #   sprintf("yr1_region_%d_%s.tif", region_val, period_name)
+  # )
+  # yr2_masked_path <- file.path(
+  #   temp_dir,
+  #   sprintf("yr2_region_%d_%s.tif", region_val, period_name)
+  # )
 
-  terra::writeRaster(
-    yr1_region,
-    yr1_masked_path,
-    overwrite = TRUE,
-    wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
-  )
-  terra::writeRaster(
-    yr2_region,
-    yr2_masked_path,
-    overwrite = TRUE,
-    wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
-  )
+  # terra::writeRaster(
+  #   yr1_region,
+  #   yr1_masked_path,
+  #   overwrite = TRUE,
+  #   wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
+  # )
+  # terra::writeRaster(
+  #   yr2_region,
+  #   yr2_masked_path,
+  #   overwrite = TRUE,
+  #   wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
+  # )
 
-  message(sprintf(
-    "        ✓ Rasters masked for region %s (cell IDs preserved)",
-    region_label
-  ))
+  # message(sprintf(
+  #   "        ✓ Rasters masked for region %s (cell IDs preserved)",
+  #   region_label
+  # ))
 
-  # Clean up in-memory rasters
-  rm(yr1_region, yr2_region, region_mask)
-  gc(verbose = FALSE)
+  # # Clean up in-memory rasters
+  # rm(yr1_region, yr2_region, region_mask)
+  # gc(verbose = FALSE)
 
   # --- Step 2: Prepare for transition-specific data loading ---
   message("  [2/4] Preparing transition data access...")
@@ -466,35 +462,132 @@ process_single_region <- function(
   message("  [4/4] Processing transitions in parallel...")
   message("        (Each worker loads only its specific transition data)")
 
-  results <- process_region_transitions(
-    region_transitions = region_transitions,
-    transitions_dir = transitions_dir,
-    region_val = region_val,
-    yr1_masked_path = yr1_masked_path,
-    yr2_masked_path = yr2_masked_path,
+  # results <- process_region_transitions(
+  #   region_transitions = region_transitions,
+  #   transitions_dir = transitions_dir,
+  #   region_val = region_val,
+  #   yr1_masked_path = yr1_masked_path,
+  #   yr2_masked_path = yr2_masked_path,
+  #   region_label = region_label,
+  #   debug_dir = debug_dir,
+  #   period_name = period_name,
+  #   temp_dir = temp_dir,
+  #   config = config
+  # )
+
+  # # Clean up temporary files
+  # gc(verbose = FALSE)
+
+  # # Clean up temporary raster files
+  # if (file.exists(yr1_masked_path)) {
+  #   unlink(yr1_masked_path)
+  # }
+  # if (file.exists(yr2_masked_path)) {
+  #   unlink(yr2_masked_path)
+  # }
+
+  # message(sprintf(
+  #   "  ✓ Completed region %s (%d transitions processed)\n",
+  #   region_label,
+  #   nrow(region_transitions)
+  # ))
+
+  # Combine RDS files for all transitions and create CSV
+  combine_region_params_to_csv(
     region_label = region_label,
-    debug_dir = debug_dir,
+    region_val = region_val,
     period_name = period_name,
-    temp_dir = temp_dir,
+    transitions = transitions,
     config = config
   )
+}
 
-  # Clean up temporary files
-  gc(verbose = FALSE)
+#' Combine RDS files for a region into a single CSV with all transitions
+#' @param region_label label of the region
+#' @param region_val numeric region value
+#' @param period_name name of the time period
+#' @param transitions data frame containing all possible transitions
+#' @param config configuration list
+combine_region_params_to_csv <- function(
+  region_label,
+  region_val,
+  period_name,
+  transitions,
+  config
+) {
+  message(sprintf(
+    "  [5/5] Combining transition parameters into CSV for region %s...",
+    region_label
+  ))
 
-  # Clean up temporary raster files
-  if (file.exists(yr1_masked_path)) {
-    unlink(yr1_masked_path)
+  # Read all RDS files for this region and period
+  rds_pattern <- sprintf(
+    "allocation_params_region_%s_from_.*_to_.*\\.rds",
+    region_label
+  )
+  rds_dir <- file.path(config[["calibration_param_dir"]], period_name)
+  rds_files <- list.files(
+    path = rds_dir,
+    pattern = rds_pattern,
+    full.names = TRUE
+  )
+
+  if (length(rds_files) == 0) {
+    warning(sprintf(
+      "No RDS files found for region %s in period %s",
+      region_label,
+      period_name
+    ))
+    return(NULL)
   }
-  if (file.exists(yr2_masked_path)) {
-    unlink(yr2_masked_path)
-  }
+
+  # Read and combine all RDS files
+  observed_params <- lapply(rds_files, readRDS) |>
+    dplyr::bind_rows()
+
+  # Create complete transition list with From* and To* values
+  all_transitions <- transitions |>
+    dplyr::select(`From.`, `To.`) |>
+    dplyr::distinct()
+
+  # Left join to get all transitions, filling missing with 0s
+  complete_params <- all_transitions |>
+    dplyr::left_join(
+      observed_params |>
+        dplyr::select(-Region),
+      by = c("From." = "From*", "To." = "To*")
+    ) |>
+    dplyr::mutate(
+      ` Mean_Patch_Size` = dplyr::coalesce(` Mean_Patch_Size`, 0),
+      `Patch_Size_Variance` = dplyr::coalesce(`Patch_Size_Variance`, 0),
+      `Patch_Isometry` = dplyr::coalesce(`Patch_Isometry`, 0),
+      `Perc_expander` = dplyr::coalesce(`Perc_expander`, 0),
+      `Perc_patcher` = dplyr::coalesce(`Perc_patcher`, 0)
+    ) |>
+    dplyr::rename(
+      `From*` = `From.`,
+      `To*` = `To.`
+    )
+
+  # Create output directory structure: period_name/region_name/
+  output_dir <- file.path(
+    config[["calibration_param_dir"]],
+    period_name,
+    region_label
+  )
+  ensure_dir(output_dir)
+
+  # Save as CSV
+  output_file <- file.path(output_dir, "allocation_params.csv")
+  readr::write_csv(complete_params, output_file)
 
   message(sprintf(
-    "  ✓ Completed region %s (%d transitions processed)\n",
-    region_label,
-    nrow(region_transitions)
+    "        ✓ Saved allocation parameters CSV: %s (%d transitions)",
+    output_file,
+    nrow(complete_params)
   ))
+
+  return(output_file)
 }
 
 #' Process all transitions for a single region (parallel)
@@ -630,7 +723,7 @@ calculate_single_transition_params <- function(
   trans_cells <- (lulc_ant == from_val) & (lulc_post == to_val)
   trans_cells[trans_cells == 0] <- NA
 
-  # Free memory from large rasters no longer needed
+  # Keep lulc_ant for neighbor analysis (to find existing patches)
   rm(lulc_post)
   gc(verbose = FALSE)
 
@@ -671,12 +764,14 @@ calculate_single_transition_params <- function(
     if (file.exists(post_class_patches_path)) {
       post_class_patches <- terra::rast(post_class_patches_path)
     } else {
+      # Use lulc_ant (initial year) to identify EXISTING patches of destination class
+      # Expanders are cells that expand existing patches (patches that existed at t1)
+      # By definition, transition cells were NOT the destination class at t1
       post_class_patches <- lulc_ant == to_val
+
+      # Convert FALSE to NA for focal operation
       post_class_patches[post_class_patches == 0] <- NA
 
-      # This is necessary because otherwise the transition cells
-      # will be ignored in the neighbourhood count
-      post_class_patches[trans_cells == 1] <- 0
       terra::writeRaster(
         post_class_patches,
         post_class_patches_path,
@@ -695,17 +790,24 @@ calculate_single_transition_params <- function(
         na.rm = TRUE,
         na.policy = "omit"
       )
+      # Replace NA values with 0 before caching
+      # NA values occur where all neighbors are NA (no destination class nearby)
+      neighbor_count[is.na(neighbor_count)] <- 0
       terra::writeRaster(neighbor_count, neighbor_count_path, overwrite = TRUE)
     }
 
+    # Ensure NA values are replaced even if loaded from cache
+    # (in case cache was created with old code)
+    neighbor_count[is.na(neighbor_count)] <- 0
+
     # Classify transition cells as expanders or patchers
-    # neighbor_count now has values everywhere (0 where no neighbors, >=1 where neighbors exist)
+    # neighbor_count now has values everywhere: 0 where no neighbors, >=1 where neighbors exist
     # trans_cells is 1 where transition occurred, NA elsewhere
     is_expander <- (trans_cells == 1) & (neighbor_count >= 1)
     is_patcher <- (trans_cells == 1) & (neighbor_count == 0)
 
-    # Free memory from cached rasters
-    rm(post_class_patches, neighbor_count)
+    # Free memory from cached rasters and lulc_ant
+    rm(post_class_patches, neighbor_count, lulc_ant)
     gc(verbose = FALSE)
 
     # Calculate percentages
@@ -713,6 +815,10 @@ calculate_single_transition_params <- function(
     n_expanders <- as.numeric(n_expanders_result[1, 1])
     n_patchers_result <- terra::global(is_patcher, "sum", na.rm = TRUE)
     n_patchers <- as.numeric(n_patchers_result[1, 1])
+
+    # Handle NA results from global (shouldn't happen after neighbor_count NA fix, but defensive)
+    n_expanders <- ifelse(is.na(n_expanders), 0, n_expanders)
+    n_patchers <- ifelse(is.na(n_patchers), 0, n_patchers)
 
     frac_expander <- n_expanders / n_trans_cells
     frac_patcher <- n_patchers / n_trans_cells
