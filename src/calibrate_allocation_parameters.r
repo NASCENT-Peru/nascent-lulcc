@@ -458,9 +458,103 @@ process_single_region <- function(
     nrow(region_transitions)
   ))
 
-  # --- Step 3: Parallelize over transitions WITHIN this region ---
+  # --- Step 3.5: Pre-compute shared cache files IN PARALLEL ---
+  message(
+    "  [3.5/4] Pre-computing shared cache files (post_class_patches, neighbor_count)..."
+  )
+
+  # Get unique destination classes (to_val) for this region
+  unique_to_classes <- unique(region_transitions$To.)
+  message(sprintf(
+    "        Found %d unique destination classes",
+    length(unique_to_classes)
+  ))
+
+  # Setup parallel backend for cache creation
+  n_cores_cache <- min(4, length(unique_to_classes), parallel::detectCores())
+  message(sprintf("        Using %d cores for cache creation", n_cores_cache))
+
+  if (n_cores_cache > 1) {
+    future::plan(future::multisession, workers = n_cores_cache)
+  }
+
+  # Pre-compute cache files in parallel (one worker per destination class)
+  furrr::future_walk(
+    unique_to_classes,
+    function(to_val, temp_dir, region_label, period_name, yr1_path, yr2_path) {
+      post_class_patches_path <- file.path(
+        temp_dir,
+        sprintf(
+          "post_class_patches_region_%s_to_%d_%s.tif",
+          region_label,
+          to_val,
+          period_name
+        )
+      )
+      neighbor_count_path <- file.path(
+        temp_dir,
+        sprintf(
+          "neighbor_count_region_%s_to_%d_%s.tif",
+          region_label,
+          to_val,
+          period_name
+        )
+      )
+
+      # Only create if doesn't exist
+      if (
+        !file.exists(post_class_patches_path) ||
+          !file.exists(neighbor_count_path)
+      ) {
+        # Each worker loads its own copy of the rasters
+        yr2_worker <- terra::rast(yr2_path)
+
+        # Create post_class_patches
+        post_class_patches <- yr2_worker == to_val
+        post_class_patches[post_class_patches == 0] <- NA
+        terra::writeRaster(
+          post_class_patches,
+          post_class_patches_path,
+          overwrite = TRUE,
+          wopt = list(datatype = "INT1U", gdal = c("COMPRESS=LZW"))
+        )
+
+        # Create neighbor_count
+        neighbor_count <- terra::focal(
+          post_class_patches,
+          w = matrix(1, nrow = 3, ncol = 3),
+          fun = "sum",
+          na.rm = TRUE,
+          na.policy = "omit"
+        )
+        neighbor_count[is.na(neighbor_count)] <- 0
+        terra::writeRaster(
+          neighbor_count,
+          neighbor_count_path,
+          overwrite = TRUE,
+          wopt = list(datatype = "INT1U", gdal = c("COMPRESS=LZW"))
+        )
+
+        rm(post_class_patches, neighbor_count, yr2_worker)
+        gc(verbose = FALSE)
+      }
+    },
+    temp_dir = temp_dir,
+    region_label = region_label,
+    period_name = period_name,
+    yr1_path = yr1_masked_path,
+    yr2_path = yr2_masked_path,
+    .options = furrr::furrr_options(seed = TRUE)
+  )
+
+  # Reset to sequential before next parallel section
+  future::plan(future::sequential)
+
+  message("        ✓ All cache files created")
+
+  # --- Step 4: Parallelize over transitions WITHIN this region ---
   message("  [4/4] Processing transitions in parallel...")
-  message("        (Each worker loads only its specific transition data)")
+  message("        (Cache files pre-computed, workers will only read them)")
 
   results <- process_region_transitions(
     region_transitions = region_transitions,
@@ -799,43 +893,12 @@ calculate_single_transition_params <- function(
       )
     )
 
-    # post_class_patches: load or compute
-    if (file.exists(post_class_patches_path)) {
-      post_class_patches <- terra::rast(post_class_patches_path)
-    } else {
-      # Use lulc_post (final year) to identify ALL cells of destination class at t2
-      # This includes both cells that were already the class AND cells that transitioned
-      post_class_patches <- lulc_post == to_val
+    # Load pre-computed cache files (created sequentially before parallel processing)
+    # These files are guaranteed to exist and are read-only, so no race conditions
+    post_class_patches <- terra::rast(post_class_patches_path)
+    neighbor_count <- terra::rast(neighbor_count_path)
 
-      # Convert FALSE to NA for focal operation
-      post_class_patches[post_class_patches == 0] <- NA
-
-      terra::writeRaster(
-        post_class_patches,
-        post_class_patches_path,
-        overwrite = TRUE
-      )
-    }
-
-    # neighbor_count: load or compute
-    if (file.exists(neighbor_count_path)) {
-      neighbor_count <- terra::rast(neighbor_count_path)
-    } else {
-      neighbor_count <- terra::focal(
-        post_class_patches,
-        w = matrix(1, nrow = 3, ncol = 3),
-        fun = "sum",
-        na.rm = TRUE,
-        na.policy = "omit"
-      )
-      # Replace NA values with 0 before caching
-      # NA values occur where all neighbors are NA (no destination class nearby)
-      neighbor_count[is.na(neighbor_count)] <- 0
-      terra::writeRaster(neighbor_count, neighbor_count_path, overwrite = TRUE)
-    }
-
-    # Ensure NA values are replaced even if loaded from cache
-    # (in case cache was created with old code)
+    # Ensure NA values are replaced (defensive, should already be done in cache)
     neighbor_count[is.na(neighbor_count)] <- 0
 
     # Subtract 1 from neighbor_count at transition cells
