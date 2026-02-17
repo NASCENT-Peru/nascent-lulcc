@@ -759,7 +759,7 @@ process_region_transitions <- function(
       temp_dir_path,
       cfg
     ) {
-      # Initialize worker log file (once per worker)
+      # Initialize trans_name and log file BEFORE error handling
       trans_name <- paste0(
         transitions[["Initial_class"]][i],
         "-",
@@ -771,19 +771,48 @@ process_region_transitions <- function(
         paste0(region_label, "_", trans_name)
       )
 
-      calculate_single_transition_params(
-        i = i,
-        region_transitions = transitions,
-        transitions_dir = trans_dir,
-        region_val = region_val,
-        trans_name = trans_name,
-        yr1_masked_path = yr1_path,
-        yr2_masked_path = yr2_path,
-        region_label = region_label,
-        log_file = log_file,
-        period_name = period_name,
-        temp_dir = temp_dir_path,
-        config = cfg
+      # Wrap in tryCatch for better error reporting
+      tryCatch(
+        {
+          calculate_single_transition_params(
+            i = i,
+            region_transitions = transitions,
+            transitions_dir = trans_dir,
+            region_val = region_val,
+            trans_name = trans_name,
+            yr1_masked_path = yr1_path,
+            yr2_masked_path = yr2_path,
+            region_label = region_label,
+            log_file = log_file,
+            period_name = period_name,
+            temp_dir = temp_dir_path,
+            config = cfg
+          )
+        },
+        error = function(e) {
+          err_msg <- sprintf(
+            "ERROR in worker processing transition %d (%s): %s\n%s",
+            i,
+            trans_name,
+            e$message,
+            paste(capture.output(traceback()), collapse = "\n")
+          )
+          cat(err_msg, file = stderr())
+
+          # Try to write error to log file
+          tryCatch(
+            cat(err_msg, file = log_file, append = TRUE),
+            error = function(e2) NULL
+          )
+
+          # Re-throw with more context
+          stop(sprintf(
+            "Worker %d failed for transition %s: %s",
+            i,
+            trans_name,
+            e$message
+          ))
+        }
       )
     },
     yr1_path = yr1_masked_path,
