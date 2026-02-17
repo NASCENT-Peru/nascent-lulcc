@@ -612,10 +612,44 @@ process_region_transitions <- function(
   temp_dir,
   config
 ) {
+  # Set up parallel processing
+  # Use number of cores from SLURM or default to half of available cores
+  n_cores <- as.integer(Sys.getenv(
+    "SLURM_CPUS_PER_TASK",
+    parallel::detectCores() / 2
+  ))
+
+  # Determine parallel strategy
+  if (n_cores > 1) {
+    # Use multicore on HPC (faster, shares memory)
+    # Use multisession on Windows (separate R sessions)
+    if (.Platform$OS.type == "unix") {
+      future::plan(future::multicore, workers = n_cores)
+      strategy <- "multicore"
+    } else {
+      future::plan(future::multisession, workers = n_cores)
+      strategy <- "multisession"
+    }
+    message(sprintf(
+      "    ✓ Parallel processing ENABLED: %d workers using %s strategy",
+      n_cores,
+      strategy
+    ))
+  } else {
+    future::plan(future::sequential)
+    message(
+      "    ⚠ Parallel processing DISABLED: Running sequentially (n_cores=1)"
+    )
+  }
+
+  # Verify the actual plan
+  current_plan <- class(future::plan())[1]
+  message(sprintf("    Current future plan: %s", current_plan))
+
   # Create worker_logs directory
   worker_log_dir <- file.path(debug_dir, "worker_logs")
 
-  furrr::future_map_dfr(
+  results <- furrr::future_map_dfr(
     seq_len(nrow(region_transitions)),
     .options = furrr::furrr_options(seed = TRUE),
     function(
@@ -669,6 +703,11 @@ process_region_transitions <- function(
     temp_dir_path = temp_dir,
     cfg = config
   )
+
+  # Reset to sequential plan after parallel processing
+  future::plan(future::sequential)
+
+  return(results)
 }
 
 #' Calculate allocation parameters for a single transition
