@@ -26,7 +26,7 @@ transition_dataset_prep <- function(
   # create save dirs
   purrr::walk(
     file.path(
-      config[["trans_pre_pred_filter_dir"]],
+      config[["trans_dataset_dir"]],
       config[["data_periods"]]
     ),
     ensure_dir
@@ -488,7 +488,7 @@ process_period_transitions <- function(
   trans_names <- viable_trans_list$Trans_name
 
   # ---- Prepare output ----
-  out_dir <- file.path(config[["trans_pre_pred_filter_dir"]], period)
+  out_dir <- file.path(config[["trans_dataset_dir"]], period)
   if (!dir.exists(out_dir)) {
     dir.create(out_dir, recursive = TRUE)
   }
@@ -678,7 +678,7 @@ process_period_transitions <- function(
 
   # Save results to a separate _checks directory to avoid Arrow reading it as parquet
   checks_dir <- file.path(
-    config[["trans_pre_pred_filter_dir"]],
+    config[["trans_dataset_dir"]],
     "_checks"
   )
   ensure_dir(checks_dir)

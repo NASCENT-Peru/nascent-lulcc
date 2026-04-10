@@ -1,0 +1,148 @@
+[
+    {
+        "clean_name": "Forested Areas",
+        "spanish_name": "Áreas forestales",
+        "class_name": "forested_areas",
+        "colour": "#29898f",
+        "value": 101,
+        "nhood_class": false,
+        "original_classes": [
+            {
+                "value": 3,
+                "name": "Forest"
+            },
+            {
+                "value": 4,
+                "name": "Dry Forest"
+            },
+            {
+                "value": 5,
+                "name": "Mangrove"
+            },
+            {
+                "value": 6,
+                "name": "Flooded forest"
+            }
+        ]
+    },
+    {
+        "clean_name": "Natural Grasslands and Shrublands",
+        "spanish_name": "Pastizales y matorrales naturales",
+        "class_name": "natural_grasslands_and_shrublands",
+        "colour": "#c4e0a1",
+        "value": 102,
+        "nhood_class": false,
+        "original_classes": [
+            {
+                "value": 11,
+                "name": "Flooded grassland / shrubland"
+            },
+            {
+                "value": 12,
+                "name": "Grasslands / herbaceous"
+            },
+            {
+                "value": 32,
+                "name": "Salt Flat"
+            },
+            {
+                "value": 13,
+                "name": "Scrubland and other non-forest formations"
+            }
+        ]
+    },
+    {
+        "clean_name": "Low-Intensity Agricultural Areas",
+        "spanish_name": "Zonas agrícolas de baja intensidad",
+        "class_name": "low_intensity_agricultural_areas",
+        "nhood_class": true,
+        "colour": "#6ca147",
+        "value": 103,
+        "original_classes": [
+            {
+                "value": 15,
+                "name": "Pasture"
+            },
+            {
+                "value": 21,
+                "name": "Mosaic of agriculture and pasture"
+            }
+        ]
+    },
+    {
+        "clean_name": "High-Intensity Agricultural Areas",
+        "spanish_name": "Zonas agrícolas de alta intensidad",
+        "class_name": "high_intensity_agricultural_areas",
+        "colour": "#f59f78",
+        "value": 104,
+        "nhood_class": true,
+        "original_classes": [
+            {
+                "value": 18,
+                "name": "Agriculture"
+            },
+            {
+                "value": 9,
+                "name": "Forest plantation"
+            },
+            {
+                "value": 35,
+                "name": "Oil palm"
+            },
+            {
+                "value": 31,
+                "name": "Aquaculture"
+            }
+        ]
+    },
+    {
+        "clean_name": "Built-Up and Barren Lands",
+        "spanish_name": "Terrenos edificados y baldíos",
+        "class_name": "built_up_and_barren_lands",
+        "colour": "#a8aba5",
+        "value": 105,
+        "nhood_class": true,
+        "original_classes": [
+            {
+                "value": 24,
+                "name": "Infrastructure"
+            },
+            {
+                "value": 25,
+                "name": "Other non-vegetated area"
+            }
+        ]
+    },
+    {
+        "clean_name": "Mining",
+        "spanish_name": "Minería",
+        "class_name": "mining",
+        "colour": "#d1d3cf",
+        "value": 106,
+        "nhood_class": false,
+        "original_classes": [
+            {
+                "value": 30,
+                "name": "Mining"
+            }
+        ]
+    },
+    {
+        "clean_name": "Water body",
+        "spanish_name": "Cuerpo de agua",
+        "class_name": "water_body",
+        "colour": "#93d0ee",
+        "value": 107,
+        "nhood_class": false,
+        "original_classes": [
+            {
+                "value": 33,
+                "name": "River, lake or ocean"
+            },
+            {
+                "value": 34,
+                "name": "Glacier"
+            }
+        ]
+    }
+]

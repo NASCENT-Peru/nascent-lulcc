@@ -134,7 +134,7 @@ dinamica_trans_potent_calc <- function(
 
   # load aggregation scheme (RAT = raster attribute table)
   lulc_rat <-
-    config[["LULC_aggregation_path"]] |>
+    config[["lulc_aggregation_path"]] |>
     readxl::read_excel() |>
     dplyr::select(tidyselect::all_of(c(
       "Class_abbreviation",

@@ -53,7 +53,7 @@ nhood_predictor_prep <- function(
       "neighbourhood_details_for_dynamic_updating"
     ),
     file.path(config[["preds_tools_dir"]], "neighbourhood_matrices"),
-    file.path(config[["prepped_lyr_path"]], "neighbourhood")
+    file.path(config[["preds_layer_dir"]], "neighbourhood")
   )
 
   purrr::walk(nhood_folder_names, ensure_dir)
@@ -136,7 +136,7 @@ nhood_predictor_prep <- function(
 
   # load the LULC scheme, disable simplification so nested lists remain lists
   scheme <- jsonlite::fromJSON(
-    config[["LULC_aggregation_path"]],
+    config[["lulc_aggregation_path"]],
     simplifyVector = FALSE
   )
 
@@ -160,7 +160,7 @@ nhood_predictor_prep <- function(
 
   # create folder path to save neighbourhood rasters
   Nhood_folder_path <- file.path(
-    config[["prepped_lyr_path"]],
+    config[["preds_layer_dir"]],
     "neighbourhood"
   )
   ensure_dir(Nhood_folder_path)

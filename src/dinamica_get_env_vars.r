@@ -21,7 +21,7 @@ dinamica_get_env_vars <- function() {
   # Created list of environment variables with names used in R scripts
   env_var_key <- list(
     "LULCC_M_WORK_DIR" = "wpath", # Working directory
-    "LULCC_M_CLASS_AGG" = "LULC_aggregation_path", # Path to LULC class aggregation table
+    "LULCC_M_CLASS_AGG" = "lulc_aggregation_path", # Path to LULC class aggregation table
     "LULCC_M_SPEC" = "model_specs_path", # Path to model specifications table
     "LULCC_M_PARAM_GRID" = "param_grid_path", # Path to model hyper parameter grids
     "LULCC_M_PRED_TABLE" = "pred_table_path", # Path to predictor table

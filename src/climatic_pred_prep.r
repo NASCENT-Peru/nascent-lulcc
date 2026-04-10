@@ -28,7 +28,7 @@ climatic_pred_prep <- function(
 
   # list files in prepped climatic predictor directory
   climatic_pred_dir <- file.path(
-    config[["prepped_lyr_path"]],
+    config[["preds_layer_dir"]],
     "climatic"
   )
   climatic_files <- list.files(
@@ -118,7 +118,7 @@ climatic_pred_prep <- function(
     }
 
     outpath <- file.path(
-      config[["prepped_lyr_path"]],
+      config[["preds_layer_dir"]],
       "climatic",
       tolower(basename(f))
     )

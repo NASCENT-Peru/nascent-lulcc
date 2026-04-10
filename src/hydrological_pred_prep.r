@@ -53,7 +53,7 @@ hydrological_pred_prep <- function(
 
     out_name <- paste0(pred_name, ".tif")
     out_path <- file.path(
-      config[["prepped_lyr_path"]],
+      config[["preds_layer_dir"]],
       "hydrological",
       out_name
     )

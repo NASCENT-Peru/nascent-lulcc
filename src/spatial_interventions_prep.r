@@ -41,9 +41,10 @@ spatial_interventions_prep <- function(config = get_config()) {
   ### =========================================================================
 
   # from https://www.kgk-cgc.ch/geodaten/geodaten-bauzonen-schweiz
-  bz_dir <- fs::path(config[["spat_prob_perturb_path"]], "building_zones")
+  bz_dir <- fs::path(config[["spat_prob_perturb_dir"]], "building_zones")
   bauzonen_gpkg <- fs::path(
-    bz_dir, "ch.are.bauzonen.gpkg"
+    bz_dir,
+    "ch.are.bauzonen.gpkg"
   )
   if (!fs::file_exists(fs::path(bauzonen_gpkg))) {
     lulcc.downloadunzip(
@@ -113,7 +114,10 @@ spatial_interventions_prep <- function(config = get_config()) {
   )
 
   # load in land use raster to mask distance raster
-  bz_mask <- terra::rast(fs::path(config[["historic_lulc_basepath"]], "lulc_2018_agg.grd"))
+  bz_mask <- terra::rast(fs::path(
+    config[["historic_lulc_basepath"]],
+    "lulc_2018_agg.grd"
+  ))
 
   # create a distance to building zones raster
   BZ_distance <-
@@ -134,14 +138,16 @@ spatial_interventions_prep <- function(config = get_config()) {
   ### =========================================================================
 
   Muni_shp <- terra::vect(
-    fs::path(config[["ch_geoms_path"]], "swissboundaries3d_1_5_tlm_hoheitsgebiet.shp")
+    fs::path(
+      config[["ch_geoms_path"]],
+      "swissboundaries3d_1_5_tlm_hoheitsgebiet.shp"
+    )
   )
 
   # filter out non-swiss municipalities
   Muni_shp <- Muni_shp[
     Muni_shp$ICC == "CH" & Muni_shp$OBJEKTART == "Gemeindegebiet",
   ]
-
 
   # Import data of typology of municipalities from FSO web service using condition:
   # 1. Municipality designations as of 01/05/2022 (to match mutations)
@@ -163,32 +169,32 @@ spatial_interventions_prep <- function(config = get_config()) {
 
   # create manual legend (data documentation only specifies categories in German/French)
   Muni_typ_legend <- tibble::tribble(
-    ~ID, ~type,
-    111, "City-center_large_agglomeration",
-    112, "Urban_employment_municipality_large_agglomeration",
-    113, "Residential_urban_municipality_large_agglomeration",
-    121, "City-centre_medium_agglomeration",
-    122, "Urban_employment_municipality_medium_agglomeration",
-    123, "Residential_urban_municipality_medium_agglomeration",
-    134, "Urban_tourist_municipality_of_a_small_agglomeration",
-    136, "Industrial_urban_municipality_of_a_small_agglomeration",
-    137, "Tertiary_urban_municipality_of_a_small_agglomeration",
-    216, "High-density_industrial_peri-urban_municipality",
-    217, "High-density_tertiary_peri-urban_municipality",
-    226, "Mid-density_industrial_peri-urban_municipality",
-    227, "Medium-density_tertiary_peri-urban_municipality",
-    235, "Low-density_agricultural_peri-urban_municipality",
-    236, "Low-density_industrial_peri-urban_municipality",
-    237, "Low_density_tertiary_peri-urban_municipality",
-    314, "Tourist_town_of_a_rural_center",
-    316, "Industrial_municipality_of_a_rural_center",
-    317, "Tertiary_municipality_of_a_rural_center",
-    325, "Rural_agricultural_municipality_in_a_central_location",
-    326, "Rural_industrial_municipality_in_a_central_location",
-    327, "Tertiary_rural_municipality_in_a_central_location",
-    334, "Peripheral_rural_tourist_municipality",
-    335, "Peripheral_agricultural_rural_municipality",
-    338, "Peripheral_mixed_rural_municipality"
+    ~ID , ~type                                                    ,
+    111 , "City-center_large_agglomeration"                        ,
+    112 , "Urban_employment_municipality_large_agglomeration"      ,
+    113 , "Residential_urban_municipality_large_agglomeration"     ,
+    121 , "City-centre_medium_agglomeration"                       ,
+    122 , "Urban_employment_municipality_medium_agglomeration"     ,
+    123 , "Residential_urban_municipality_medium_agglomeration"    ,
+    134 , "Urban_tourist_municipality_of_a_small_agglomeration"    ,
+    136 , "Industrial_urban_municipality_of_a_small_agglomeration" ,
+    137 , "Tertiary_urban_municipality_of_a_small_agglomeration"   ,
+    216 , "High-density_industrial_peri-urban_municipality"        ,
+    217 , "High-density_tertiary_peri-urban_municipality"          ,
+    226 , "Mid-density_industrial_peri-urban_municipality"         ,
+    227 , "Medium-density_tertiary_peri-urban_municipality"        ,
+    235 , "Low-density_agricultural_peri-urban_municipality"       ,
+    236 , "Low-density_industrial_peri-urban_municipality"         ,
+    237 , "Low_density_tertiary_peri-urban_municipality"           ,
+    314 , "Tourist_town_of_a_rural_center"                         ,
+    316 , "Industrial_municipality_of_a_rural_center"              ,
+    317 , "Tertiary_municipality_of_a_rural_center"                ,
+    325 , "Rural_agricultural_municipality_in_a_central_location"  ,
+    326 , "Rural_industrial_municipality_in_a_central_location"    ,
+    327 , "Tertiary_rural_municipality_in_a_central_location"      ,
+    334 , "Peripheral_rural_tourist_municipality"                  ,
+    335 , "Peripheral_agricultural_rural_municipality"             ,
+    338 , "Peripheral_mixed_rural_municipality"
   )
 
   # add municipality type to data
@@ -219,7 +225,10 @@ spatial_interventions_prep <- function(config = get_config()) {
   levels(Muni_type_rast) <- Muni_typ_legend
 
   # save
-  save_dir <- fs::path(config[["spat_prob_perturb_path"]], "municipality_typology")
+  save_dir <- fs::path(
+    config[["spat_prob_perturb_dir"]],
+    "municipality_typology"
+  )
   ensure_dir(save_dir)
   terra::writeRaster(
     Muni_type_rast,
@@ -276,7 +285,10 @@ spatial_interventions_prep <- function(config = get_config()) {
   levels(Muni_mount_rast) <- Muni_mount_legend
 
   # save
-  save_dir <- fs::path(config[["spat_prob_perturb_path"]], "mountainous_municipalities")
+  save_dir <- fs::path(
+    config[["spat_prob_perturb_dir"]],
+    "mountainous_municipalities"
+  )
   ensure_dir(save_dir)
   terra::writeRaster(
     Muni_mount_rast,
@@ -293,7 +305,9 @@ spatial_interventions_prep <- function(config = get_config()) {
   # https://www.geodienste.ch/downloads/lwb_biodiversitaetsfoerderflaechen?data_format=gpkg
   # and requires permission from some of the cantons
   BPA_path <- fs::path(
-    config[["spat_prob_perturb_path"]], "agriculture_bio_areas", "agri_bio_areas.gpkg"
+    config[["spat_prob_perturb_dir"]],
+    "agriculture_bio_areas",
+    "agri_bio_areas.gpkg"
   )
 
   BPA_layer <- terra::vector_layers(BPA_path)[[1]]
@@ -304,7 +318,10 @@ spatial_interventions_prep <- function(config = get_config()) {
   BPAs$ID <- seq_len(nrow(BPAs))
 
   # rasterize using the most recent LULC layer as a mask
-  bpa_mask <- terra::rast(fs::path(config[["historic_lulc_basepath"]], "lulc_2018_agg.grd"))
+  bpa_mask <- terra::rast(fs::path(
+    config[["historic_lulc_basepath"]],
+    "lulc_2018_agg.grd"
+  ))
   BPA_raster <- terra::mask(bpa_mask, BPAs)
 
   # change non-NA values to 1
@@ -312,7 +329,11 @@ spatial_interventions_prep <- function(config = get_config()) {
 
   terra::writeRaster(
     BPA_raster,
-    fs::path(config[["spat_prob_perturb_path"]], "agriculture_bio_areas", "BPA_raster.tif")
+    fs::path(
+      config[["spat_prob_perturb_dir"]],
+      "agriculture_bio_areas",
+      "BPA_raster.tif"
+    )
   )
 
   ### =========================================================================
@@ -330,16 +351,32 @@ spatial_interventions_prep <- function(config = get_config()) {
   Ref_grid <- terra::rast(config[["ref_grid_path"]])
 
   # vector dir of raw data
-  PA_raw_dir <- fs::path(config[["spat_prob_perturb_path"]], "protected_areas", "raw_data")
+  PA_raw_dir <- fs::path(
+    config[["spat_prob_perturb_dir"]],
+    "protected_areas",
+    "raw_data"
+  )
 
   # create dir for intermediate data layers produced
-  PA_int_dir <- fs::path(config[["spat_prob_perturb_path"]], "protected_areas", "int_data")
+  PA_int_dir <- fs::path(
+    config[["spat_prob_perturb_dir"]],
+    "protected_areas",
+    "int_data"
+  )
   ensure_dir(PA_int_dir)
 
-  New_PA_dir <- fs::path(config[["spat_prob_perturb_path"]], "protected_areas", "new_pas")
+  New_PA_dir <- fs::path(
+    config[["spat_prob_perturb_dir"]],
+    "protected_areas",
+    "new_pas"
+  )
   ensure_dir(New_PA_dir)
 
-  PA_final_dir <- fs::path(config[["spat_prob_perturb_path"]], "protected_areas", "future_pas")
+  PA_final_dir <- fs::path(
+    config[["spat_prob_perturb_dir"]],
+    "protected_areas",
+    "future_pas"
+  )
   ensure_dir(PA_final_dir)
 
   # load PAs shapefile of SwissPAs layer compiled by Louis-Rey
@@ -429,7 +466,11 @@ spatial_interventions_prep <- function(config = get_config()) {
 
   # combine PA raster with raster of Biodiversity promotion areas
   BPA_raster <- terra::rast(
-    fs::path(config[["spat_prob_perturb_path"]], "agriculture_bio_areas", "BPA_raster.tif")
+    fs::path(
+      config[["spat_prob_perturb_dir"]],
+      "agriculture_bio_areas",
+      "BPA_raster.tif"
+    )
   )
   terra::crs(BPA_raster) <- ProjCH
   PA_total_rast <- PA_BAFU_raster + BPA_raster
@@ -499,7 +540,9 @@ spatial_interventions_prep <- function(config = get_config()) {
   # Calculate area for polygons missing flaeche_m2 using terra::expanse
   missing_area_idx <- is.na(Non_PA_BPAs$flaeche_m2)
   if (any(missing_area_idx)) {
-    Non_PA_BPAs$flaeche_m2[missing_area_idx] <- terra::expanse(Non_PA_BPAs[missing_area_idx, ])
+    Non_PA_BPAs$flaeche_m2[missing_area_idx] <- terra::expanse(Non_PA_BPAs[
+      missing_area_idx,
+    ])
   }
 
   poly_area_BPA <- sum(Non_PA_BPAs$flaeche_m2)
@@ -892,10 +935,12 @@ spatial_interventions_prep <- function(config = get_config()) {
   # solver function from: https://stackoverflow.com/a/69622144
   # for identifying combination of patches whose sum total area
   # exceeds a specifcied amount
-  findSumm <- function(xy,
-                       sfind,
-                       nmax = 10000,
-                       tmax = 100000000000000000000000000) {
+  findSumm <- function(
+    xy,
+    sfind,
+    nmax = 10000,
+    tmax = 100000000000000000000000000
+  ) {
     # sort xy according to target variable
     xy <- xy[order(xy$num_cells, decreasing = TRUE), ]
 
@@ -1085,7 +1130,10 @@ spatial_interventions_prep <- function(config = get_config()) {
     )
     terra::writeRaster(
       Best_patches,
-      file = file.path(New_PA_dir, paste0(names(n_cells)[i], "_all_future_PAs.tif")),
+      file = file.path(
+        New_PA_dir,
+        paste0(names(n_cells)[i], "_all_future_PAs.tif")
+      ),
       overwrite = TRUE
     )
 
@@ -1198,7 +1246,7 @@ spatial_interventions_prep <- function(config = get_config()) {
     ]
 
     # load the LULC aggregation scheme
-    LULC_agg <- openxlsx::read.xlsx(config[["LULC_aggregation_path"]])
+    LULC_agg <- openxlsx::read.xlsx(config[["lulc_aggregation_path"]])
 
     # swap the target classes for class numbers
     Param_ints$target_classes <- sapply(

@@ -14,7 +14,7 @@ lulc_data_prep <- function(config = get_config(), refresh_cache = FALSE) {
 
   # Load JSON, disable simplification so nested lists remain lists
   scheme <- jsonlite::fromJSON(
-    config[["LULC_aggregation_path"]],
+    config[["lulc_aggregation_path"]],
     simplifyVector = FALSE
   )
 

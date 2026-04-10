@@ -4,7 +4,7 @@
 
 # # --- Set up file paths ---
 # transitions_pq_path <- file.path(
-#   config[["trans_pre_pred_filter_dir"]],
+#   config[["trans_dataset_dir"]],
 #   period
 # )
 # static_preds_pq_path <- file.path(

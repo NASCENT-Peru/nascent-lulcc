@@ -13,11 +13,13 @@
 #' @export
 #'
 
-lulcc.spatprobmanipulation <- function(Interventions,
-                                       scenario_id,
-                                       Raster_prob_values,
-                                       Simulation_time_step,
-                                       config = get_config()) {
+lulcc.spatprobmanipulation <- function(
+  Interventions,
+  scenario_id,
+  Raster_prob_values,
+  Simulation_time_step,
+  config = get_config()
+) {
   message(Sys.time(), " - lulcc.spatprobmanipulation")
   # vector names of columns of probability predictions (matching on Prob_)
   Pred_prob_columns <- grep("prob_", names(Raster_prob_values), value = TRUE)
@@ -34,18 +36,28 @@ lulcc.spatprobmanipulation <- function(Interventions,
   names(Prob_raster_stack@layers) <- Pred_prob_columns
 
   # convert time_step and target_classes columns back to character vectors
-  Interventions$time_step <- sapply(Interventions$time_step, function(x) {
-    x <- stringr::str_remove_all(x, " ")
-    unlist(strsplit(x, ","))
-  }, simplify = FALSE)
+  Interventions$time_step <- sapply(
+    Interventions$time_step,
+    function(x) {
+      x <- stringr::str_remove_all(x, " ")
+      unlist(strsplit(x, ","))
+    },
+    simplify = FALSE
+  )
 
-  Interventions$target_classes <- sapply(Interventions$target_classes, function(x) {
-    x <- stringr::str_remove_all(x, " ")
-    unlist(strsplit(x, ","))
-  }, simplify = FALSE)
+  Interventions$target_classes <- sapply(
+    Interventions$target_classes,
+    function(x) {
+      x <- stringr::str_remove_all(x, " ")
+      unlist(strsplit(x, ","))
+    },
+    simplify = FALSE
+  )
 
   # subset interventions to scenario
-  Scenario_interventions <- Interventions[Interventions$scenario_id == scenario_id, ]
+  Scenario_interventions <- Interventions[
+    Interventions$scenario_id == scenario_id,
+  ]
 
   # subset to interventions for current time point
   Time_step_rows <- sapply(Scenario_interventions$time_step, function(x) {
@@ -58,12 +70,18 @@ lulcc.spatprobmanipulation <- function(Interventions,
     for (i in nrow(Current_interventions)) {
       # vector intervention details for easy reference
       intervention_id <- Current_interventions[i, "intervention_id"]
-      target_classes <- paste0("Prob_", Current_interventions[[i, "target_classes"]])
+      target_classes <- paste0(
+        "Prob_",
+        Current_interventions[[i, "target_classes"]]
+      )
       intervention_data <- Current_interventions[i, "intervention_data"]
 
       # if Perc_diff is too small then the effect will likely not be achieved
       # to mitigate use a threshold of minimum probability perturbation
-      Prob_perturb_thresh <- as.numeric(Current_interventions[i, "prob_perturb_threshold"])
+      Prob_perturb_thresh <- as.numeric(Current_interventions[
+        i,
+        "prob_perturb_threshold"
+      ])
 
       #--------------------------------------------------------------------------
       # Urban_densification intervention
@@ -88,7 +106,6 @@ lulcc.spatprobmanipulation <- function(Interventions,
         # replace values in target raster
         Prob_raster_stack@layers[[target_classes]][ix] <- Intersecting[ix]
       } # close Urban_densification chunk
-
 
       #--------------------------------------------------------------------------
       # Urban_sprawl intervention
@@ -118,7 +135,8 @@ lulcc.spatprobmanipulation <- function(Interventions,
         # excluding those with a value of 0
         Intersect_percentile <- quantile(
           Intersecting@data@values[Intersecting@data@values > 0],
-          probs = 0.90, na.rm = TRUE
+          probs = 0.90,
+          na.rm = TRUE
         )
         Nonintersect_percentile <- quantile(
           non_intersecting@data@values[non_intersecting@data@values > 0],
@@ -128,7 +146,9 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
         # get the means of the values above the 90th percentile
         Intersect_percentile_mean <- mean(
-          Intersecting@data@values[Intersecting@data@values >= Intersect_percentile],
+          Intersecting@data@values[
+            Intersecting@data@values >= Intersect_percentile
+          ],
           na.rm = TRUE
         )
         Nonintersect_percentile_mean <- mean(
@@ -142,7 +162,9 @@ lulcc.spatprobmanipulation <- function(Interventions,
         Mean_diff <- Intersect_percentile_mean - Nonintersect_percentile_mean
 
         # Average of means
-        Average_mean <- (Intersect_percentile_mean + Nonintersect_percentile_mean) / 2
+        Average_mean <- (Intersect_percentile_mean +
+          Nonintersect_percentile_mean) /
+          2
 
         # calculate percentage difference
         Perc_diff <- (Mean_diff / Average_mean) * 100
@@ -162,7 +184,9 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
           non_intersecting[non_intersecting > Nonintersect_percentile] <-
             non_intersecting[non_intersecting > Nonintersect_percentile] +
-            (non_intersecting[non_intersecting > Nonintersect_percentile] / 100) * Perc_diff
+            (non_intersecting[non_intersecting > Nonintersect_percentile] /
+              100) *
+              Perc_diff
 
           # replace any values greater than 1 with 1
           non_intersecting[non_intersecting > 1] <- 1
@@ -184,7 +208,8 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
           Intersecting[Intersecting > Intersect_percentile] <-
             Intersecting[Intersecting > Intersect_percentile] +
-            (Intersecting[Intersecting > Intersect_percentile] / 100) * Perc_diff
+            (Intersecting[Intersecting > Intersect_percentile] / 100) *
+              Perc_diff
 
           # replace any values greater than 1 with 1
           Intersecting[Intersecting < 0] <- 0
@@ -238,7 +263,8 @@ lulcc.spatprobmanipulation <- function(Interventions,
         # excluding cells with a value of 0 in both cases
         Intersect_percentile <- quantile(
           Intersecting@data@values[Intersecting@data@values > 0],
-          probs = 0.90, na.rm = TRUE
+          probs = 0.90,
+          na.rm = TRUE
         )
         Nonintersect_percentile <- quantile(
           non_intersecting@data@values[non_intersecting@data@values > 0],
@@ -248,11 +274,15 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
         # get the means of the values above the percentiles
         Intersect_percentile_mean <- mean(
-          Intersecting@data@values[Intersecting@data@values >= Intersect_percentile],
+          Intersecting@data@values[
+            Intersecting@data@values >= Intersect_percentile
+          ],
           na.rm = TRUE
         )
         Nonintersect_percentile_mean <- mean(
-          non_intersecting@data@values[non_intersecting@data@values >= Nonintersect_percentile],
+          non_intersecting@data@values[
+            non_intersecting@data@values >= Nonintersect_percentile
+          ],
           na.rm = TRUE
         )
 
@@ -260,7 +290,9 @@ lulcc.spatprobmanipulation <- function(Interventions,
         Mean_diff <- Nonintersect_percentile_mean - Intersect_percentile_mean
 
         # Average of means
-        Average_mean <- (Intersect_percentile_mean + Nonintersect_percentile_mean) / 2
+        Average_mean <- (Intersect_percentile_mean +
+          Nonintersect_percentile_mean) /
+          2
 
         # percentage difference
         Perc_diff <- (Mean_diff / Average_mean) * 100
@@ -276,7 +308,8 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
           Intersecting[Intersecting > Intersect_percentile] <-
             Intersecting[Intersecting > Intersect_percentile] +
-            (Intersecting[Intersecting > Intersect_percentile] / 100) * Perc_diff
+            (Intersecting[Intersecting > Intersect_percentile] / 100) *
+              Perc_diff
 
           # replace any values greater than 1 with 1
           Intersecting[Intersecting > 1] <- 1
@@ -298,7 +331,9 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
           non_intersecting[non_intersecting > Nonintersect_percentile] <-
             non_intersecting[non_intersecting > Nonintersect_percentile] +
-            (non_intersecting[non_intersecting > Nonintersect_percentile] / 100) * Perc_diff
+            (non_intersecting[non_intersecting > Nonintersect_percentile] /
+              100) *
+              Perc_diff
 
           # replace any values greater than 1 with 1
           non_intersecting[non_intersecting > 1] <- 1
@@ -371,11 +406,15 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
         # get the means of the values above the percentiles
         Intersect_percentile_mean <- mean(
-          Intersecting@data@values[Intersecting@data@values >= Intersect_percentile],
+          Intersecting@data@values[
+            Intersecting@data@values >= Intersect_percentile
+          ],
           na.rm = TRUE
         )
         Nonintersect_percentile_mean <- mean(
-          non_intersecting@data@values[non_intersecting@data@values >= Nonintersect_percentile],
+          non_intersecting@data@values[
+            non_intersecting@data@values >= Nonintersect_percentile
+          ],
           na.rm = TRUE
         )
 
@@ -383,7 +422,9 @@ lulcc.spatprobmanipulation <- function(Interventions,
         Mean_diff <- Nonintersect_percentile_mean - Intersect_percentile_mean
 
         # Average of means
-        Average_mean <- (Intersect_percentile_mean + Nonintersect_percentile_mean) / 2
+        Average_mean <- (Intersect_percentile_mean +
+          Nonintersect_percentile_mean) /
+          2
 
         # percentage difference
         Perc_diff <- (Mean_diff / Average_mean) * 100
@@ -400,7 +441,8 @@ lulcc.spatprobmanipulation <- function(Interventions,
           # increase the values
           Intersecting[Intersecting > Intersect_percentile] <-
             Intersecting[Intersecting > Intersect_percentile] +
-            (Intersecting[Intersecting > Intersect_percentile] / 100) * Perc_diff
+            (Intersecting[Intersecting > Intersect_percentile] / 100) *
+              Perc_diff
 
           # replace any values greater than 1 with 1
           Intersecting[Intersecting > 1] <- 1
@@ -410,7 +452,6 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
           # replace values in target raster
           Prob_raster_stack@layers[[target_classes]][ix] <- Intersecting[ix]
-
 
           # else if Perc_diff is >0 then increase the probability of instances above the
           # 90th percentile for the outside pixels by the percentage difference
@@ -423,7 +464,9 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
           non_intersecting[non_intersecting > Nonintersect_percentile] <-
             non_intersecting[non_intersecting > Nonintersect_percentile] +
-            (non_intersecting[non_intersecting > Nonintersect_percentile] / 100) * Perc_diff
+            (non_intersecting[non_intersecting > Nonintersect_percentile] /
+              100) *
+              Perc_diff
 
           # replace any values greater than 1 with 1
           non_intersecting[non_intersecting > 1] <- 1
@@ -455,12 +498,14 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
         # identify pixels inside of remote rural municipalities
         Intersecting <- raster::mask(
-          Prob_raster_stack@layers[[target_classes]], Intervention_rast == 1
+          Prob_raster_stack@layers[[target_classes]],
+          Intervention_rast == 1
         )
 
         # identify pixels outside of remote rural municipalities
         non_intersecting <- raster::overlay(
-          Prob_raster_stack@layers[[target_classes]], Intervention_rast,
+          Prob_raster_stack@layers[[target_classes]],
+          Intervention_rast,
           fun = function(x, y) {
             x[y == 1] <- NA
             return(x)
@@ -485,11 +530,15 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
         # get the means of the values above the percentiles
         Intersect_percentile_mean <- mean(
-          Intersecting@data@values[Intersecting@data@values >= Intersect_percentile],
+          Intersecting@data@values[
+            Intersecting@data@values >= Intersect_percentile
+          ],
           na.rm = TRUE
         )
         Nonintersect_percentile_mean <- mean(
-          non_intersecting@data@values[non_intersecting@data@values >= Nonintersect_percentile],
+          non_intersecting@data@values[
+            non_intersecting@data@values >= Nonintersect_percentile
+          ],
           na.rm = TRUE
         )
 
@@ -498,7 +547,9 @@ lulcc.spatprobmanipulation <- function(Interventions,
         Mean_diff <- Nonintersect_percentile_mean - Intersect_percentile_mean
 
         # Average of means
-        Average_mean <- (Intersect_percentile_mean + Nonintersect_percentile_mean) / 2
+        Average_mean <- (Intersect_percentile_mean +
+          Nonintersect_percentile_mean) /
+          2
 
         # percentage difference
         Perc_diff <- (Mean_diff / Average_mean) * 100
@@ -515,7 +566,8 @@ lulcc.spatprobmanipulation <- function(Interventions,
           # increase the values
           Intersecting[Intersecting > Intersect_percentile] <-
             Intersecting[Intersecting > Intersect_percentile] +
-            (Intersecting[Intersecting > Intersect_percentile] / 100) * Perc_diff
+            (Intersecting[Intersecting > Intersect_percentile] / 100) *
+              Perc_diff
 
           # replace any values greater than 1 with 1
           Intersecting[Intersecting > 1] <- 1
@@ -525,7 +577,6 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
           # replace values in target raster
           Prob_raster_stack@layers[[target_classes]][ix] <- Intersecting[ix]
-
 
           # else if Perc_diff is <0 then increase the probability of instances above the
           # 90th percentile for the pixels outside the remote rural municipalities
@@ -538,7 +589,9 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
           non_intersecting[non_intersecting > Nonintersect_percentile] <-
             non_intersecting[non_intersecting > Nonintersect_percentile] +
-            (non_intersecting[non_intersecting > Nonintersect_percentile] / 100) * Perc_diff
+            (non_intersecting[non_intersecting > Nonintersect_percentile] /
+              100) *
+              Perc_diff
 
           # replace any values greater than 1 with 1
           non_intersecting[non_intersecting > 1] <- 1
@@ -581,12 +634,14 @@ lulcc.spatprobmanipulation <- function(Interventions,
         # distance to roads
         Dist2rds <- raster::raster(
           file.path(
-            config[["prepped_lyr_path"]],
-            "transport", "distance_to_roads_mean_100m.tif"
+            config[["preds_layer_dir"]],
+            "transport",
+            "distance_to_roads_mean_100m.tif"
           )
         )
         Dist2rds <- raster::calc(Dist2rds, function(x) {
-          rescale(x,
+          rescale(
+            x,
             x.min = raster::minValue(Dist2rds),
             x.max = raster::maxValue(Dist2rds)
           )
@@ -595,12 +650,14 @@ lulcc.spatprobmanipulation <- function(Interventions,
         # Slope
         Slope <- raster::raster(
           file.path(
-            config[["prepped_lyr_path"]],
-            "topographic", "slope_mean_100m.tif"
+            config[["preds_layer_dir"]],
+            "topographic",
+            "slope_mean_100m.tif"
           )
         )
         Slope <- raster::calc(Slope, function(x) {
-          rescale(x,
+          rescale(
+            x,
             x.min = raster::minValue(Slope),
             x.max = raster::maxValue(Slope)
           )
@@ -609,12 +666,14 @@ lulcc.spatprobmanipulation <- function(Interventions,
         # elevation
         Elev <- raster::raster(
           file.path(
-            config[["prepped_lyr_path"]],
-            "topographic", "elevation_mean_100m.tif"
+            config[["preds_layer_dir"]],
+            "topographic",
+            "elevation_mean_100m.tif"
           )
         )
         Elev <- raster::calc(Elev, function(x) {
-          rescale(x,
+          rescale(
+            x,
             x.min = raster::minValue(Elev),
             x.max = raster::maxValue(Elev)
           )
@@ -626,12 +685,14 @@ lulcc.spatprobmanipulation <- function(Interventions,
         # which means less likely to abandon hence x.min and x.max values swapped
         Dist2BZ <- raster::raster(
           file.path(
-            config[["spat_prob_perturb_path"]],
-            "building_zones", "bz_distance.tif"
+            config[["spat_prob_perturb_dir"]],
+            "building_zones",
+            "bz_distance.tif"
           )
         )
         Dist2BZ <- raster::calc(Dist2BZ, function(x) {
-          rescale(x,
+          rescale(
+            x,
             x.min = raster::maxValue(Dist2BZ),
             x.max = raster::minValue(Dist2BZ)
           )
@@ -639,20 +700,29 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
         # stack dist2rds, slope and forest_dist layers and sum values as raster
         Marginality_rast <- raster::calc(
-          raster::stack(Dist2rds, Slope, Elev, Dist2BZ), mean
+          raster::stack(Dist2rds, Slope, Elev, Dist2BZ),
+          mean
         )
 
         # subset the marginality raster to only the pixels of the agricultural
         # land types (Int_AG, Alp_Past)
-        Agri_rast <- raster::rasterFromXYZ(Raster_prob_values[, c("x", "y", "alp_past")])
+        Agri_rast <- raster::rasterFromXYZ(Raster_prob_values[, c(
+          "x",
+          "y",
+          "alp_past"
+        )])
         Agri_rast[Agri_rast == 0] <- NA
         Agri_marginality <- raster::mask(
-          Marginality_rast, Agri_rast
+          Marginality_rast,
+          Agri_rast
         )
 
-
         # calculate the upper quartile value of marginality for the agricultural cells
-        Marginality_percentile <- quantile(Agri_marginality@data@values, probs = 0.75, na.rm = TRUE)
+        Marginality_percentile <- quantile(
+          Agri_marginality@data@values,
+          probs = 0.75,
+          na.rm = TRUE
+        )
 
         # indexes of all cells above/below the upper quartile
         marginal_index <- Agri_marginality > Marginality_percentile
@@ -685,7 +755,9 @@ lulcc.spatprobmanipulation <- function(Interventions,
             Prob_raster_stack@layers[[class]][marginal_index] <- marginal_cells
           } # close if statement
 
-          non_marginal_cells <- Prob_raster_stack@layers[[class]][non_marginal_index]
+          non_marginal_cells <- Prob_raster_stack@layers[[class]][
+            non_marginal_index
+          ]
           if (length(unique(non_marginal_cells)) > 1) {
             nonmarginal_percentile <- quantile(
               non_marginal_cells[non_marginal_cells > 0],
@@ -703,7 +775,9 @@ lulcc.spatprobmanipulation <- function(Interventions,
             non_marginal_cells[non_marginal_cells > 1] <- 1
 
             # replace values in target raster
-            Prob_raster_stack@layers[[class]][non_marginal_index] <- non_marginal_cells
+            Prob_raster_stack@layers[[class]][
+              non_marginal_index
+            ] <- non_marginal_cells
           } # close if statement
         } # close loop over target classes
       } # close Agri_abandonment chunk
@@ -733,10 +807,15 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
         # distance to roads
         Dist2rds <- raster::raster(
-          file.path(config[["prepped_lyr_path"]], "transport", "distance_to_roads_mean_100m.tif")
+          file.path(
+            config[["preds_layer_dir"]],
+            "transport",
+            "distance_to_roads_mean_100m.tif"
+          )
         )
         Dist2rds <- raster::calc(Dist2rds, function(x) {
-          rescale(x,
+          rescale(
+            x,
             x.min = raster::minValue(Dist2rds),
             x.max = raster::maxValue(Dist2rds)
           )
@@ -744,10 +823,15 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
         # Slope
         Slope <- raster::raster(
-          file.path(config[["prepped_lyr_path"]], "topographic", "slope_mean_100m.tif")
+          file.path(
+            config[["preds_layer_dir"]],
+            "topographic",
+            "slope_mean_100m.tif"
+          )
         )
         Slope <- raster::calc(Slope, function(x) {
-          rescale(x,
+          rescale(
+            x,
             x.min = raster::minValue(Slope),
             x.max = raster::maxValue(Slope)
           )
@@ -755,10 +839,15 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
         # elevation
         Elev <- raster::raster(
-          file.path(config[["prepped_lyr_path"]], "topographic", "elevation_mean_100m.tif")
+          file.path(
+            config[["preds_layer_dir"]],
+            "topographic",
+            "elevation_mean_100m.tif"
+          )
         )
         Elev <- raster::calc(Elev, function(x) {
-          rescale(x,
+          rescale(
+            x,
             x.min = raster::minValue(Elev),
             x.max = raster::maxValue(Elev)
           )
@@ -769,10 +858,15 @@ lulcc.spatprobmanipulation <- function(Interventions,
         # greater distance from building zones means lower land cost
         # which means less likely to abandon hence x.min and x.max values swapped
         Dist2BZ <- raster::raster(
-          file.path(config[["spat_prob_perturb_path"]], "building_zones", "bz_distance.tif")
+          file.path(
+            config[["spat_prob_perturb_dir"]],
+            "building_zones",
+            "bz_distance.tif"
+          )
         )
         Dist2BZ <- raster::calc(Dist2BZ, function(x) {
-          rescale(x,
+          rescale(
+            x,
             x.min = raster::maxValue(Dist2BZ),
             x.max = raster::minValue(Dist2BZ)
           )
@@ -780,19 +874,29 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
         # stack dist2rds, slope and forest_dist layers and sum values as raster
         Marginality_rast <- raster::calc(
-          raster::stack(Dist2rds, Slope, Elev, Dist2BZ), mean
+          raster::stack(Dist2rds, Slope, Elev, Dist2BZ),
+          mean
         )
 
         # subset the marginality raster to only the pixels of the agricultural
         # land types (Int_AG, Alp_Past)
-        Agri_rast <- raster::rasterFromXYZ(Raster_prob_values[, c("x", "y", "alp_past")])
+        Agri_rast <- raster::rasterFromXYZ(Raster_prob_values[, c(
+          "x",
+          "y",
+          "alp_past"
+        )])
         Agri_rast[Agri_rast == 0] <- NA
         Agri_marginality <- raster::mask(
-          Marginality_rast, Agri_rast
+          Marginality_rast,
+          Agri_rast
         )
 
         # calculate the upper quartile value of marginality for the agricultural cells
-        Marginality_percentile <- quantile(Agri_marginality@data@values, probs = 0.75, na.rm = TRUE)
+        Marginality_percentile <- quantile(
+          Agri_marginality@data@values,
+          probs = 0.75,
+          na.rm = TRUE
+        )
 
         # indexes of all cells above/below the upper quartile
         marginal_index <- Agri_marginality > Marginality_percentile
@@ -805,7 +909,9 @@ lulcc.spatprobmanipulation <- function(Interventions,
           # calculate the 90th percentile value of probability of transition to the
           # target class in the marginal agricultural cells vs. non-marginal
           marginal_cells <- Prob_raster_stack@layers[[class]][marginal_index]
-          non_marginal_cells <- Prob_raster_stack@layers[[class]][non_marginal_index]
+          non_marginal_cells <- Prob_raster_stack@layers[[class]][
+            non_marginal_index
+          ]
           if (length(unique(non_marginal_cells)) > 1) {
             nonmarginal_percentile <- quantile(
               non_marginal_cells[non_marginal_cells > 0],
@@ -842,7 +948,10 @@ lulcc.spatprobmanipulation <- function(Interventions,
         # loop over target classes
         for (class in target_classes) {
           # identify pixels of target class inside of protected areas
-          Intersecting <- raster::mask(Prob_raster_stack@layers[[class]], Intervention_rast == 1)
+          Intersecting <- raster::mask(
+            Prob_raster_stack@layers[[class]],
+            Intervention_rast == 1
+          )
 
           if (scenario_id == "EI_NAT" || scenario_id == "EI_SOC") {
             # decrease probability to zero
@@ -856,7 +965,8 @@ lulcc.spatprobmanipulation <- function(Interventions,
           } else if (scenario_id == "EI_CUL") {
             # identify pixels outside of PAs
             non_intersecting <- raster::overlay(
-              Prob_raster_stack@layers[[class]], Intervention_rast,
+              Prob_raster_stack@layers[[class]],
+              Intervention_rast,
               fun = function(x, y) {
                 x[y == 1] <- NA
                 return(x)
@@ -869,7 +979,10 @@ lulcc.spatprobmanipulation <- function(Interventions,
             # if statement for the condition that all pixels of the target class inside
             # or outside the protected areas have prob values of 0 i.e not possible to
             # calculate a percentile value.
-            if (length(unique(Intersecting)) > 1 && length(unique(non_intersecting)) > 1) {
+            if (
+              length(unique(Intersecting)) > 1 &&
+                length(unique(non_intersecting)) > 1
+            ) {
               Intersect_percentile <- quantile(
                 Intersecting@data@values[Intersecting@data@values > 0],
                 probs = 0.90,
@@ -883,7 +996,9 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
               # get the means of the values above the 90th percentile
               Intersect_percentile_mean <- mean(
-                Intersecting@data@values[Intersecting@data@values >= Intersect_percentile],
+                Intersecting@data@values[
+                  Intersecting@data@values >= Intersect_percentile
+                ],
                 na.rm = TRUE
               )
               Nonintersect_percentile_mean <- mean(
@@ -894,10 +1009,14 @@ lulcc.spatprobmanipulation <- function(Interventions,
               )
 
               # mean difference
-              Mean_diff <- Intersect_percentile_mean - Nonintersect_percentile_mean
+              Mean_diff <- Intersect_percentile_mean -
+                Nonintersect_percentile_mean
 
               # Average of means
-              Average_mean <- mean(Intersect_percentile_mean, Nonintersect_percentile_mean)
+              Average_mean <- mean(
+                Intersect_percentile_mean,
+                Nonintersect_percentile_mean
+              )
 
               # calculate percentage difference
               Perc_diff <- (Mean_diff / Average_mean) * 100
@@ -918,7 +1037,8 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
                 Intersecting[Intersecting > Intersect_percentile] <-
                   Intersecting[Intersecting > Intersect_percentile] +
-                  (Intersecting[Intersecting > Intersect_percentile] / 100) * Perc_diff
+                  (Intersecting[Intersecting > Intersect_percentile] / 100) *
+                    Perc_diff
 
                 # replace any values greater than 1 with 1
                 Intersecting[Intersecting > 1] <- 1
@@ -941,7 +1061,11 @@ lulcc.spatprobmanipulation <- function(Interventions,
 
                 non_intersecting[non_intersecting > Nonintersect_percentile] <-
                   non_intersecting[non_intersecting > Nonintersect_percentile] +
-                  (non_intersecting[non_intersecting > Nonintersect_percentile] / 100) * Perc_diff
+                  (non_intersecting[
+                    non_intersecting > Nonintersect_percentile
+                  ] /
+                    100) *
+                    Perc_diff
 
                 # replace any values greater than 1 with 1
                 non_intersecting[non_intersecting > 1] <- 1

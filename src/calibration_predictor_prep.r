@@ -54,7 +54,7 @@ calibration_predictor_prep <- function(
   )
 
   # create base directory for prepared predictor layers
-  ensure_dir(config[["prepped_lyr_path"]])
+  ensure_dir(config[["preds_layer_dir"]])
 
   # prepare topographical predictors
   terrain_pred_prep(

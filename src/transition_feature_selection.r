@@ -120,7 +120,7 @@ perform_feature_selection <- function(
   ))
 
   lulc_schema <- jsonlite::fromJSON(
-    config[["LULC_aggregation_path"]],
+    config[["lulc_aggregation_path"]],
     simplifyVector = FALSE
   )
   message(
@@ -213,7 +213,7 @@ perform_feature_selection <- function(
 
   # --- Set up file paths ---
   transitions_pq_path <- file.path(
-    config[["trans_pre_pred_filter_dir"]],
+    config[["trans_dataset_dir"]],
     period
   )
   static_preds_pq_path <- file.path(

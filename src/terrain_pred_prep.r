@@ -1,5 +1,5 @@
 terrain_pred_prep <- function(config = get_config()) {
-  terrain_dir <- file.path(config[["prepped_lyr_path"]], "terrain")
+  terrain_dir <- file.path(config[["preds_layer_dir"]], "terrain")
   ensure_dir(terrain_dir)
 
   # Load existing DEM raster and predictor YAML
@@ -43,7 +43,7 @@ terrain_pred_prep <- function(config = get_config()) {
   # Include elevation in terrain measures for YAML update
   all_measures <- c("elevation", terrain_measures)
   all_paths <- file.path(
-    config[["prepped_lyr_path"]],
+    config[["preds_layer_dir"]],
     "terrain",
     paste0(all_measures, ".tif")
   )

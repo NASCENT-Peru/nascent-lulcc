@@ -114,7 +114,7 @@ simulated_map_finalisation <- function() {
   Web_maps_dir <- "C:/Users/bblack/polybox/LULC_validation_data/LULC_maps/Switzerland"
 
   # load aggregation scheme
-  Aggregation_scheme <- read_excel(LULC_aggregation_path)
+  Aggregation_scheme <- read_excel(lulc_aggregation_path)
 
   ### =========================================================================
   ### B- Finalising simulated LULC maps

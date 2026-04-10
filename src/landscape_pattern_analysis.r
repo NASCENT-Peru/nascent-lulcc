@@ -183,7 +183,7 @@ landscape_pattern_analysis <- function() {
   Rast_freq <- Rast_freq[1:(nrow(Rast_freq) - 1), ]
 
   # add column for class names
-  LULC_agg_scheme <- readxl::read_excel(LULC_aggregation_path)
+  LULC_agg_scheme <- readxl::read_excel(lulc_aggregation_path)
 
   Rast_freq$LULC_name <- sapply(Rast_freq$value, function(x) {
     unique(LULC_agg_scheme[

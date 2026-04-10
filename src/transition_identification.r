@@ -23,7 +23,7 @@ transition_identification <- function(
 
   # Read aggregation scheme externally provided
   scheme <- jsonlite::fromJSON(
-    config[["LULC_aggregation_path"]],
+    config[["lulc_aggregation_path"]],
     simplifyVector = FALSE
   )
 

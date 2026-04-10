@@ -102,21 +102,9 @@ fi
 echo "Reference grid preparation job submitted with ID: $ref_grid_job_id"
 check_job_status $ref_grid_job_id "reference grid preparation"
 
-# Step 1b: LULC Data Preparation
+# Step 1b: Region Preparation
 echo
-echo "Step 1b: LULC Data Preparation"
-echo "-------------------------------------------"
-lulc_job_id=$(sbatch --dependency=afterok:$ref_grid_job_id --parsable "$SCRIPT_DIR/submit_lulc_data_prep.sh")
-if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to submit LULC data preparation job"
-    exit 1
-fi
-echo "LULC data preparation job submitted with ID: $lulc_job_id"
-check_job_status $lulc_job_id "LULC data preparation"
-
-# Step 1c: Region Preparation
-echo
-echo "Step 1c: Region Preparation"
+echo "Step 1b: Region Preparation"
 echo "-------------------------------------------"
 region_job_id=$(sbatch --dependency=afterok:$lulc_job_id --parsable "$SCRIPT_DIR/submit_region_prep.sh")
 if [ $? -ne 0 ]; then
@@ -125,6 +113,18 @@ if [ $? -ne 0 ]; then
 fi
 echo "Region preparation job submitted with ID: $region_job_id"
 check_job_status $region_job_id "region preparation"
+
+# Step 1c: LULC Data Preparation
+echo
+echo "Step 1c: LULC Data Preparation"
+echo "-------------------------------------------"
+lulc_job_id=$(sbatch --dependency=afterok:$ref_grid_job_id --parsable "$SCRIPT_DIR/submit_lulc_data_prep.sh")
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to submit LULC data preparation job"
+    exit 1
+fi
+echo "LULC data preparation job submitted with ID: $lulc_job_id"
+check_job_status $lulc_job_id "LULC data preparation"
 
 # Step 1d: Ancillary Data Preparation
 echo
@@ -220,28 +220,28 @@ fi
 echo "Transition modelling job submitted with ID: $model_job_id"
 check_job_status $model_job_id "transition modelling"
 
-# Step 4: Model Finalization (depends on transition modelling)
+# Step 4: Allocation parameter estimation
 echo
 echo "========================================="
-echo "Step 4: Model Finalization"
+echo "Step 4: Allocation parameter estimation"
 echo "========================================="
 
-model_final_job_id=$(sbatch --dependency=afterok:$model_job_id --parsable "$SCRIPT_DIR/submit_model_finalization.sh")
+allocation_param_job_id=$(sbatch --dependency=afterok:$model_job_id --parsable "$SCRIPT_DIR/submit_allocation_paramization.sh")
 if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to submit model finalization job"
+    echo "ERROR: Failed to submit Allocation Parameter Estimation job"
     exit 1
 fi
 
-echo "Model finalization job submitted with ID: $model_final_job_id"
-check_job_status $model_final_job_id "model finalization"
+echo "Allocation parameter estimation job submitted with ID: $allocation_param_job_id"
+check_job_status $allocation_param_job_id "Allocation Parameter Estimation"
 
-# Step 5: Scenario Preparation (depends on model finalization)
+# Step 5: Scenario Preparation (depends on Allocation Parameter Estimation)
 echo
 echo "========================================="
 echo "Step 5: Scenario Preparation"
 echo "========================================="
 
-scenario_prep_job_id=$(sbatch --dependency=afterok:$model_final_job_id --parsable "$SCRIPT_DIR/submit_scenario_preparation.sh")
+scenario_prep_job_id=$(sbatch --dependency=afterok:$allocation_param_job_id --parsable "$SCRIPT_DIR/submit_scenario_preparation.sh")
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to submit scenario preparation job"
     exit 1
@@ -310,7 +310,7 @@ summary_file="$PROJECT_ROOT/logs/complete_pipeline_summary_$(date +%Y%m%d_%H%M%S
     echo "    1h. Transition Dataset Preparation: $trans_data_job_id"
     echo "  Feature Selection: $fs_job_id"
     echo "  Transition Modelling: $model_job_id"
-    echo "  Model Finalization: $model_final_job_id"
+    echo "  Allocation Parameter Estimation: $allocation_param_job_id"
     echo "  Scenario Preparation: $scenario_prep_job_id"
     echo "  Simulation Setup: $sim_setup_job_id"
     echo "  Dinamica Simulations: $dinamica_job_id"
@@ -327,7 +327,7 @@ summary_file="$PROJECT_ROOT/logs/complete_pipeline_summary_$(date +%Y%m%d_%H%M%S
     echo "    1h. Transition Dataset: logs/transition-dataset-prep-$trans_data_job_id.{out,err}"
     echo "  Feature Selection: logs/feat-select-$fs_job_id.{out,err}"
     echo "  Transition Modelling: logs/trans-model-$model_job_id.{out,err}"
-    echo "  Model Finalization: logs/model-final-$model_final_job_id.{out,err}"
+    echo "  Allocation Parameter Estimation: logs/model-final-$allocation_param_job_id.{out,err}"
     echo "  Scenario Preparation: logs/scenario-prep-$scenario_prep_job_id.{out,err}"
     echo "  Simulation Setup: logs/sim-setup-$sim_setup_job_id.{out,err}"
     echo "  Dinamica Simulations: logs/dinamica-sim-$dinamica_job_id.{out,err}"
@@ -344,7 +344,7 @@ summary_file="$PROJECT_ROOT/logs/complete_pipeline_summary_$(date +%Y%m%d_%H%M%S
     echo "     1h. Transition dataset preparation"
     echo "  2. Feature Selection: Predictor variable selection with GRRF"
     echo "  3. Transition Modelling: Statistical modelling of LULC transitions"
-    echo "  4. Model Finalization: Evaluation, specification selection, final training"
+    echo "  4. Allocation Parameter Estimation: Evaluation, specification selection, final training"
     echo "  5. Scenario Preparation: Transition tables and predictor data for scenarios"
     echo "  6. Simulation Setup: Calibration parameters and spatial interventions"
     echo "  7. Dinamica Simulations: Final land use change simulations"

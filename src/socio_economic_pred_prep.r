@@ -66,7 +66,7 @@ socio_economic_pred_prep <- function(
   gav_rast <- terra::mask(gav_rast, ref_raster)
 
   gav_pred_dir <- file.path(
-    config[["prepped_lyr_path"]],
+    config[["preds_layer_dir"]],
     gav_pred$grouping
   )
   ensure_dir(gav_pred_dir)
@@ -145,7 +145,7 @@ socio_economic_pred_prep <- function(
   pop_rast <- terra::mask(pop_rast, ref_raster)
 
   pop_pred_dir <- file.path(
-    config[["prepped_lyr_path"]],
+    config[["preds_layer_dir"]],
     pop_pred$grouping
   )
   ensure_dir(pop_pred_dir)
@@ -233,7 +233,7 @@ socio_economic_pred_prep <- function(
     )
 
     market_pred_dir <- file.path(
-      config[["prepped_lyr_path"]],
+      config[["preds_layer_dir"]],
       market_pred$grouping
     )
     ensure_dir(market_pred_dir)
@@ -325,7 +325,7 @@ socio_economic_pred_prep <- function(
     )
 
     commercial_pred_dir <- file.path(
-      config[["prepped_lyr_path"]],
+      config[["preds_layer_dir"]],
       commercial_pred$grouping
     )
     ensure_dir(commercial_pred_dir)
@@ -397,7 +397,7 @@ socio_economic_pred_prep <- function(
   financial_vect <- terra::crop(financial_vect, terra::ext(ref_raster))
 
   financial_pred_dir <- file.path(
-    config[["prepped_lyr_path"]],
+    config[["preds_layer_dir"]],
     financial_pred$grouping
   )
   ensure_dir(financial_pred_dir)
@@ -430,7 +430,7 @@ socio_economic_pred_prep <- function(
 
     # final output path
     outpath <- file.path(
-      config[["prepped_lyr_path"]],
+      config[["preds_layer_dir"]],
       financial_pred$grouping,
       paste0("dist_to_", group_name, ".tif")
     )
@@ -512,7 +512,7 @@ socio_economic_pred_prep <- function(
   }
 
   travel_time_pred_dir <- file.path(
-    config[["prepped_lyr_path"]],
+    config[["preds_layer_dir"]],
     travel_time_pred$grouping
   )
   ensure_dir(travel_time_pred_dir)

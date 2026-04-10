@@ -175,12 +175,10 @@ calculate_allocation_params_for_periods <- function(
     comparison_years <- comparison_years[[1]]
   }
 
-  message(paste(rep("=", 80), collapse = ""))
   message(sprintf(
     "STARTING ALLOCATION PARAMETER CALCULATION FOR PERIOD: %s",
     period_name
   ))
-  message(paste(rep("=", 80), collapse = ""))
 
   # Create debug directory for this period
   debug_dir <- file.path(
@@ -280,7 +278,7 @@ calculate_allocation_params_for_periods <- function(
 
   # check that transition parquet directory exists
   transitions_dir <- file.path(
-    config[["trans_pre_pred_filter_dir"]],
+    config[["trans_dataset_dir"]],
     period_name
   )
 
@@ -315,7 +313,6 @@ calculate_allocation_params_for_periods <- function(
   message(
     "\n✓ COMPLETED ALLOCATION PARAMETER ESTIMATION FOR ALL TRANSITIONS, REGIONS, AND TIME PERIODS"
   )
-  message(paste(rep("=", 80), collapse = ""))
 }
 
 #' Process all regions sequentially

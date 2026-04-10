@@ -5,7 +5,7 @@ soil_pred_prep <- function(
 ) {
   message("Preparing soil predictor data...")
 
-  ensure_dir(config[["prepped_lyr_path"]])
+  ensure_dir(config[["preds_layer_dir"]])
 
   # load the pred_table yaml file
   pred_yaml_file <- config[["pred_table_path"]]
@@ -34,10 +34,10 @@ soil_pred_prep <- function(
   for (f in seq_along(soil_pred_entries)) {
     message(paste("Processing", names(soil_pred_paths)[f]))
 
-    soil_dir <- file.path(config[["prepped_lyr_path"]], "soil")
+    soil_dir <- file.path(config[["preds_layer_dir"]], "soil")
     ensure_dir(soil_dir)
 
-    # save the aligned raster to the prepped_lyr_path directory
+    # save the aligned raster to the preds_layer_dir directory
     out_name <- basename(soil_pred_paths[f])
     out_path <- file.path(
       soil_dir,
