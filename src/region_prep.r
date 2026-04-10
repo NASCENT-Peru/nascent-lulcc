@@ -61,7 +61,7 @@ region_prep <- function(config = get_config()) {
     "region_gap_cells.tif"
   ))
 
-  # # Calcuklate distance-based rasters from each polygon to gap cells
+  # # Calculate distance-based rasters from each polygon to gap cells
   # # more efficient to do with gdal command line tools outside of R
   # message("Computing distance-based assignments for gap cells only...")
   # temp_dir <- file.path(config[["reg_dir"]], "temp_distances")
