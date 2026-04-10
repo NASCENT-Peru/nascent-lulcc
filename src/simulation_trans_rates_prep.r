@@ -78,13 +78,24 @@ simulation_trans_rates_prep <- function(config = get_config()) {
     simplifyVector = FALSE
   )
 
-  # TODO: add a routine to the lulc data prep script to prep this initial areas table.
-  # Load data files
-  file_initial <- config[["lulc_initial_areas_path"]]
-  if (!file.exists(file_initial)) {
-    stop(sprintf("File not found: %s", file_initial))
+  # Derive the initial LULC year as one step before the simulation start and
+  # load the pre-computed areas CSV saved by lulc_data_prep()
+  initial_year <- as.character(
+    config[["simulation_start_year"]] - config[["step_length"]]
+  )
+  areas_files <- list.files(
+    config[["lulc_initial_areas_path"]],
+    pattern = paste0(".*", initial_year, ".*_areas\\.csv$"),
+    full.names = TRUE
+  )
+  if (length(areas_files) == 0) {
+    stop(sprintf(
+      "No initial areas CSV found for year '%s' in: %s. Run lulc_data_prep() first.",
+      initial_year,
+      config[["lulc_initial_areas_path"]]
+    ))
   }
-  initial_lulc_areas <- read.csv(file_initial)
+  initial_lulc_areas <- read.csv(areas_files[1])
 
   #TODO: move labels to a config file
   # for confidence factor column the first ',' should be '.' and the others removed.

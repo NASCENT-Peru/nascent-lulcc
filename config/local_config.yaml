@@ -39,7 +39,7 @@ input_output_files_paths:
   viable_transitions_lists: "outputs/transition_identification/viable_transitions_lists.rds"
   ref_grid_path: "inputs/spatial_reference_grid/ref_grid_aggregated.tif"
   ref_grid_agg_path: "inputs/spatial_reference_grid/ref_grid_aggregated.tif"
-  lulc_initial_areas_path: "inputs/lulc/future_demand/lulc_initial_areas.csv"
+  lulc_initial_areas_path: "inputs/lulc/future_demand"
   lulc_demand_path: "inputs/lulc/future_demand/lulc_demand_results.csv"
   lulc_historic_trans_rates_path : "inputs/lulc/future_demand/historic_lulc_transition_rates.csv"
 

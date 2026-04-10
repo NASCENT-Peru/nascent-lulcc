@@ -46,6 +46,16 @@ lulc_data_prep <- function(config = get_config(), refresh_cache = FALSE) {
   }
   rcl <- as.matrix(rcl)
 
+  ensure_dir(config[["lulc_initial_areas_path"]])
+
+  # Load region raster and ID -> name mapping for area calculations
+  reg_rast <- terra::rast(file.path(config[["reg_dir"]], "regions.tif"))
+  reg_map <- jsonlite::fromJSON(file.path(config[["reg_dir"]], "regions.json"))
+  lulc_code_to_name <- setNames(
+    vapply(scheme, function(cl) cl[["clean_name"]], character(1)),
+    vapply(scheme, function(cl) as.character(cl[["value"]]), character(1))
+  )
+
   # List input rasters
   tifs <- list.files(
     config[["rasterized_lulc_dir"]],
@@ -93,6 +103,28 @@ lulc_data_prep <- function(config = get_config(), refresh_cache = FALSE) {
       filename = out_path
     )
     message("Wrote: ", out_path)
+
+    # Calculate LULC areas per region and save to the future_demand directory
+    areas_path <- file.path(
+      config[["lulc_initial_areas_path"]],
+      sub("\\.tif$", "_areas.csv", basename(out_path))
+    )
+    message("  Calculating LULC areas per region...")
+    vals_df <- terra::as.data.frame(c(reg_rast, r_agg), na.rm = TRUE)
+    names(vals_df) <- c("region_id", "lulc_code")
+    counts_df <- vals_df |>
+      dplyr::group_by(region_id, lulc_code) |>
+      dplyr::summarise(initial_amount = dplyr::n(), .groups = "drop") |>
+      dplyr::left_join(
+        data.frame(region_id = reg_map$value, Region = reg_map$pretty,
+                   stringsAsFactors = FALSE),
+        by = "region_id"
+      ) |>
+      dplyr::mutate(lulc_name = lulc_code_to_name[as.character(lulc_code)]) |>
+      dplyr::filter(!is.na(Region), !is.na(lulc_name)) |>
+      dplyr::select(Region, lulc_name, initial_amount)
+    write.csv(counts_df, areas_path, row.names = FALSE)
+    message("  Wrote areas: ", areas_path)
   }
   message("Done.")
 }
