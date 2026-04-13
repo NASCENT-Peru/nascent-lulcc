@@ -122,7 +122,7 @@ simulation_trans_rates_prep <- function(config = get_config()) {
     )
   message(sprintf("  ✓ Demand results: %d rows", nrow(lulc_demand)))
 
-  trans_rates_path <- config[["lulc_historic_trans_rates_path"]]
+  trans_rates_path <- config[["viable_transitions_lists"]]
   if (!file.exists(trans_rates_path)) {
     stop(sprintf("File not found: %s", trans_rates_path))
   }
@@ -202,7 +202,7 @@ simulation_trans_rates_prep <- function(config = get_config()) {
   # E. SETUP SCALAR ITERATIONS
   # ================================
 
-  message("\n[6/7] Setting up scalar iterations...")
+  message("\n[5/7] Setting up scalar iterations...")
 
   scalars <- c(1.0, seq(3.0, 9.0, by = 2))
   # set scalar value to 5.0
@@ -223,7 +223,7 @@ simulation_trans_rates_prep <- function(config = get_config()) {
   # F. EXECUTION LOOP
   # ================================
 
-  message("\n[7/7] Starting execution loop...")
+  message("\n[6/7] Starting execution loop...")
 
   # Outer loop over slider scaling factors
   for (s_val in scalars) {
@@ -232,15 +232,11 @@ simulation_trans_rates_prep <- function(config = get_config()) {
       dir.create(dir_name)
     }
 
-    cat(paste0("\n\n====================================================\n"))
-    cat(paste0(
-      "STARTING RUN: SCALAR ",
+    message(sprintf(
+      "\nStarting scalar run: %.1fx  (output: %s)",
       s_val,
-      "x\nOutput Folder: ",
-      dir_name,
-      "\n"
+      dir_name
     ))
-    cat(paste0("====================================================\n"))
 
     # 1. Recalculate targets
     df_slider_sum <- df_demand_raw %>%
@@ -340,7 +336,7 @@ simulation_trans_rates_prep <- function(config = get_config()) {
           f_in,
           f_pair
         ) {
-          src <- trans %>% filter(Region == reg)
+          src <- trans %>% filter(region_name == reg)
           src_clean <- src %>%
             filter(iLULC %in% cls, jLULC %in% cls) %>%
             group_by(iLULC, jLULC) %>%
@@ -803,9 +799,9 @@ simulation_trans_rates_prep <- function(config = get_config()) {
           dpi = 300
         )
       }
-      cat("Finished Scalar", s_val, "x\n")
+      message(sprintf("Scalar %.1fx complete", s_val))
     } else {
-      cat("Scalar", s_val, "x FAILED completely.\n")
+      message(sprintf("Scalar %.1fx FAILED: no valid results returned", s_val))
     }
   }
 
@@ -813,6 +809,7 @@ simulation_trans_rates_prep <- function(config = get_config()) {
   # G. CLEANUP
   # ================================
 
+  message("\n[7/7] Shutting down workers...")
   message("\n", paste(rep("=", 80), collapse = ""))
   future::plan(future::sequential)
   message("  ✓ Workers shutdown")

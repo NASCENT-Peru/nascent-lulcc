@@ -112,7 +112,16 @@ perform_feature_selection <- function(
   ensure_dir(period_dir)
 
   # --- Load metadata ---
-  transitions_info <- readRDS(config[["viable_transitions_lists"]])[[period]]
+  vt_csv   <- read.csv(config[["viable_transitions_lists"]])
+  rate_col <- paste0("rate_", period)
+  transitions_info <- vt_csv[
+    vt_csv$region_name == "whole_map" &
+    vt_csv$from_lulc   != vt_csv$to_lulc &
+    !is.na(vt_csv[[rate_col]]),
+  ]
+  transitions_info$Trans_name <- paste(
+    transitions_info$from_lulc, transitions_info$to_lulc, sep = "-"
+  )
   message(sprintf(
     "Loaded %d viable transitions for period %s",
     nrow(transitions_info),

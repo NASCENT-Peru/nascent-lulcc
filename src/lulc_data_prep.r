@@ -1,7 +1,6 @@
 #' LULC_data_prep
 #'
-#' Preparing land use land cover rasters for all historic periods in the the Swiss Areal
-#' Statistiks and aggregating LULC rasters to new classification scheme
+#' Preparing land use land cover rasters: reclassifying according to project LULC classes, aggregating to coarser resolution, and calculating initial areas per region.
 #' @author Ben Black
 #' @export
 
@@ -116,8 +115,11 @@ lulc_data_prep <- function(config = get_config(), refresh_cache = FALSE) {
       dplyr::group_by(region_id, lulc_code) |>
       dplyr::summarise(initial_amount = dplyr::n(), .groups = "drop") |>
       dplyr::left_join(
-        data.frame(region_id = reg_map$value, Region = reg_map$pretty,
-                   stringsAsFactors = FALSE),
+        data.frame(
+          region_id = reg_map$value,
+          Region = reg_map$pretty,
+          stringsAsFactors = FALSE
+        ),
         by = "region_id"
       ) |>
       dplyr::mutate(lulc_name = lulc_code_to_name[as.character(lulc_code)]) |>

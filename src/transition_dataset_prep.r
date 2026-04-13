@@ -123,7 +123,7 @@ transition_dataset_prep <- function(
   )
 
   if (file.exists(valid_ids_parquet) && !refresh_cache) {
-    cat("✓ Found existing valid_cell_ids.parquet, using...\n")
+    message("Found existing valid_cell_ids.parquet, using cached data")
     valid_cell_data <- valid_ids_parquet # Store path, not data
 
     # Get summary stats without loading into memory
@@ -135,8 +135,8 @@ transition_dataset_prep <- function(
       dplyr::collect() %>%
       dplyr::pull(n)
 
-    cat(sprintf(
-      "\n✓ Found %s valid cells across %d regions\n\n",
+    message(sprintf(
+      "Found %s valid cells across %d regions",
       format(n_cells, big.mark = ","),
       n_regions
     ))
@@ -149,7 +149,7 @@ transition_dataset_prep <- function(
   }
 
   # Verify mask alignment is internally consistent
-  cat("Verifying mask cell ID consistency...\n")
+  message("Verifying mask cell ID consistency...")
   verify_mask_cell_ids_transitions(mask_raster_path, valid_cell_data)
 
   periods <- list(config[["data_periods"]])
@@ -482,9 +482,17 @@ process_period_transitions <- function(
 
   regionalization <- isTRUE(config[["regionalization"]])
 
-  viable_trans_list <- readRDS(config[["viable_transitions_lists"]])[[paste(
-    period
-  )]]
+  # Read CSV and filter to whole-map transition rows for this period
+  vt_csv   <- read.csv(config[["viable_transitions_lists"]])
+  rate_col <- paste0("rate_", period)
+  viable_trans_list <- vt_csv[
+    vt_csv$region_name == "whole_map" &
+    vt_csv$from_lulc   != vt_csv$to_lulc &
+    !is.na(vt_csv[[rate_col]]),
+  ]
+  viable_trans_list$Trans_name <- paste(
+    viable_trans_list$from_lulc, viable_trans_list$to_lulc, sep = "-"
+  )
   trans_names <- viable_trans_list$Trans_name
 
   # ---- Prepare output ----

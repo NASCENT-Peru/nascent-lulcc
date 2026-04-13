@@ -27,7 +27,7 @@ validation_dir: "outputs/validation"
 
 # Seperate file path entries for important individual files that are used in multiple places or need to be easily referenced
 input_output_files_paths:
-  viable_transitions_lists: "outputs/transition_identification/viable_transitions_lists.rds"
+  viable_transitions_lists: "outputs/transition_identification/viable_transitions_lists.csv"
   ref_grid_path: "spatial_reference_grid/ref_grid.tif"
   ref_grid_agg_path: "spatial_reference_grid/ref_grid_aggregated.tif"
   lulc_initial_areas_path: "inputs/lulc/future_demand"
