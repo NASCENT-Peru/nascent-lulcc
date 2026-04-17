@@ -10,16 +10,16 @@ config_dir: "config"
 temp_dir: "temp"
 
 # Input directories (relative to data_basepath)
-input_dirs:
+input_dirs: 
   reg_dir: "inputs/regionalization"
   predictors_dir: "inputs/predictors"
   ancillary_spatial_dir: "inputs/ancillary_spatial_data"
   spat_prob_perturb_dir: "inputs/spat_prob_perturb"
-  predictors_prepped_dir: "predictors/prepared"
-  predictors_raw_dir: "predictors/raw"
-  predictors_intermediate_dir: "predictors/intermediate"
-  preds_tools_dir: "predictors/tools"
-  preds_layer_dir: "predictors/prepared/layers"
+  predictors_prepped_dir: "inputs/predictors/prepared"
+  predictors_raw_dir: "inputs/predictors/raw"
+  predictors_intermediate_dir: "inputs/predictors/intermediate"
+  preds_tools_dir: "inputs/predictors/tools"
+  preds_layer_dir: "inputs/predictors/prepared/layers"
   rasterized_lulc_dir: "inputs/lulc/original"
   aggregated_lulc_dir: "inputs/lulc/aggregated"
 
@@ -37,8 +37,11 @@ output_dirs:
 # Seperate file path entries for important individual files that are used in multiple places or need to be easily referenced
 input_output_files_paths:
   viable_transitions_lists: "outputs/transition_identification/viable_transitions_lists.rds"
-  ref_grid_path: "spatial_reference_grid/ref_grid.tif"
-  ref_grid_agg_path: "spatial_reference_grid/ref_grid_aggregated.tif"
+  ref_grid_path: "inputs/spatial_reference_grid/ref_grid_aggregated.tif"
+  ref_grid_agg_path: "inputs/spatial_reference_grid/ref_grid_aggregated.tif"
+  lulc_initial_areas_path: "inputs/lulc/future_demand/lulc_initial_areas.csv"
+  lulc_demand_path: "inputs/lulc/future_demand/lulc_demand_results.csv"
+  lulc_historic_trans_rates_path : "inputs/lulc/future_demand/historic_lulc_transition_rates.csv"
 
 # Config files/settings
 config_files_paths:
@@ -56,7 +59,7 @@ configuration_settings:
   ref_grid_target_cellsize: 100  # in meters
   reference_crs: "epsg:2056"
   step_length: 4
-  data_periods: ["2018_2022"] #"2010_2014", "2014_2018",
+  data_periods: ["2018_2022"] #"2010_2014", "2014_2018", 
   regionalization: true
   scenario_names: ["BAU", "NAT", "CUL", "SOC"]
   simulation_start_year: 2022
