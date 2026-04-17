@@ -10,20 +10,29 @@ config_dir: "config"
 temp_dir: "temp"
 
 # Input directories (relative to data_basepath)
-reg_dir: "inputs/regionalization"
-predictors_dir: "inputs/predictors"
-ancillary_spatial_dir: "inputs/ancillary_spatial_data"
-spat_prob_perturb_dir: "inputs/spat_prob_perturb"
+input_dirs:
+  reg_dir: "inputs/regionalization"
+  predictors_dir: "inputs/predictors"
+  ancillary_spatial_dir: "inputs/ancillary_spatial_data"
+  spat_prob_perturb_dir: "inputs/spat_prob_perturb"
+  predictors_prepped_dir: "predictors/prepared"
+  predictors_raw_dir: "predictors/raw"
+  predictors_intermediate_dir: "predictors/intermediate"
+  preds_tools_dir: "predictors/tools"
+  preds_layer_dir: "predictors/prepared/layers"
+  rasterized_lulc_dir: "inputs/lulc/original"
+  aggregated_lulc_dir: "inputs/lulc/aggregated"
 
 # Output directories/files (relative to data_basepath)
-calibration_param_dir: "outputs/allocation_parameters/calibration"
-simulation_param_dir: "outputs/allocation_parameters/simulation"
-trans_rate_table_dir: "outputs/transition_tables"
-trans_rates_raw_dir: "outputs/transition_identification/raw_trans_rates"
-trans_dataset_dir: "outputs/transition_datasets"
-feature_selection_dir: "outputs/feature_selection"
-transition_model_dir: "outputs/transition_models"
-validation_dir: "outputs/validation"
+output_dirs:
+  calibration_param_dir: "outputs/allocation_parameters/calibration"
+  simulation_param_dir: "outputs/allocation_parameters/simulation"
+  trans_rate_table_dir: "outputs/transition_tables"
+  trans_rates_raw_dir: "outputs/transition_identification/raw_trans_rates"
+  trans_dataset_dir: "outputs/transition_datasets"
+  feature_selection_dir: "outputs/feature_selection"
+  transition_model_dir: "outputs/transition_models"
+  validation_dir: "outputs/validation"
 
 # Seperate file path entries for important individual files that are used in multiple places or need to be easily referenced
 input_output_files_paths:
@@ -31,40 +40,30 @@ input_output_files_paths:
   ref_grid_path: "spatial_reference_grid/ref_grid.tif"
   ref_grid_agg_path: "spatial_reference_grid/ref_grid_aggregated.tif"
 
-# Additional derived directories
-predictors_prepped_dir: "predictors/prepared"
-predictors_raw_dir: "predictors/raw"
-predictors_intermediate_dir: "predictors/intermediate"
-preds_tools_dir: "predictors/tools"
-preds_layer_dir: "predictors/prepared/layers"
-
-
-# LULC directories
-rasterized_lulc_dir: "inputs/lulc/original"
-aggregated_lulc_dir: "inputs/lulc/aggregated"
-
 # Config files/settings
-lulc_aggregation_path: "config/lulc_schema.json"
-model_specs_path: "config/model_specs.yaml"  # Project root - resolved by R code
-pred_table_path: "config/pred_data.yaml"     # Project root - resolved by R code
-model_lookup_path: "tools/model_lookup.xlsx"
-scenario_area_mods_csv: "tools/simulation_lulc_areas_2060.csv"
-calibration_ctrl_tbl_path: "tools/calibration_control.csv"
-ctrl_tbl_path: "tools/simulation_control.csv"
-ancillary_data_table: "config/ancillary_data.yaml"  # Project root - resolved by R code
-ref_grid_target_cellsize: 100  # in meters
-reference_crs: "epsg:2056"
+config_files_paths:
+  lulc_aggregation_path: "config/lulc_schema.json"
+  model_specs_path: "config/model_specs.yaml"  # Project root - resolved by R code
+  pred_table_path: "config/pred_data.yaml"     # Project root - resolved by R code
+  model_lookup_path: "tools/model_lookup.xlsx"
+  scenario_area_mods_csv: "tools/simulation_lulc_areas_2060.csv"
+  calibration_ctrl_tbl_path: "tools/calibration_control.csv"
+  ctrl_tbl_path: "tools/simulation_control.csv"
+  ancillary_data_table: "config/ancillary_data.yaml"  # Project root - resolved by R code
 
-# Simulation configuration
-step_length: 4
-data_periods: ["2018_2022"] #"2010_2014", "2014_2018", 
-regionalization: true
-scenario_names: ["BAU", "NAT", "CUL", "SOC"]
-simulation_start_year: 2022
-simulation_end_year: 2060
+# Calibration/simulation configurations
+configuration_settings:
+  ref_grid_target_cellsize: 100  # in meters
+  reference_crs: "epsg:2056"
+  step_length: 4
+  data_periods: ["2018_2022"] #"2010_2014", "2014_2018",
+  regionalization: true
+  scenario_names: ["BAU", "NAT", "CUL", "SOC"]
+  simulation_start_year: 2022
+  simulation_end_year: 2060
 
 # Simulation transition rates preparation configuration
-simulation_trans_rates:
+simulation_trans_rates_params:
   margin: 0.50
   stay_min: 0.10
   stay_max: 0.999
@@ -82,5 +81,3 @@ simulation_trans_rates:
   rel_guard: 0.05
   forbid_inflow: []
   num_workers: 6
-
-
