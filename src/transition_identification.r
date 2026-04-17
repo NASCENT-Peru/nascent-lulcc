@@ -49,8 +49,12 @@ transition_identification <- function(
   ### B- Calculate historic areal change for LULC classes
   ### =========================================================================
 
+  # Named vector of file paths (name = year) passed to parallel workers instead
+  # of terra raster objects, which are non-exportable across future sessions.
+  lulc_file_paths <- setNames(as.character(lulc_files), lulc_years)
+
   message("Loading LULC rasters...")
-  # Load LULC rasters with terra
+  # Load LULC rasters with terra (used for sequential area computation below)
   lulc_rasters <- purrr::map(
     lulc_files,
     terra::rast
@@ -126,16 +130,24 @@ transition_identification <- function(
     length(lulc_change_periods),
     paste(names(lulc_change_periods), collapse = ", ")
   ))
-  # Run function over each period
-  mapply(
+
+  ti_config <- config[["transition_identification_params"]]
+  num_workers <- if (!is.null(ti_config)) ti_config[["num_workers"]] else 1L
+  future::plan(future::multisession, workers = num_workers)
+  message(sprintf("  Parallel workers: %d", num_workers))
+
+  # Run function over each period in parallel; lulc_file_paths passed instead
+  # of the raster stack because terra objects are non-exportable to workers.
+  future.apply::future_mapply(
     compute_trans_rates_by_period,
     raster_combo = lulc_change_periods,
     period_name = names(lulc_change_periods),
     MoreArgs = list(
-      raster_stack = lulc_rasters,
+      lulc_file_paths = lulc_file_paths,
       trans_rates_dir = config[["trans_rates_raw_dir"]]
     ),
-    SIMPLIFY = FALSE
+    SIMPLIFY = FALSE,
+    future.seed = TRUE
   )
   message("Transition matrices written")
 
@@ -148,17 +160,17 @@ transition_identification <- function(
     list.files(
       config[["trans_rates_raw_dir"]],
       full.names = TRUE,
-      pattern = "_trans_table"
+      pattern = "^whole_map_.*_trans_table\\.csv$"
     ),
     read.csv
   )
   names(calibration_tables) <- gsub(
-    "calibration_|_trans_table.csv",
+    "^whole_map_|_trans_table\\.csv$",
     "",
     list.files(
       config[["trans_rates_raw_dir"]],
       full.names = FALSE,
-      pattern = "_trans_table.csv$"
+      pattern = "^whole_map_.*_trans_table\\.csv$"
     )
   )
 
@@ -223,7 +235,6 @@ transition_identification <- function(
       pattern = "regions.tif$",
       full.names = TRUE
     )
-    regions_raster <- terra::rast(regions_raster_path)
     regions_json <- jsonlite::fromJSON(
       file.path(config[["reg_dir"]], "regions.json")
     )
@@ -231,20 +242,30 @@ transition_identification <- function(
     # Create a data.frame of viable transitions (From., To.) to filter regional crosstabs
     trans_from_to_vals <- whole_map_csv[, c("From.", "To.")]
 
-    regional_dfs <- mapply(
+    future.apply::future_mapply(
       compute_regional_trans_rates,
       raster_combo = lulc_change_periods,
       period_name = names(lulc_change_periods),
       MoreArgs = list(
-        raster_stack = lulc_rasters,
-        regions_raster = regions_raster,
+        lulc_file_paths = lulc_file_paths,
+        regions_raster_path = regions_raster_path,
         region_ids = regions_json$value,
         region_labels = regions_json$pretty,
         lulc_classes = lulc_classes,
-        viable_pairs = trans_from_to_vals
+        viable_pairs = trans_from_to_vals,
+        trans_rates_dir = config[["trans_rates_raw_dir"]]
       ),
-      SIMPLIFY = FALSE
+      SIMPLIFY = FALSE,
+      future.seed = TRUE
     )
+
+    message("Loading and combining regional transition rate CSVs...")
+    regional_csv_files <- list.files(
+      config[["trans_rates_raw_dir"]],
+      full.names = TRUE,
+      pattern = "^regional_.*_trans_rates\\.csv$"
+    )
+    regional_dfs <- lapply(regional_csv_files, read.csv)
 
     regional_csv <- Reduce(
       function(x, y) {
@@ -273,6 +294,8 @@ transition_identification <- function(
     config[["viable_transitions_lists"]],
     row.names = FALSE
   )
+
+  future::plan(future::sequential)
   message("Transition identification complete")
 }
 
@@ -286,16 +309,22 @@ transition_identification <- function(
 #' }_trans_table.csv".
 compute_trans_rates_by_period <- function(
   raster_combo,
-  raster_stack,
+  lulc_file_paths,
   period_name,
   trans_rates_dir
 ) {
-  # Extract rasters by year, drop RATs and rename
-  r1 <- raster_stack[[grep(raster_combo[1], names(raster_stack))]]
+  # Load rasters from disk (terra objects are non-exportable across futures)
+  r1 <- terra::rast(lulc_file_paths[[grep(
+    raster_combo[1],
+    names(lulc_file_paths)
+  )]])
   levels(r1) <- NULL
   names(r1) <- "from_lulc"
 
-  r2 <- raster_stack[[grep(raster_combo[2], names(raster_stack))]]
+  r2 <- terra::rast(lulc_file_paths[[grep(
+    raster_combo[2],
+    names(lulc_file_paths)
+  )]])
   levels(r2) <- NULL
   names(r2) <- "to_lulc"
 
@@ -343,7 +372,7 @@ compute_trans_rates_by_period <- function(
     perchange_for_period,
     file.path(
       trans_rates_dir,
-      paste0("calibration_", period_name, "_trans_table.csv")
+      paste0("whole_map_", period_name, "_trans_table.csv")
     )
   )
 }
@@ -417,27 +446,46 @@ build_period_rates <- function(period_name, period_df, lulc_classes) {
 #' @return A data.frame with columns region_name, from_lulc, to_luc, From., To., and rate_{period_name}, containing the transition rates for each region. The output includes only the transitions that are either persistence (from_lulc == to_lulc) or are in the viable_pairs list. The transition rates are calculated as the percentage of pixels that transition from one class to another within each region, based on the masked LULC rasters for the specified period.
 compute_regional_trans_rates <- function(
   raster_combo,
-  raster_stack,
-  regions_raster,
+  lulc_file_paths,
+  regions_raster_path,
   region_ids,
   region_labels,
   lulc_classes,
   viable_pairs, # data.frame: From. (numeric) / To. (numeric) of viable transitions
-  period_name
+  period_name,
+  trans_rates_dir
 ) {
-  r1 <- raster_stack[[grep(raster_combo[1], names(raster_stack))]]
+  message(sprintf(
+    "Computing regional transition rates for period: %s",
+    period_name
+  ))
+
+  # Load rasters from disk (terra objects are non-exportable across futures)
+  r1 <- terra::rast(lulc_file_paths[[grep(
+    raster_combo[1],
+    names(lulc_file_paths)
+  )]])
   levels(r1) <- NULL
   names(r1) <- "from_lulc"
 
-  r2 <- raster_stack[[grep(raster_combo[2], names(raster_stack))]]
+  r2 <- terra::rast(lulc_file_paths[[grep(
+    raster_combo[2],
+    names(lulc_file_paths)
+  )]])
   levels(r2) <- NULL
   names(r2) <- "to_lulc"
 
+  regions_raster <- terra::rast(regions_raster_path)
+
   rate_col <- paste0("rate_", period_name)
+
+  message(sprintf("  Processing %d regions...", length(region_ids)))
 
   results <- lapply(seq_along(region_ids), function(i) {
     reg_id <- region_ids[i]
     reg_label <- region_labels[i]
+
+    message(sprintf("    Region %s (%d/%d)", reg_label, i, length(region_ids)))
 
     region_mask <- regions_raster == reg_id
     r1_m <- terra::mask(r1, region_mask, maskvalue = FALSE)
@@ -486,5 +534,22 @@ compute_regional_trans_rates <- function(
     result
   })
 
-  do.call(rbind, Filter(Negate(is.null), results))
+  period_result <- do.call(rbind, Filter(Negate(is.null), results))
+  n_regions_with_data <- length(Filter(Negate(is.null), results))
+  message(sprintf(
+    "  Period %s: wrote regional rates for %d/%d region(s)",
+    period_name,
+    n_regions_with_data,
+    length(region_ids)
+  ))
+
+  readr::write_csv(
+    period_result,
+    file.path(
+      trans_rates_dir,
+      paste0("regional_", period_name, "_trans_rates.csv")
+    )
+  )
+
+  invisible(NULL)
 }

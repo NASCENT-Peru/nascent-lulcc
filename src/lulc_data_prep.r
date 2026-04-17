@@ -71,7 +71,7 @@ lulc_data_prep <- function(config = get_config(), refresh_cache = FALSE) {
     # replace lulc_ with lulc_agg_ in the output filename
     out_name <- gsub("lulc_", "lulc_agg_", basename(f))
     out_path <- file.path(config[["aggregated_lulc_dir"]], out_name)
-    if (file.exists(out_path)) {
+    if (file.exists(out_path) && !refresh_cache) {
       message("Skipping existing: ", out_path)
       next
     }

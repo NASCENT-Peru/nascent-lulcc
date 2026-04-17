@@ -83,5 +83,8 @@ simulation_trans_rates:
   rel_guard: 0.05
   forbid_inflow: []
   num_workers: 6
+  scale_factor: [1.0, 3.0, 5.0, 9.0]  # Scale factors to apply to the transition rates for each scenario (in same order as scenario_names)
 
+transition_identification_params:
+  num_workers: 8
 

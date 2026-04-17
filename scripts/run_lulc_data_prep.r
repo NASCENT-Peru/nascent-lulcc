@@ -125,7 +125,7 @@ cat("========================================\n")
 
 result <- tryCatch(
   {
-    lulc_data_prep(config = config, refresh_cache = FALSE)
+    lulc_data_prep(config = config, refresh_cache = TRUE)
     list(status = "success", error = NA)
   },
   error = function(e) {
