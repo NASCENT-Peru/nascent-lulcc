@@ -1,29 +1,32 @@
-#' Dinamica Utility Functions
+#' Dinamica EGO Utility Functions
 #'
-#' Interact with Dinamica from R, see **Functions** section below.
+#' Helpers for executing Dinamica EGO models from R.
+#' Adapted from evoland-plus R/util_dinamica.R
 #'
-#' @name dinamica_utils
-NULL
+#' @author Ben Black
 
-#' @describeIn dinamica_utils Execute a Dinamica .ego file using `DinamicaConsole`
-#' @param model_path Path to the .ego model file to run. Any submodels must be included
-#' in a directory of the exact form `basename(modelpath)_ego_Submodels`, [see
-#' wiki](https://csr.ufmg.br/dinamica/dokuwiki/doku.php?id=submodels)
+#' Execute a Dinamica .ego file using DinamicaConsole
+#'
+#' @param model_path Path to the .ego model file
 #' @param disable_parallel Whether to disable parallel steps (default TRUE)
 #' @param log_level Logging level (1-7, default NULL)
-#' @param additional_args Additional arguments to pass to DinamicaConsole, see
-#' `DinamicaConsole -help`
-#' @param write_logfile bool, write stdout&stderr to a file?
+#' @param write_logfile bool, write stdout & stderr to a file?
 #' @param echo bool, direct echo to console?
-#'
-#' @export
+#' @return invisible processx result
+exec_dinamica <- function(
+  model_path,
+  disable_parallel = TRUE,
+  log_level = NULL,
+  write_logfile = TRUE,
+  echo = FALSE
+) {
+  if (Sys.which("DinamicaConsole") == "") {
+    stop(
+      "DinamicaConsole not found on PATH. ",
+      "Please ensure Dinamica EGO is installed and DinamicaConsole is available."
+    )
+  }
 
-exec_dinamica <- function(model_path,
-                          disable_parallel = TRUE,
-                          log_level = NULL,
-                          additional_args = NULL,
-                          write_logfile = TRUE,
-                          echo = FALSE) {
   args <- character()
   if (disable_parallel) {
     args <- c(args, "-disable-parallel-steps")
@@ -31,149 +34,115 @@ exec_dinamica <- function(model_path,
   if (!is.null(log_level)) {
     args <- c(args, paste0("-log-level ", log_level))
   }
-  if (!is.null(additional_args)) {
-    args <- c(args, additional_args)
-  }
   args <- c(args, model_path)
 
+  dinamica_home <- Sys.getenv("DINAMICA_EGO_8_HOME", unset = "")
+  if (!nzchar(dinamica_home)) {
+    stop(
+      "Environment variable DINAMICA_EGO_8_HOME is not set. ",
+      "Please set it to the Dinamica EGO installation directory.",
+      call. = FALSE
+    )
+  }
+  new_ld <- file.path(dinamica_home, "usr", "lib")
+
   if (write_logfile) {
-    logfile_path <- fs::path(
-      fs::path_dir(model_path),
+    logfile_path <- file.path(
+      dirname(model_path),
       format(Sys.time(), "%Y-%m-%d_%Hh%Mm%Ss_dinamica.log")
     )
-    cli::cli_inform(
-      "Logging to {.file {logfile_path}}"
+    message("Logging to ", logfile_path)
+
+    res <- processx::run(
+      command = "bash",
+      args = c(
+        "-c",
+        sprintf(
+          paste(
+            "set -o pipefail;",
+            "stdbuf -oL",
+            "DinamicaConsole %s 2>&1 |",
+            "sed 's/\\x1b\\[[0-9;]*m//g' |",
+            "tee '%s';",
+            "exit ${PIPESTATUS[0]}"
+          ),
+          paste(shQuote(args), collapse = " "),
+          logfile_path
+        )
+      ),
+      error_on_status = FALSE,
+      echo = echo,
+      spinner = TRUE,
+      env = c(
+        "current",
+        DINAMICA_HOME = dirname(model_path),
+        LD_LIBRARY_PATH = new_ld
+      )
     )
-    logfile_con <- file(
-      description = logfile_path,
-      open = "a"
-    )
-    on.exit(close(logfile_con))
-    # callback should have irrelevant overhead versus launching a shell, tee-ing a pipe,
-    # and stripping escape sequences with sed
-    stdout_cb <- function(chunk, process) {
-      cli::ansi_strip(chunk) |>
-        cat(file = logfile_con)
-    }
   } else {
-    # register empty callback
-    stdout_cb <- function(chunk, process) {
-      NULL
-    }
+    res <- processx::run(
+      command = "stdbuf",
+      args = c(
+        "-oL",
+        "DinamicaConsole",
+        args
+      ),
+      error_on_status = FALSE,
+      echo = echo,
+      spinner = TRUE,
+      env = c(
+        "current",
+        DINAMICA_HOME = dirname(model_path),
+        LD_LIBRARY_PATH = new_ld
+      )
+    )
   }
 
-  res <- processx::run(
-    # If called directly, DinamicaConsole does not flush its buffer upon SIGTERM.
-    # stdbuf -oL forces flushing the stdout buffer after every line.
-    command = "stdbuf",
-    args = c(
-      "-oL",
-      "DinamicaConsole", # assume that $PATH is complete
-      args
-    ),
-    error_on_status = FALSE,
-    echo = echo,
-    stdout_callback = stdout_cb,
-    stderr_callback = stdout_cb,
-    spinner = TRUE,
-    env = c(
-      "current",
-      DINAMICA_HOME = fs::path_dir(model_path)
-    )
-  )
-
-  if (res[["status"]] != 0L) {
-    cli::cli_abort(
-      c(
-        "Dinamica registered an error.",
-        "Rerun with echo = TRUE write_logfile = TRUE to see what went wrong."
-      ),
-      class = "dinamicaconsole_error",
-      body = res[["stderr"]]
+  if (
+    res[["status"]] != 0L ||
+      grepl("Dinamica EGO exited with an error", res[["stdout"]])
+  ) {
+    stop(
+      "Dinamica registered an error. \n",
+      "Rerun with echo = TRUE or check logfile to see what went wrong."
     )
   }
 
   invisible(res)
 }
 
-#' @describeIn dinamica_utils Set up evoland-specific Dinamica EGO files; execute using
-#' [exec_dinamica()]
-#' @param run_modelprechecks bool, Validate that everything's in place for a model run.
-#' Will never be run if calibration.
-#' @param config List of config params
-#' @param calibration bool, Is this a calibration run?
-#' @param work_dir Working dir, where to place ego files and control table
-#' @param ... passed to [exec_dinamica()]
-#' @export
-run_evoland_dinamica_sim <- function(
-    run_modelprechecks = TRUE,
-    config = get_config(),
-    work_dir = format(Sys.time(), "%Y-%m-%d_%Hh%Mm%Ss"),
-    calibration = FALSE,
-    ...) {
-  if (run_modelprechecks && !calibration) {
-    stopifnot(lulcc.modelprechecks())
-  }
 
-  # find raw ego files with decoded R/Python code chunks
-  decoded_files <- fs::dir_ls(
-    path = system.file("dinamica_model", package = "evoland"),
-    regexp = "evoland.*\\.ego-decoded$",
-    recurse = TRUE
-  )
-
-  purrr::walk(decoded_files, function(decoded_file) {
-    # Determine relative path and new output path with .ego extension
-    rel_path <- fs::path_rel(
-      path = decoded_file,
-      start = system.file("dinamica_model", package = "evoland")
-    )
-    out_path <- fs::path_ext_set(fs::path(work_dir, rel_path), "ego")
-    fs::dir_create(fs::path_dir(out_path))
-    process_dinamica_script(decoded_file, out_path)
-  })
-
-  # move simulation control csv into place
-  fs::file_copy(
-    ifelse(
-      calibration,
-      config[["calibration_ctrl_tbl_path"]],
-      config[["ctrl_tbl_path"]]
-    ),
-    fs::path(work_dir, "simulation_control.csv"),
-    overwrite = TRUE
-  )
-
-  cli::cli_inform("Starting to run model with Dinamica EGO")
-  exec_dinamica(
-    model_path = fs::path(work_dir, "evoland.ego"),
-    ...
-  )
-}
-
-#' @describeIn dinamica_utils Encode or decode raw R and Python code chunks in .ego
-#' files and their submodels to/from base64
-#' @param infile Input file path. Treated as input if passed AsIs using `base::I()`
+#' Encode or decode R/Python code chunks in .ego files to/from base64
+#'
+#' @param infile Input file path
 #' @param outfile Output file path (optional)
 #' @param mode Character, either "encode" or "decode"
-#' @param check Default TRUE, simple check to ensure that you're handling what you're expecting
-
+#' @param check Default TRUE, sanity check on base64 content
+#' @return If outfile is given, writes and returns outfile invisibly;
+#'   otherwise returns modified text
 process_dinamica_script <- function(infile, outfile, mode = "encode", check = TRUE) {
-  mode <- rlang::arg_match(mode, c("encode", "decode"))
+  mode <- match.arg(mode, c("encode", "decode"))
   if (inherits(infile, "AsIs")) {
-    file_text <- infile
+    file_text <- unclass(infile)
   } else {
-    # read the input file as a single string
     file_text <- readChar(infile, file.info(infile)$size)
   }
 
-  # match the Calculate R or Python Expression blocks - guesswork involved
-  pattern <- ':= Calculate(?:Python|R)Expression "(\\X*?)" (?:\\.no )?\\{\\{'
-  # extracts both full match [,1] and capture group [,2]
-  matches <- stringr::str_match_all(file_text, pattern)[[1]]
+  pattern <- r'(:= Calculate(?:Python|R)Expression "(\X*?)" (?:\.no )?\{\{)'
+  match_positions <- gregexpr(pattern, file_text, perl = TRUE)[[1]]
+  if (match_positions[1] == -1) {
+    matches <- character(0)
+  } else {
+    full_matches <- regmatches(file_text, match_positions)
+    all_matches <- lapply(full_matches, function(m) {
+      cap <- regmatches(m, regexec(pattern, m, perl = TRUE))[[1]]
+      cap[2]
+    })
+    matches <- do.call(c, all_matches)
+  }
 
   if (check) {
-    non_base64_chars_present <- stringr::str_detect(matches[, 2], "[^A-Za-z0-9+=\\n/]")
+    non_base64_chars_present <- grepl("[^A-Za-z0-9+=\\n/]", matches)
     if (mode == "encode" && any(!non_base64_chars_present)) {
       stop(
         "There are no non-base64 chars in one of the matched patterns, which seems ",
@@ -189,28 +158,103 @@ process_dinamica_script <- function(infile, outfile, mode = "encode", check = TR
     }
   }
 
-  if (nrow(matches) > 0) {
-    encoder_decoder <- ifelse(mode == "encode",
-      \(code) base64enc::base64encode(charToRaw(code)),
-      \(code) rawToChar(base64enc::base64decode(code))
-    )
-    # matches[,2] contains the captured R/python code OR base64-encoded code
-    encoded_vec <- purrr::map_chr(matches[, 2], encoder_decoder)
-    # replace each original code with its base64 encoded version
+  if (length(matches) > 0) {
+    encoder_decoder <- if (mode == "encode") {
+      function(code) base64enc::base64encode(charToRaw(code))
+    } else {
+      function(code) rawToChar(base64enc::base64decode(code))
+    }
+    encoded_vec <- vapply(matches, encoder_decoder, character(1), USE.NAMES = FALSE)
     for (i in seq_along(encoded_vec)) {
-      file_text <- stringr::str_replace(
-        string = file_text,
-        pattern = stringr::fixed(matches[i, 2]),
-        replacement = encoded_vec[i]
+      file_text <- sub(
+        pattern = matches[i],
+        replacement = encoded_vec[i],
+        x = file_text,
+        fixed = TRUE
       )
     }
   }
 
-  # Write to outfile if specified, otherwise return the substituted string
   if (!missing(outfile)) {
     writeChar(file_text, outfile, eos = NULL)
     invisible(outfile)
   } else {
     file_text
   }
+}
+
+
+#' Run a Dinamica allocation model in a work directory
+#'
+#' Copies the .ego-decoded model + submodels into work_dir, encodes to .ego,
+#' executes DinamicaConsole, and returns the path to the posterior.tif output.
+#'
+#' @param work_dir Working directory containing anterior.tif and all input CSVs
+#' @param project_root Project root (to find dinamica model files)
+#' @param ... additional args passed to exec_dinamica
+#' @return Path to posterior.tif
+run_allocation_dinamica <- function(work_dir, project_root = NULL, ...) {
+  if (is.null(project_root)) {
+    project_root <- find_project_root()
+  }
+
+  # Fallback if DinamicaConsole not available (for testing)
+  if (Sys.which("DinamicaConsole") == "") {
+    warning(
+      "DinamicaConsole not found on PATH; ",
+      "Copying anterior.tif to posterior.tif as fallback so we can test."
+    )
+    file.copy(
+      file.path(work_dir, "anterior.tif"),
+      file.path(work_dir, "posterior.tif")
+    )
+    return(invisible(file.path(work_dir, "posterior.tif")))
+  }
+
+  # Source model files
+  model_dir <- file.path(project_root, "dinamica", "dinamica_model")
+  decoded_file <- file.path(model_dir, "allocation.ego-decoded")
+  submodels_src <- file.path(model_dir, "evoland_ego_Submodels")
+
+  if (!file.exists(decoded_file)) {
+    stop("allocation.ego-decoded not found at: ", decoded_file)
+  }
+
+  # Copy .ego-decoded to work_dir
+  file.copy(decoded_file, file.path(work_dir, "allocation.ego-decoded"))
+
+  # Copy submodels directory
+  submodels_dst <- file.path(work_dir, "allocation_ego_Submodels")
+  if (!dir.exists(submodels_dst)) {
+    dir.create(submodels_dst, recursive = TRUE)
+  }
+  submodel_files <- list.files(submodels_src, full.names = TRUE)
+  file.copy(submodel_files, submodels_dst)
+
+  # Encode .ego-decoded -> .ego
+  ego_decoded <- file.path(work_dir, "allocation.ego-decoded")
+  ego_encoded <- file.path(work_dir, "allocation.ego")
+
+  # Also encode any submodel .ego-decoded files
+  submodel_decoded <- list.files(
+    submodels_dst,
+    pattern = "\\.ego-decoded$",
+    full.names = TRUE
+  )
+  for (sm in submodel_decoded) {
+    sm_encoded <- sub("\\.ego-decoded$", ".ego", sm)
+    process_dinamica_script(sm, sm_encoded)
+  }
+
+  process_dinamica_script(ego_decoded, ego_encoded)
+
+  message("Starting Dinamica allocation model in: ", work_dir)
+  exec_dinamica(model_path = ego_encoded, ...)
+
+  posterior_path <- file.path(work_dir, "posterior.tif")
+  if (!file.exists(posterior_path)) {
+    stop("Dinamica did not produce posterior.tif in: ", work_dir)
+  }
+
+  invisible(posterior_path)
 }

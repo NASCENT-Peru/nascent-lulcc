@@ -33,6 +33,7 @@ output_dirs:
   feature_selection_dir: "outputs/feature_selection"
   transition_model_dir: "outputs/transition_models"
   validation_dir: "outputs/validation"
+  simulation_output_dir: "outputs/simulations"
 
 # Seperate file path entries for important individual files that are used in multiple places or need to be easily referenced
 input_output_files_paths:
@@ -64,6 +65,7 @@ configuration_settings:
   scenario_names: ["BAU", "NAT", "CUL", "SOC"]
   simulation_start_year: 2022
   simulation_end_year: 2060
+  selected_scalar: 9.0
 
 # Simulation transition rates preparation configuration
 simulation_trans_rates_params:
