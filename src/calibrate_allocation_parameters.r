@@ -166,7 +166,6 @@ calculate_allocation_params_for_periods <- function(
   lulc_rasters,
   period_name,
   use_regions = isTRUE(config[["regionalization"]]),
-  temp_dir = config[["temp_dir"]],
   refresh_cache = FALSE
 ) {
   # Handle both list and vector input for comparison_years
@@ -187,12 +186,16 @@ calculate_allocation_params_for_periods <- function(
     "debug"
   )
   ensure_dir(debug_dir)
+  message(sprintf("  ✓ Debug directory created: %s", debug_dir))
 
   # Ensure temp directory exists
-  if (!dir.exists(temp_dir)) {
-    message(sprintf("Creating temp directory: %s", temp_dir))
-    ensure_dir(temp_dir)
-  }
+  temp_dir <- file.path(
+    config[["calibration_param_dir"]],
+    period_name,
+    "temp"
+  )
+  ensure_dir(temp_dir)
+  message(sprintf("  ✓ Temp directory ready: %s", temp_dir))
 
   # Load LULC rasters for time period
   message(sprintf(
