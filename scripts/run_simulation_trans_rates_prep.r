@@ -49,7 +49,9 @@ required_pkgs <- c(
   "readr",
   "ggplot2",
   "scales",
-  "CVXR"
+  "CVXR",
+  "ggrepel",
+  "patchwork"
 )
 
 missing_pkgs <- setdiff(required_pkgs, rownames(installed.packages()))

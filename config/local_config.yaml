@@ -36,12 +36,11 @@ output_dirs:
 
 # Seperate file path entries for important individual files that are used in multiple places or need to be easily referenced
 input_output_files_paths:
-  viable_transitions_lists: "outputs/transition_identification/viable_transitions_lists.rds"
+  viable_transitions_lists: "outputs/transition_identification/viable_transitions_lists.csv"
   ref_grid_path: "inputs/spatial_reference_grid/ref_grid_aggregated.tif"
   ref_grid_agg_path: "inputs/spatial_reference_grid/ref_grid_aggregated.tif"
-  lulc_initial_areas_path: "inputs/lulc/future_demand/lulc_initial_areas.csv"
+  lulc_initial_areas_path: "inputs/lulc/future_demand"
   lulc_demand_path: "inputs/lulc/future_demand/lulc_demand_results.csv"
-  lulc_historic_trans_rates_path : "inputs/lulc/future_demand/historic_lulc_transition_rates.csv"
 
 # Config files/settings
 config_files_paths:
@@ -84,5 +83,8 @@ simulation_trans_rates_params:
   rel_guard: 0.05
   forbid_inflow: []
   num_workers: 6
+  scale_factor: [9.0] #[1.0, 3.0, 5.0, 9.0]  # Scale factors to apply to the transition rates for each scenario (in same order as scenario_names)
 
+transition_identification_params:
+  num_workers: 4
 
