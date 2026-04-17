@@ -1022,8 +1022,9 @@ calculate_single_transition_params <- function(
     # because focal sum includes the cell itself (center of 3x3 window)
     # We want to know if there are OTHER cells of the destination class nearby
     neighbor_count_at_trans <- neighbor_count * trans_cells
-    neighbor_count_at_trans[!is.na(neighbor_count_at_trans)] <-
-      neighbor_count_at_trans[!is.na(neighbor_count_at_trans)] - 1
+    neighbor_count_at_trans[
+      !is.na(neighbor_count_at_trans)
+    ] <- neighbor_count_at_trans[!is.na(neighbor_count_at_trans)] - 1
 
     # Classify transition cells as expanders or patchers
     # Expander: has at least 1 OTHER cell of destination class as neighbor (neighbor_count >= 1 after subtracting self)
@@ -1031,24 +1032,34 @@ calculate_single_transition_params <- function(
     is_expander <- (trans_cells == 1) & (neighbor_count_at_trans >= 1)
     is_patcher <- (trans_cells == 1) & (neighbor_count_at_trans == 0)
 
-    # Free memory from cached rasters and lulc_post
-    rm(post_class_patches, neighbor_count, neighbor_count_at_trans, lulc_post)
-    gc(verbose = FALSE) # Calculate percentages
+    # Calculate percentages BEFORE freeing source rasters.
+    # terra creates lazy/virtual rasters from expressions — is_expander and
+    # is_patcher hold references to neighbor_count_at_trans via their
+    # computation graph. Calling rm() + gc() on the sources before global()
+    # forces evaluation can silently invalidate the lazy rasters, causing
+    # global() to return 0.
     n_expanders_result <- terra::global(is_expander, "sum", na.rm = TRUE)
     n_expanders <- as.numeric(n_expanders_result[1, 1])
     n_patchers_result <- terra::global(is_patcher, "sum", na.rm = TRUE)
     n_patchers <- as.numeric(n_patchers_result[1, 1])
 
-    # Handle NA results from global (shouldn't happen after neighbor_count NA fix, but defensive)
+    # Now safe to free all intermediate rasters
+    rm(
+      post_class_patches,
+      neighbor_count,
+      neighbor_count_at_trans,
+      lulc_post,
+      is_expander,
+      is_patcher
+    )
+    gc(verbose = FALSE)
+
+    # Handle NA results from global
     n_expanders <- ifelse(is.na(n_expanders), 0, n_expanders)
     n_patchers <- ifelse(is.na(n_patchers), 0, n_patchers)
 
     frac_expander <- n_expanders / n_trans_cells
     frac_patcher <- n_patchers / n_trans_cells
-
-    # Free memory from boolean rasters
-    rm(is_expander, is_patcher)
-    gc(verbose = FALSE)
 
     # Calculate patch statistics using internal cpp function
     # Get actual cell area in square meters (handles both projected and unprojected data)
