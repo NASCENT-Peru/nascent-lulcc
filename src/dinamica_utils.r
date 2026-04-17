@@ -46,6 +46,7 @@ exec_dinamica <- function(
   }
   new_ld <- file.path(dinamica_home, "usr", "lib")
 
+  #todo - change log file location to use the generic logs dir that is used by other scripts. We can still use the timestamped filename, but it would be good to have all logs in the same place.
   if (write_logfile) {
     logfile_path <- file.path(
       dirname(model_path),
@@ -120,7 +121,12 @@ exec_dinamica <- function(
 #' @param check Default TRUE, sanity check on base64 content
 #' @return If outfile is given, writes and returns outfile invisibly;
 #'   otherwise returns modified text
-process_dinamica_script <- function(infile, outfile, mode = "encode", check = TRUE) {
+process_dinamica_script <- function(
+  infile,
+  outfile,
+  mode = "encode",
+  check = TRUE
+) {
   mode <- match.arg(mode, c("encode", "decode"))
   if (inherits(infile, "AsIs")) {
     file_text <- unclass(infile)
@@ -164,7 +170,12 @@ process_dinamica_script <- function(infile, outfile, mode = "encode", check = TR
     } else {
       function(code) rawToChar(base64enc::base64decode(code))
     }
-    encoded_vec <- vapply(matches, encoder_decoder, character(1), USE.NAMES = FALSE)
+    encoded_vec <- vapply(
+      matches,
+      encoder_decoder,
+      character(1),
+      USE.NAMES = FALSE
+    )
     for (i in seq_along(encoded_vec)) {
       file_text <- sub(
         pattern = matches[i],

@@ -5,7 +5,6 @@
 #'
 #' @author Ben Black
 
-
 #' Top-level entry point for the allocation step
 #'
 #' @param config Configuration list from get_config()
@@ -35,7 +34,11 @@ run_allocation <- function(config = get_config()) {
     )
 
     elapsed <- (proc.time() - t_start)[["elapsed"]]
-    message(sprintf("Scenario %s completed in %.1f minutes", scenario, elapsed / 60))
+    message(sprintf(
+      "Scenario %s completed in %.1f minutes",
+      scenario,
+      elapsed / 60
+    ))
   }
 
   message("\n========================================")
@@ -51,7 +54,12 @@ run_allocation <- function(config = get_config()) {
 #' @param region_rast Region raster
 #' @param config Configuration list
 #' @return NULL (called for side effects)
-run_allocation_for_scenario <- function(scenario, regions, region_rast, config) {
+run_allocation_for_scenario <- function(
+  scenario,
+  regions,
+  region_rast,
+  config
+) {
   sim_dir <- file.path(config[["simulation_output_dir"]], scenario)
   ensure_dir(sim_dir)
 
@@ -67,8 +75,11 @@ run_allocation_for_scenario <- function(scenario, regions, region_rast, config) 
   )
   initial_lulc_file <- lulc_files[grepl(as.character(start_year), lulc_files)]
   if (length(initial_lulc_file) == 0) {
-    stop(sprintf("No LULC raster found for start year %d in %s",
-                 start_year, config[["aggregated_lulc_dir"]]))
+    stop(sprintf(
+      "No LULC raster found for start year %d in %s",
+      start_year,
+      config[["aggregated_lulc_dir"]]
+    ))
   }
 
   current_lulc_path <- initial_lulc_file[1]
@@ -79,13 +90,20 @@ run_allocation_for_scenario <- function(scenario, regions, region_rast, config) 
   year_ends <- year_starts + step_length
 
   # Calibration period: use the last (most recent) data period
-  calibration_period <- config[["data_periods"]][length(config[["data_periods"]])]
+  calibration_period <- config[["data_periods"]][length(config[[
+    "data_periods"
+  ]])]
 
   for (i in seq_along(year_starts)) {
     year_ant <- year_starts[i]
     year_post <- year_ends[i]
-    message(sprintf("\n  Timestep %d/%d: %d -> %d",
-                    i, length(year_starts), year_ant, year_post))
+    message(sprintf(
+      "\n  Timestep %d/%d: %d -> %d",
+      i,
+      length(year_starts),
+      year_ant,
+      year_post
+    ))
 
     current_lulc_path <- run_allocation_one_timestep(
       scenario = scenario,
@@ -99,8 +117,12 @@ run_allocation_for_scenario <- function(scenario, regions, region_rast, config) 
       config = config
     )
 
-    message(sprintf("  Timestep %d -> %d complete: %s",
-                    year_ant, year_post, current_lulc_path))
+    message(sprintf(
+      "  Timestep %d -> %d complete: %s",
+      year_ant,
+      year_post,
+      current_lulc_path
+    ))
   }
 }
 
@@ -135,6 +157,7 @@ run_allocation_one_timestep <- function(
   region_names <- regions$label
   region_vals <- as.integer(regions$value)
 
+  #todo within the parallel step use the log_msg functionality as per utils.r and other scripts.
   # Process each region (parallel via furrr if available)
   posterior_paths <- furrr::future_map(
     seq_along(region_names),
@@ -143,7 +166,10 @@ run_allocation_one_timestep <- function(
       region_val <- region_vals[idx]
       region_suffix <- gsub(" ", "_", tolower(region_label))
 
-      region_work_dir <- file.path(timestep_dir, paste0("region_", region_suffix))
+      region_work_dir <- file.path(
+        timestep_dir,
+        paste0("region_", region_suffix)
+      )
       ensure_dir(region_work_dir)
 
       message(sprintf("    Region: %s (ID=%d)", region_label, region_val))
@@ -154,6 +180,7 @@ run_allocation_one_timestep <- function(
       lulc_region <- terra::trim(lulc_region, padding = 0)
 
       anterior_path <- file.path(region_work_dir, "anterior.tif")
+      #todo consider using the project write_raster function from utils.r here to ensure consistent datatype and compression settings across all rasters. We should also consider using it for all subsequent raster writes in this script, including the probability maps and the final posterior rasters.
       terra::writeRaster(
         lulc_region,
         anterior_path,
@@ -272,30 +299,47 @@ setup_allocation_inputs <- function(
   # Expansion table: From*, To*, Perc_expander
   expansion_tbl <- alloc_params[, c("From*", "To*", "Perc_expander")]
   # Clamp to (1e-6, 1-1e-6) - values are already in 0-100 range as percentage
-  expansion_tbl[["Perc_expander"]] <- pmax(1e-4, pmin(100 - 1e-4,
-    expansion_tbl[["Perc_expander"]]))
-  write.csv(expansion_tbl, file.path(work_dir, "expansion_table.csv"),
-            row.names = FALSE)
+  expansion_tbl[["Perc_expander"]] <- pmax(
+    1e-4,
+    pmin(100 - 1e-4, expansion_tbl[["Perc_expander"]])
+  )
+  write.csv(
+    expansion_tbl,
+    file.path(work_dir, "expansion_table.csv"),
+    row.names = FALSE
+  )
 
   # 3. Patcher table: From*, To*, Mean_Patch_Size, Patch_Size_Variance, Patch_Isometry
-  patcher_cols <- c("From*", "To*", " Mean_Patch_Size",
-                    "Patch_Size_Variance", "Patch_Isometry")
+  patcher_cols <- c(
+    "From*",
+    "To*",
+    " Mean_Patch_Size",
+    "Patch_Size_Variance",
+    "Patch_Isometry"
+  )
   patcher_tbl <- alloc_params[, patcher_cols]
   # Replace NAs/zeros with sensible defaults for unobserved transitions
   patcher_tbl[[" Mean_Patch_Size"]] <- ifelse(
-    is.na(patcher_tbl[[" Mean_Patch_Size"]]) | patcher_tbl[[" Mean_Patch_Size"]] == 0,
-    1, patcher_tbl[[" Mean_Patch_Size"]]
+    is.na(patcher_tbl[[" Mean_Patch_Size"]]) |
+      patcher_tbl[[" Mean_Patch_Size"]] == 0,
+    1,
+    patcher_tbl[[" Mean_Patch_Size"]]
   )
   patcher_tbl[["Patch_Size_Variance"]] <- ifelse(
     is.na(patcher_tbl[["Patch_Size_Variance"]]),
-    0, patcher_tbl[["Patch_Size_Variance"]]
+    0,
+    patcher_tbl[["Patch_Size_Variance"]]
   )
   patcher_tbl[["Patch_Isometry"]] <- ifelse(
     is.na(patcher_tbl[["Patch_Isometry"]]),
-    0.5, patcher_tbl[["Patch_Isometry"]]
+    0.5,
+    patcher_tbl[["Patch_Isometry"]]
   )
-  write.csv(patcher_tbl, file.path(work_dir, "patcher_table.csv"),
-            row.names = FALSE)
+  write.csv(
+    patcher_tbl,
+    file.path(work_dir, "patcher_table.csv"),
+    row.names = FALSE
+  )
 
   # 4. Generate probability maps
   generate_probability_maps(
@@ -365,8 +409,11 @@ generate_probability_maps <- function(
     full.names = TRUE
   )
   if (length(model_files) == 0) {
-    stop(sprintf("No fitted model RDS files found for region '%s' in %s",
-                 region_suffix, model_dir))
+    stop(sprintf(
+      "No fitted model RDS files found for region '%s' in %s",
+      region_suffix,
+      model_dir
+    ))
   }
 
   # Parse transition names from filenames
@@ -374,14 +421,18 @@ generate_probability_maps <- function(
   model_info <- data.frame(
     file_path = model_files,
     trans_name = sub(
-      sprintf("_%s\\.rds$", region_suffix), "",
+      sprintf("_%s\\.rds$", region_suffix),
+      "",
       basename(model_files)
     ),
     stringsAsFactors = FALSE
   )
 
-  message(sprintf("    Found %d transition models for %s",
-                  nrow(model_info), region_label))
+  message(sprintf(
+    "    Found %d transition models for %s",
+    nrow(model_info),
+    region_label
+  ))
 
   # Load all models and extract required predictor names
   fitted_models <- list()
@@ -399,19 +450,29 @@ generate_probability_maps <- function(
     all_required_preds <- union(all_required_preds, pred_names)
   }
 
-  message(sprintf("    %d unique predictors required across all models",
-                  length(all_required_preds)))
+  message(sprintf(
+    "    %d unique predictors required across all models",
+    length(all_required_preds)
+  ))
 
   # Load the anterior LULC raster for this region
   anterior <- terra::rast(anterior_path)
 
   # Get cell IDs and XY coordinates from the anterior raster
   # (non-NA cells only)
-  anterior_df <- terra::as.data.frame(anterior, cells = TRUE, xy = TRUE, na.rm = TRUE)
+  anterior_df <- terra::as.data.frame(
+    anterior,
+    cells = TRUE,
+    xy = TRUE,
+    na.rm = TRUE
+  )
   names(anterior_df) <- c("cell_id", "x", "y", "lulc_class")
 
   if (nrow(anterior_df) == 0) {
-    warning(sprintf("No valid cells in anterior raster for region %s", region_label))
+    warning(sprintf(
+      "No valid cells in anterior raster for region %s",
+      region_label
+    ))
     return(prob_map_dir)
   }
 
@@ -424,14 +485,18 @@ generate_probability_maps <- function(
   if (length(parquet_pred_names) > 0) {
     # Open parquet datasets
     static_preds_pq_path <- file.path(
-      config[["predictors_prepped_dir"]], "parquet_data", "static"
+      config[["predictors_prepped_dir"]],
+      "parquet_data",
+      "static"
     )
     # For simulation beyond calibration period, use the last available dynamic year
     period_start_year <- as.integer(
       stringr::str_extract(calibration_period, "^[0-9]{4}")
     )
     dynamic_preds_pq_path <- file.path(
-      config[["predictors_prepped_dir"]], "parquet_data", "dynamic",
+      config[["predictors_prepped_dir"]],
+      "parquet_data",
+      "dynamic",
       period_start_year
     )
 
@@ -452,7 +517,12 @@ generate_probability_maps <- function(
     # Use the national-grid cell_ids from the reference grid, not the trimmed raster
     # We need to map the trimmed anterior cell IDs to national grid cell IDs
     ref_grid <- terra::rast(config[["ref_grid_path"]])
-    ref_grid_df <- terra::as.data.frame(ref_grid, cells = TRUE, xy = TRUE, na.rm = FALSE)
+    ref_grid_df <- terra::as.data.frame(
+      ref_grid,
+      cells = TRUE,
+      xy = TRUE,
+      na.rm = FALSE
+    )
     names(ref_grid_df) <- c("ref_cell_id", "ref_x", "ref_y", "ref_val")
 
     # Match anterior cells to reference grid by XY coordinates
@@ -504,7 +574,9 @@ generate_probability_maps <- function(
   if (!is.null(nhood_data) && nrow(nhood_data) > 0) {
     nhood_cols <- setdiff(names(nhood_data), "cell_id")
     nhood_data_renamed <- nhood_data
-    names(nhood_data_renamed)[names(nhood_data_renamed) == "cell_id"] <- "local_cell_id"
+    names(nhood_data_renamed)[
+      names(nhood_data_renamed) == "cell_id"
+    ] <- "local_cell_id"
     combined_df <- merge(
       combined_df,
       nhood_data_renamed[, c("local_cell_id", nhood_cols), drop = FALSE],
@@ -542,8 +614,10 @@ generate_probability_maps <- function(
     to_value <- as.integer(class_name_to_value[to_class_name])
 
     if (is.na(from_value) || is.na(to_value)) {
-      warning(sprintf("Could not map transition '%s' to class values, skipping",
-                      trans_name))
+      warning(sprintf(
+        "Could not map transition '%s' to class values, skipping",
+        trans_name
+      ))
       next
     }
 
@@ -573,25 +647,26 @@ generate_probability_maps <- function(
   message("    Normalizing probabilities...")
   normalize_probability_maps(combined_df, prob_col_names)
 
+  #todo integrate more recent approach to spatiall intervention from NCCS project
   # Apply spatial interventions if configured
-  if (!is.null(config[["spat_prob_perturb_dir"]]) &&
-      dir.exists(config[["spat_prob_perturb_dir"]])) {
-    interventions_path <- file.path(
-      config[["spat_prob_perturb_dir"]],
-      "spatial_interventions.csv"
-    )
-    if (file.exists(interventions_path)) {
-      interventions <- readr::read_csv2(interventions_path, col_types = "cccccdcc")
-      combined_df <- lulcc.spatprobmanipulation(
-        Interventions = interventions,
-        scenario_id = scenario,
-        Raster_prob_values = combined_df,
-        Simulation_time_step = as.character(year_ant)
-      )
-      # Re-normalize after interventions
-      normalize_probability_maps(combined_df, prob_col_names)
-    }
-  }
+  # if (!is.null(config[["spat_prob_perturb_dir"]]) &&
+  #     dir.exists(config[["spat_prob_perturb_dir"]])) {
+  #   interventions_path <- file.path(
+  #     config[["spat_prob_perturb_dir"]],
+  #     "spatial_interventions.csv"
+  #   )
+  #   if (file.exists(interventions_path)) {
+  #     interventions <- readr::read_csv2(interventions_path, col_types = "cccccdcc")
+  #     combined_df <- lulcc.spatprobmanipulation(
+  #       Interventions = interventions,
+  #       scenario_id = scenario,
+  #       Raster_prob_values = combined_df,
+  #       Simulation_time_step = as.character(year_ant)
+  #     )
+  #     # Re-normalize after interventions
+  #     normalize_probability_maps(combined_df, prob_col_names)
+  #   }
+  # }
 
   # Save probability maps as TIFs
   message("    Saving probability maps...")
@@ -603,8 +678,12 @@ generate_probability_maps <- function(
     rate <- trans_rates_df[["Rate"]][row_idx]
 
     # Skip self-transitions (diagonal) or zero-rate transitions
-    if (from_val == to_val) next
-    if (rate == 0) next
+    if (from_val == to_val) {
+      next
+    }
+    if (rate == 0) {
+      next
+    }
 
     from_name <- class_value_to_name[as.character(from_val)]
     to_name <- class_value_to_name[as.character(to_val)]
@@ -700,14 +779,20 @@ compute_neighbourhood_predictors <- function(
 
     class_val <- class_name_to_value[class_name]
     if (is.na(class_val)) {
-      warning(sprintf("Unknown class '%s' in nhood predictor: %s",
-                      class_name, pred_name))
+      warning(sprintf(
+        "Unknown class '%s' in nhood predictor: %s",
+        class_name,
+        pred_name
+      ))
       next
     }
 
     if (!matrix_id %in% names(focal_matrices)) {
-      warning(sprintf("Unknown matrix '%s' in nhood predictor: %s",
-                      matrix_id, pred_name))
+      warning(sprintf(
+        "Unknown matrix '%s' in nhood predictor: %s",
+        matrix_id,
+        pred_name
+      ))
       next
     }
 
@@ -731,11 +816,16 @@ compute_neighbourhood_predictors <- function(
   }
 
   # Convert to data frames and merge
-  nhood_dfs <- mapply(function(rast, name) {
-    df <- terra::as.data.frame(rast, cells = TRUE, na.rm = TRUE)
-    names(df) <- c("cell_id", name)
-    df
-  }, nhood_rasters, names(nhood_rasters), SIMPLIFY = FALSE)
+  nhood_dfs <- mapply(
+    function(rast, name) {
+      df <- terra::as.data.frame(rast, cells = TRUE, na.rm = TRUE)
+      names(df) <- c("cell_id", name)
+      df
+    },
+    nhood_rasters,
+    names(nhood_rasters),
+    SIMPLIFY = FALSE
+  )
 
   result <- Reduce(
     function(x, y) merge(x, y, by = "cell_id", all = TRUE),
@@ -754,14 +844,17 @@ compute_neighbourhood_predictors <- function(
 #' @return NULL (modifies df by reference if data.table, or returns modified df)
 normalize_probability_maps <- function(df, prob_cols) {
   prob_cols_present <- intersect(prob_cols, names(df))
-  if (length(prob_cols_present) == 0) return(invisible(NULL))
+  if (length(prob_cols_present) == 0) {
+    return(invisible(NULL))
+  }
 
   row_sums <- rowSums(df[, prob_cols_present, drop = FALSE], na.rm = TRUE)
   needs_rescale <- row_sums > 1
 
   if (any(needs_rescale)) {
     for (col in prob_cols_present) {
-      df[[col]][needs_rescale] <- df[[col]][needs_rescale] / row_sums[needs_rescale]
+      df[[col]][needs_rescale] <- df[[col]][needs_rescale] /
+        row_sums[needs_rescale]
     }
   }
 

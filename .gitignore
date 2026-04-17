@@ -31,3 +31,6 @@ inst/doc
 
 renv*
 .claude/settings.local.json
+Agent-tool-input-(l9orum).txt
+allocation_step_integration_plan.md
+.claude/settings.json
