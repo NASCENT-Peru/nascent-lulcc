@@ -4,6 +4,15 @@
 #' Dinamica EGO, processing multiple scenarios, timesteps, and regions.
 #'
 #' @author Ben Black
+#'
+#'
+# testing vars
+scenario <- "BAU"
+i <- 1
+idx <- 1
+work_dir = region_work_dir
+j <- 1
+k <- 1
 
 #' Top-level entry point for the allocation step
 #'
@@ -187,8 +196,12 @@ run_allocation_one_timestep <- function(
       current_lulc <- terra::rast(current_lulc_path)
 
       # Mask and trim current LULC to region
-      region_mask <- terra::ifel(region_rast == region_val, 1L, NA)
-      lulc_region <- terra::mask(current_lulc, region_mask)
+      lulc_region <- terra::mask(
+        current_lulc,
+        region_rast,
+        maskvalues = region_val,
+        inverse = TRUE
+      )
       lulc_region <- terra::trim(lulc_region, padding = 0)
 
       anterior_path <- file.path(region_work_dir, "anterior.tif")
@@ -200,6 +213,7 @@ run_allocation_one_timestep <- function(
         wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
       )
 
+      #todo pass the log_file to the functions called within setup_allocation_inputs and run_allocation_dinamica so they can log messages there as well, instead of just in this main loop. This will give us more visibility into what's happening inside those functions, especially if something goes wrong.
       # Prepare all Dinamica input files
       setup_allocation_inputs(
         work_dir = region_work_dir,
@@ -210,7 +224,8 @@ run_allocation_one_timestep <- function(
         year_post = year_post,
         anterior_path = anterior_path,
         calibration_period = calibration_period,
-        config = config
+        config = config,
+        log_file = log_file
       )
 
       # Run Dinamica
@@ -271,6 +286,7 @@ run_allocation_one_timestep <- function(
 #' @param anterior_path Path to the anterior LULC raster
 #' @param calibration_period Calibration period string
 #' @param config Configuration list
+#' @param log_file Path to the log file for this worker/region
 #' @return NULL (called for side effects)
 setup_allocation_inputs <- function(
   work_dir,
@@ -281,7 +297,8 @@ setup_allocation_inputs <- function(
   year_post,
   anterior_path,
   calibration_period,
-  config
+  config,
+  log_file
 ) {
   # 1. Copy transition rates CSV
   scalar_str <- sprintf("%.1f", config[["selected_scalar"]])
@@ -293,12 +310,18 @@ setup_allocation_inputs <- function(
     paste0(scenario, "-", region_label, "-trans_rates-", year_ant, ".csv")
   )
   if (!file.exists(trans_rate_src)) {
-    stop(sprintf("Transition rate file not found: %s", trans_rate_src))
+    stop(log_msg(
+      sprintf("Transition rate file not found: %s", trans_rate_src),
+      log_file
+    ))
   }
   trans_rates_dst <- file.path(work_dir, "trans_rates.csv")
   file.copy(trans_rate_src, trans_rates_dst, overwrite = TRUE)
 
   trans_rates_df <- read.csv(trans_rates_dst, check.names = FALSE)
+
+  # sort by id_trans
+  trans_rates_df <- trans_rates_df[order(trans_rates_df[["id_trans"]]), ]
 
   # 2. Extract expansion table from allocation params
   alloc_params_path <- file.path(
@@ -308,9 +331,35 @@ setup_allocation_inputs <- function(
     "allocation_params.csv"
   )
   if (!file.exists(alloc_params_path)) {
-    stop(sprintf("Allocation params file not found: %s", alloc_params_path))
+    stop(log_msg(
+      sprintf("Allocation params file not found: %s", alloc_params_path),
+      log_file
+    ))
   }
   alloc_params <- read.csv(alloc_params_path, check.names = FALSE)
+
+  # sort by id_trans
+  alloc_params <- alloc_params[order(alloc_params[["id_trans"]]), ]
+
+  # subset alloc_params to only values of id_trans that are present in trans_rates_df
+  alloc_params <- alloc_params[
+    alloc_params[["id_trans"]] %in% trans_rates_df[["id_trans"]],
+  ]
+
+  # warn if any id_trans values in trans_rates_df are missing from alloc_params
+  missing_alloc_params <- setdiff(
+    trans_rates_df[["id_trans"]],
+    alloc_params[["id_trans"]]
+  )
+  if (length(missing_alloc_params) > 0) {
+    warning(log_msg(
+      sprintf(
+        "The following id_trans values are present in trans_rates_df but missing from alloc_params: %s",
+        paste(missing_alloc_params, collapse = ", ")
+      ),
+      log_file
+    ))
+  }
 
   # Expansion table: From*, To*, Perc_expander
   expansion_tbl <- alloc_params[, c("From*", "To*", "Perc_expander")]
@@ -318,6 +367,10 @@ setup_allocation_inputs <- function(
     expansion_tbl,
     file.path(work_dir, "expansion_table.csv"),
     row.names = FALSE
+  )
+  log_msg(
+    sprintf("  Expansion table written with %d rows", nrow(expansion_tbl)),
+    log_file
   )
 
   # 3. Patcher table: From*, To*, Mean_Patch_Size, Patch_Size_Variance, Patch_Isometry
@@ -352,6 +405,10 @@ setup_allocation_inputs <- function(
     file.path(work_dir, "patcher_table.csv"),
     row.names = FALSE
   )
+  log_msg(
+    sprintf("  Patcher table written with %d rows", nrow(patcher_tbl)),
+    log_file
+  )
 
   # 4. Generate probability maps
   generate_probability_maps(
@@ -363,7 +420,8 @@ setup_allocation_inputs <- function(
     calibration_period = calibration_period,
     anterior_path = anterior_path,
     trans_rates_df = trans_rates_df,
-    config = config
+    config = config,
+    log_file = log_file
   )
 }
 
@@ -394,6 +452,7 @@ setup_allocation_inputs <- function(
 #' @param anterior_path Path to the anterior LULC raster
 #' @param trans_rates_df Data frame of transition rates (From*, To*, Rate)
 #' @param config Configuration list
+#' @param log_file Path to the log file for this worker/region
 #' @return Path to the probability_map_dir
 generate_probability_maps <- function(
   work_dir,
@@ -404,7 +463,8 @@ generate_probability_maps <- function(
   calibration_period,
   anterior_path,
   trans_rates_df,
-  config
+  config,
+  log_file
 ) {
   prob_map_dir <- file.path(work_dir, "probability_map_dir")
   ensure_dir(prob_map_dir)
@@ -414,10 +474,17 @@ generate_probability_maps <- function(
   # Scenario -> SSP for dynamic predictor parquet partition filter
   ssp_name <- config[["scenario_to_ssp_mapping"]][[scenario]]
   if (is.null(ssp_name)) {
-    stop(sprintf(
-      "No scenario_to_ssp_mapping entry for scenario '%s'",
-      scenario
+    stop(log_msg(
+      sprintf(
+        "No scenario_to_ssp_mapping entry for scenario '%s'",
+        scenario
+      ),
+      log_file
     ))
+  }
+  #if year_ant is < 2022 then ssp_name == baseline
+  if (year_ant <= 2022) {
+    ssp_name <- "baseline"
   }
 
   # Load LULC schema for class ID <-> name mapping
@@ -438,10 +505,13 @@ generate_probability_maps <- function(
     full.names = TRUE
   )
   if (length(model_files) == 0) {
-    stop(sprintf(
-      "No fitted model RDS files found for region '%s' in %s",
-      region_suffix,
-      model_dir
+    stop(log_msg(
+      sprintf(
+        "No fitted model RDS files found for region '%s' in %s",
+        region_suffix,
+        model_dir
+      ),
+      log_file
     ))
   }
 
@@ -457,24 +527,42 @@ generate_probability_maps <- function(
     )
   )
   model_info[,
-    c("from_class_name", "to_class_name") := data.table::tstrsplit(
+    c("anterior_class", "posterior_class") := data.table::tstrsplit(
       trans_name,
-      "_to_",
+      "-",
       fixed = TRUE
     )
   ]
   model_info[,
     `:=`(
-      from_val = as.integer(class_name_to_value[from_class_name]),
-      to_val = as.integer(class_name_to_value[to_class_name])
+      from_val = as.integer(class_name_to_value[anterior_class]),
+      to_val = as.integer(class_name_to_value[posterior_class])
     )
   ]
+  # id_trans is not strictly needed for the prediction step, but it's helpful metadata
+  model_info <- merge(
+    model_info,
+    trans_rates_df[, c("From*", "To*", "id_trans")],
+    by.x = c("from_val", "to_val"),
+    by.y = c("From*", "To*"),
+    all.x = FALSE, # to avoid keeping models that don't have a corresponding transition rate (e.g. zero-rate or not in this scenario)
+    sort = FALSE
+  )
 
-  message(sprintf(
-    "    Found %d transition models for %s",
-    nrow(model_info),
-    region_label
-  ))
+  # what id_trans values are present in trans_rates_df but missing from model_info? these represent transitions that have a transition rate but no fitted model (e.g. zero-rate or not in this scenario). we should log these so we know which transitions are being skipped in the prediction step.
+  missing_models <- setdiff(
+    trans_rates_df[["id_trans"]],
+    model_info[["id_trans"]]
+  )
+  if (length(missing_models) > 0L) {
+    stop(log_msg(
+      sprintf(
+        "The following id_trans values are present in trans_rates_df but missing from model_info (i.e. no fitted model found for these transitions, likely due to zero-rate or not being in this scenario): %s",
+        paste(missing_models, collapse = ", ")
+      ),
+      log_file
+    ))
+  }
 
   # Load the anterior LULC raster for this region
   anterior <- terra::rast(anterior_path)
@@ -491,9 +579,12 @@ generate_probability_maps <- function(
   )
 
   if (nrow(anterior_dt) == 0L) {
-    warning(sprintf(
-      "No valid cells in anterior raster for region %s",
-      region_label
+    warning(log_msg(
+      sprintf(
+        "No valid cells in anterior raster for region %s",
+        region_label
+      ),
+      log_file
     ))
     return(prob_map_dir)
   }
@@ -513,14 +604,12 @@ generate_probability_maps <- function(
     "parquet_data",
     "static"
   )
-  period_start_year <- as.integer(
-    stringr::str_extract(calibration_period, "^[0-9]{4}")
-  )
+
   dynamic_preds_pq_path <- file.path(
     config[["predictors_prepped_dir"]],
     "parquet_data",
     "dynamic",
-    period_start_year
+    year_ant
   )
   ds_static <- arrow::open_dataset(
     static_preds_pq_path,
@@ -576,18 +665,21 @@ generate_probability_maps <- function(
   trans_rates_dt[, row_idx := seq_len(.N)]
 
   # Per-transition: load model -> predict at sparse from-class cells -> release
-  message("    Predicting transition probabilities...")
+  log_msg("    Predicting transition probabilities...", log_file)
   gather <- vector("list", nrow(model_info))
-  for (i in seq_len(nrow(model_info))) {
-    mi <- model_info[i]
+  for (j in seq_len(nrow(model_info))) {
+    mi <- model_info[j]
     trans_name <- mi$trans_name
     from_val <- mi$from_val
     to_val <- mi$to_val
 
     if (is.na(from_val) || is.na(to_val)) {
-      warning(sprintf(
-        "Could not map transition '%s' to class values, skipping",
-        trans_name
+      warning(log_msg(
+        sprintf(
+          "Could not map transition '%s' to class values, skipping",
+          trans_name
+        ),
+        log_file
       ))
       next
     }
@@ -659,12 +751,22 @@ generate_probability_maps <- function(
     }
 
     # Predict, then release the model
-    pred_result <- predict(fitted_wf, from_data, type = "prob")
+    # ranger's predict.ranger accesses $importance.mode unconditionally; if the
+    # slot was dropped during model-trimming or a ranger version change, the
+    # `%in%` test returns logical(0) and the enclosing `if` errors. Restore a
+    # safe default so prediction proceeds.
+    if (
+      inherits(fitted_wf$model$fit, "ranger") &&
+        !length(fitted_wf$model$fit$importance.mode)
+    ) {
+      fitted_wf$model$fit$importance.mode <- "none"
+    }
+    pred_result <- predict(fitted_wf$model, from_data, type = "prob")
     prob_values <- pred_result[[2L]]
     prob_values[is.na(prob_values)] <- 0
     prob_values <- pmax(0, pmin(1, prob_values))
 
-    gather[[i]] <- data.table::data.table(
+    gather[[j]] <- data.table::data.table(
       row_idx = row_idx,
       from_val = from_val,
       to_val = to_val,
@@ -682,10 +784,10 @@ generate_probability_maps <- function(
   }
 
   # Normalize across transitions per cell (long-format, sparse)
-  message("    Normalizing probabilities...")
+  log_msg("    Normalizing probabilities...", log_file)
   normalized <- data.table::rbindlist(gather, use.names = TRUE, fill = TRUE)
   if (nrow(normalized) == 0L) {
-    message("    No predictions produced; skipping map writes")
+    log_msg("    No predictions produced; skipping map writes", log_file)
     return(prob_map_dir)
   }
   normalized[, tot_prob := sum(prob), by = cell_id]
@@ -697,23 +799,28 @@ generate_probability_maps <- function(
 
   # Write one TIF per trans_rates row, preserving the numeric prefix required
   # by Dinamica's CreateCubeOfProbabilityMaps submodel.
-  message("    Saving probability maps...")
-  for (j in seq_len(nrow(trans_rates_dt))) {
-    from_val <- trans_rates_dt[["From*"]][j]
-    to_val <- trans_rates_dt[["To*"]][j]
-    rate <- trans_rates_dt[["Rate"]][j]
+  # Prefixing with 001, 002... so these files are sorted the same as the
+  # transition, expansion, and patcher tables on all sorts of filesystems.
+  log_msg("    Saving probability maps...", log_file)
+  for (k in seq_len(nrow(trans_rates_dt))) {
+    from_val <- trans_rates_dt[["From*"]][k]
+    to_val <- trans_rates_dt[["To*"]][k]
+    rate <- trans_rates_dt[["Rate"]][k]
+    id_trans <- trans_rates_dt[["id_trans"]][k]
 
     if (from_val == to_val || rate == 0) {
       next
     }
 
-    dt_j <- normalized[row_idx == j]
+    dt_j <- normalized[row_idx == k]
     if (nrow(dt_j) == 0L) {
       next
     }
 
-    tif_name <- sprintf("%d_%d_to_%d.tif", j, from_val, to_val)
-    tif_path <- file.path(prob_map_dir, tif_name)
+    tif_path <- file.path(
+      prob_map_dir,
+      sprintf("%03d_id_trans_%d.tif", k, id_trans)
+    )
 
     terra::rasterize(
       x = as.matrix(dt_j[, .(x, y)]),
@@ -726,9 +833,21 @@ generate_probability_maps <- function(
         overwrite = TRUE,
         NAflag = -999
       )
+    log_msg(
+      sprintf(
+        "      Transition %d -> %d (id_trans=%d): %d cells, mean prob=%.4f, saved to %s",
+        from_val,
+        to_val,
+        id_trans,
+        nrow(dt_j),
+        mean(dt_j[["prob"]]),
+        tif_path
+      ),
+      log_file
+    )
   }
 
-  message(sprintf("    Probability maps saved to: %s", prob_map_dir))
+  log_msg(sprintf("    Probability maps saved to: %s", prob_map_dir), log_file)
   return(prob_map_dir)
 }
 

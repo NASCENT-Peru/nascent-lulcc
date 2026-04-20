@@ -194,5 +194,8 @@ cat(sprintf("\nSummary saved to: %s\n", summary_file))
 
 # Exit with appropriate code
 exit_code <- ifelse(result$status == "error", 1, 0)
-cat(sprintf("\nAllocation simulations completed with exit code: %d\n", exit_code))
+cat(sprintf(
+  "\nAllocation simulations completed with exit code: %d\n",
+  exit_code
+))
 quit(status = exit_code)
