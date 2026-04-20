@@ -28,7 +28,6 @@ simulation_trans_rates_prep <- function(
   # ================================
   # A. LOAD CONFIGURATION
   # ================================
-
   message("\n[1/7] Loading configuration...")
 
   sim_config <- config[["simulation_trans_rates_params"]]
@@ -42,11 +41,6 @@ simulation_trans_rates_prep <- function(
   trans_rate_table_dir <- config[["trans_rate_table_dir"]]
   ensure_dir(trans_rate_table_dir)
   message(sprintf("  ✓ Output directory: %s", trans_rate_table_dir))
-
-  # set up directory for scalar experimentation
-  scalar_dir <- file.path(trans_rate_table_dir, "scalar_experimentation")
-  ensure_dir(scalar_dir)
-  message(sprintf("  ✓ Scalar experimentation directory: %s", scalar_dir))
 
   # ================================
   # B. LOAD INPUT DATA
@@ -273,7 +267,15 @@ simulation_trans_rates_prep <- function(
       meanRate = ifelse(is.finite(meanRate), pmax(0, pmin(1, meanRate)), 0),
       maxRate = pmax(maxRate, minRate)
     ) %>%
-    dplyr::select(region_name, iLULC, jLULC, minRate, maxRate, meanRate)
+    dplyr::select(
+      region_name,
+      iLULC,
+      jLULC,
+      minRate,
+      maxRate,
+      meanRate,
+      id_trans
+    )
 
   # year_steps <- unique(c(
   #   seq(
@@ -313,7 +315,7 @@ simulation_trans_rates_prep <- function(
     step_length = step_length,
     T_steps_val = T_steps_val,
     forbid_pairs_df = forbid_pairs_df,
-    trans_rate_table_dir = scalar_dir
+    trans_rate_table_dir = trans_rate_table_dir
   )
 
   message("\nSimulation Transition Rates Preparation Complete")
@@ -817,6 +819,23 @@ optimize_region_scenario <- function(
       )
       lulc_ids <- class_to_value[lulcs]
 
+      # Build id_trans lookup from df_trans_source (From./To. in class_name → id_trans)
+      # We need to map lulc_ids (numeric values) back to class names, then to id_trans
+      value_to_class <- setNames(
+        sapply(lulc_schema, function(x) x$class_name),
+        sapply(lulc_schema, function(x) x$value)
+      )
+
+      # Create lookup: (from_val, to_val) → id_trans
+      id_trans_lookup <- df_trans_source %>%
+        dplyr::filter(region_name == r) %>%
+        dplyr::mutate(
+          from_val = class_to_value[iLULC],
+          to_val = class_to_value[jLULC]
+        ) %>%
+        dplyr::select(from_val, to_val, id_trans) %>%
+        dplyr::distinct()
+
       rate_dir <- file.path(output_dir, s, r)
       dir.create(rate_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -836,6 +855,18 @@ optimize_region_scenario <- function(
           Rate = rates,
           check.names = FALSE
         )
+
+        # Left-join id_trans
+        rate_df <- rate_df %>%
+          dplyr::left_join(
+            id_trans_lookup,
+            by = c("From*" = "from_val", "To*" = "to_val")
+          )
+
+        # Filter out persistence rows (From* == To*, id_trans = NA)
+        # Keep only modelable transitions for Dinamica
+        rate_df <- rate_df %>%
+          dplyr::filter(!is.na(id_trans))
 
         rate_file <- file.path(
           rate_dir,

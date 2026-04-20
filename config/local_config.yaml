@@ -62,6 +62,11 @@ configuration_settings:
   data_periods: ["2018_2022"] #"2010_2014", "2014_2018", 
   regionalization: true
   scenario_names: ["BAU", "NAT", "CUL", "SOC"]
+  scenario_to_ssp_mapping: 
+    BAU: "ssp245"
+    NAT: "ssp126"
+    CUL: "ssp126"
+    SOC: "ssp126"
   simulation_start_year: 2022
   simulation_end_year: 2060
   selected_scalar: 9.0

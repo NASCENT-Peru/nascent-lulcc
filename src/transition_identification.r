@@ -187,7 +187,7 @@ transition_identification <- function(
       )
       x$Trans_name <- paste(x$Initial_class, x$Final_class, sep = "-")
 
-      x$Trans_ID <- sprintf("%02d", seq_len(nrow(x)))
+      # Trans_ID removed: replaced by global id_trans
       return(x)
     }
   )
@@ -224,6 +224,32 @@ transition_identification <- function(
     },
     whole_map_dfs
   )
+
+  # Assign id_trans: unique integer per (From., To.) pair where From. != To.
+  # Persistence rows (From. == To.) get id_trans = NA
+  message("Assigning id_trans to transitions...")
+  transition_pairs <- whole_map_csv[
+    whole_map_csv$From. != whole_map_csv$To.,
+    c("From.", "To.")
+  ]
+  transition_pairs <- unique(transition_pairs)
+  transition_pairs <- transition_pairs[
+    order(transition_pairs$From., transition_pairs$To.),
+  ]
+  transition_pairs$id_trans <- seq_len(nrow(transition_pairs))
+
+  # Left-join id_trans back to whole_map_csv
+  whole_map_csv <- merge(
+    whole_map_csv,
+    transition_pairs,
+    by = c("From.", "To."),
+    all.x = TRUE
+  )
+
+  message(sprintf(
+    "  Assigned %d unique transition IDs (persistence rows = NA)",
+    nrow(transition_pairs)
+  ))
 
   message("Building whole-map transition rates (wide format)...")
 
@@ -277,6 +303,15 @@ transition_identification <- function(
         )
       },
       regional_dfs
+    )
+
+    # Join id_trans from whole_map_csv to regional_csv by (From., To.)
+    id_trans_lookup <- unique(whole_map_csv[, c("From.", "To.", "id_trans")])
+    regional_csv <- merge(
+      regional_csv,
+      id_trans_lookup,
+      by = c("From.", "To."),
+      all.x = TRUE
     )
 
     viable_trans_csv <- rbind(whole_map_csv, regional_csv)
