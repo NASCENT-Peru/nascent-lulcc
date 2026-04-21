@@ -10,7 +10,7 @@
 scenario <- "BAU"
 i <- 1
 idx <- 1
-work_dir = region_work_dir
+#work_dir = region_work_dir
 j <- 1
 k <- 1
 
@@ -672,6 +672,15 @@ generate_probability_maps <- function(
     trans_name <- mi$trans_name
     from_val <- mi$from_val
     to_val <- mi$to_val
+    log_msg(
+      sprintf(
+        "      Transition %d -> %d: predicting with model '%s'",
+        from_val,
+        to_val,
+        basename(mi$file_path)
+      ),
+      log_file
+    )
 
     if (is.na(from_val) || is.na(to_val)) {
       warning(log_msg(
@@ -722,6 +731,13 @@ generate_probability_maps <- function(
     from_data <- data.table::copy(from_idx)
 
     if (length(parquet_needed) > 0L) {
+      log_msg(
+        sprintf(
+          "        Loading predictor data from Parquet for predictors: %s",
+          paste(parquet_needed, collapse = ", ")
+        ),
+        log_file
+      )
       pred_data <- data.table::as.data.table(load_predictor_data(
         ds_static = ds_static,
         ds_dynamic = ds_dynamic,
@@ -738,6 +754,13 @@ generate_probability_maps <- function(
     }
 
     if (length(nhood_needed) > 0L) {
+      log_msg(
+        sprintf(
+          "        Computing/loading neighbourhood rasters for predictors: %s",
+          paste(nhood_needed, collapse = ", ")
+        ),
+        log_file
+      )
       nhood_stack <- terra::rast(lapply(nhood_needed, get_nhood_raster))
       nhood_vals <- terra::extract(
         nhood_stack,
@@ -766,6 +789,10 @@ generate_probability_maps <- function(
     prob_values[is.na(prob_values)] <- 0
     prob_values <- pmax(0, pmin(1, prob_values))
 
+    log_msg(
+      "Appending predictions to gather table for normalization...",
+      log_file
+    )
     gather[[j]] <- data.table::data.table(
       row_idx = row_idx,
       from_val = from_val,
@@ -776,10 +803,7 @@ generate_probability_maps <- function(
       prob = prob_values
     )
 
-    rm(fitted_wf, pred_result, from_data)
-    if (exists("pred_data", inherits = FALSE)) {
-      rm(pred_data)
-    }
+    rm(fitted_wf, pred_result, from_data, pred_data)
     gc(verbose = FALSE)
   }
 
