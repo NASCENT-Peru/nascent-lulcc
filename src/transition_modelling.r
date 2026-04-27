@@ -19,29 +19,12 @@
 transition_modelling <- function(
   config = get_config(),
   refresh_cache = FALSE,
-  model_dir = NULL,
-  eval_dir = NULL,
-  use_regions = NULL,
-  model_specs_path = NULL,
-  periods_to_process = NULL
+  model_dir = config[["output_dirs"]][["transition_model_dir"]],
+  eval_dir = config[["output_dirs"]][["transition_model_eval_dir"]],
+  use_regions = config[["configuration_settings"]][["regionalization"]],
+  model_specs_path = config[["config_files_paths"]][["model_specs_path"]],
+  periods_to_process = config[["configuration_settings"]][["data_periods"]]
 ) {
-  # Extract values from config if not provided
-  if (is.null(model_dir)) {
-    model_dir <- config[["output_dirs"]][["transition_model_dir"]]
-  }
-  if (is.null(eval_dir)) {
-    eval_dir <- config[["output_dirs"]][["transition_model_eval_dir"]]
-  }
-  if (is.null(use_regions)) {
-    use_regions <- config[["configuration_settings"]][["regionalization"]]
-  }
-  if (is.null(model_specs_path)) {
-    model_specs_path <- config[["config_files_paths"]][["model_specs_path"]]
-  }
-  if (is.null(periods_to_process)) {
-    periods_to_process <- config[["configuration_settings"]][["data_periods"]]
-  }
-
   # create model and eval directories if they do not exist
   ensure_dir(model_dir)
   ensure_dir(eval_dir)
