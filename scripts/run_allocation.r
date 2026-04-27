@@ -106,7 +106,6 @@ for (src_file in src_files) {
     },
     error = function(e) {
       cat(sprintf("ERROR sourcing %s: %s\n", src_file, e$message))
-      quit(status = 1)
     }
   )
 }

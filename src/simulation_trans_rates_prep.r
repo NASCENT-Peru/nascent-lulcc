@@ -19,6 +19,32 @@
 #' @author Ben Black
 #' @export
 
+load_unmodelled_transitions <- function(config) {
+  period <- dplyr::last(config[["data_periods"]])
+  recon_path <- file.path(
+    config[["transition_model_eval_dir"]],
+    period,
+    sprintf("transition_modelling_reconciliation_%s.rds", period)
+  )
+
+  if (!file.exists(recon_path)) {
+    stop(sprintf(
+      "Reconciliation file not found for period '%s': %s. Run transition_modelling() first.",
+      period,
+      recon_path
+    ))
+  }
+
+  readRDS(recon_path) %>%
+    dplyr::filter(model_status != "success") %>%
+    dplyr::transmute(
+      region_name = as.character(region),
+      From = from_lulc,
+      To = to_lulc
+    ) %>%
+    dplyr::distinct()
+}
+
 simulation_trans_rates_prep <- function(
   config = get_config()
 ) {
@@ -249,6 +275,17 @@ simulation_trans_rates_prep <- function(
     To = setdiff(lulcs_global, "mining")
   ) %>%
     tibble::as_tibble()
+
+  unmodelled_df <- load_unmodelled_transitions(config)
+  message(sprintf(
+    "  - Forbidding %d non-modelled (region, transition) pairs from reconciliation",
+    nrow(unmodelled_df)
+  ))
+  forbid_pairs_df <- dplyr::bind_rows(
+    forbid_pairs_df,
+    unmodelled_df
+  ) %>%
+    dplyr::distinct()
 
   # Process the historical transition rates to compute min, max, and mean rates for each Region-iLULC-jLULC combination.
   # This will be used to set bounds and preferences in the optimization model.
