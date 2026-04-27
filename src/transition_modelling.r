@@ -19,12 +19,29 @@
 transition_modelling <- function(
   config = get_config(),
   refresh_cache = FALSE,
-  model_dir = config[["transition_model_dir"]],
-  eval_dir = config[["transition_model_eval_dir"]],
-  use_regions = config[["regionalization"]],
-  model_specs_path = config[["model_specs_path"]],
-  periods_to_process = config[["data_periods"]]
+  model_dir = NULL,
+  eval_dir = NULL,
+  use_regions = NULL,
+  model_specs_path = NULL,
+  periods_to_process = NULL
 ) {
+  # Extract values from config if not provided
+  if (is.null(model_dir)) {
+    model_dir <- config[["transition_model_dir"]]
+  }
+  if (is.null(eval_dir)) {
+    eval_dir <- config[["transition_model_eval_dir"]]
+  }
+  if (is.null(use_regions)) {
+    use_regions <- config[["regionalization"]]
+  }
+  if (is.null(model_specs_path)) {
+    model_specs_path <- config[["model_specs_path"]]
+  }
+  if (is.null(periods_to_process)) {
+    periods_to_process <- config[["data_periods"]]
+  }
+
   # create model and eval directories if they do not exist
   ensure_dir(model_dir)
   ensure_dir(eval_dir)
@@ -101,7 +118,12 @@ format_reconciliation_preview <- function(data, cols, max_rows = 5) {
 }
 
 #' Reconcile viable transitions against feature-selection outputs for a period
-reconcile_period_transitions <- function(period, region_names, use_regions, config) {
+reconcile_period_transitions <- function(
+  period,
+  region_names,
+  use_regions,
+  config
+) {
   rate_col <- paste0("rate_", period)
   viable_path <- config[["viable_transitions_lists"]]
   fs_success_path <- file.path(
@@ -301,7 +323,7 @@ reconcile_period_transitions <- function(period, region_names, use_regions, conf
       c("transition", "region", "fs_error_details")
     )
     message("  Feature-selection failures (first few):")
-    purrr::walk(preview_lines, ~message(sprintf("    %s", .x)))
+    purrr::walk(preview_lines, ~ message(sprintf("    %s", .x)))
   }
 
   missing_preview <- reconciliation %>%
@@ -312,7 +334,7 @@ reconcile_period_transitions <- function(period, region_names, use_regions, conf
       c("transition", "region")
     )
     message("  Missing from feature-selection outputs (first few):")
-    purrr::walk(preview_lines, ~message(sprintf("    %s", .x)))
+    purrr::walk(preview_lines, ~ message(sprintf("    %s", .x)))
   }
 
   reconciliation
@@ -388,7 +410,7 @@ write_transition_modelling_summary_log <- function(
       1,
       function(row) paste(row, collapse = " | ")
     )
-    purrr::walk(preview_lines, ~log_msg(.x, log_path))
+    purrr::walk(preview_lines, ~ log_msg(.x, log_path))
   }
 
   fitted_models <- sum(reconciliation$model_status == "success", na.rm = TRUE)
@@ -415,11 +437,16 @@ perform_transition_modelling <- function(
   period,
   use_regions,
   config,
-  model_dir = model_dir,
-  eval_dir = eval_dir,
+  model_dir = NULL,
+  eval_dir = NULL,
   refresh_cache = FALSE,
-  model_specs_path = config[["model_specs_path"]]
+  model_specs_path = NULL
 ) {
+  # Extract model_specs_path from config if not provided
+  if (is.null(model_specs_path)) {
+    model_specs_path <- config[["model_specs_path"]]
+  }
+
   # Directories for saving models, evaluations, and debug info
   model_dir <- file.path(
     config[["transition_model_dir"]],
@@ -586,7 +613,7 @@ perform_transition_modelling <- function(
         model_path = purrr::map2_chr(
           transition,
           region,
-          ~build_transition_model_path(.x, .y, model_dir)
+          ~ build_transition_model_path(.x, .y, model_dir)
         ),
         model_status = dplyr::case_when(
           fs_status == "failed" ~ "not_attempted_fs_failed",
@@ -766,17 +793,16 @@ perform_transition_modelling <- function(
       model_path = purrr::map2_chr(
         transition,
         region,
-        ~build_transition_model_path(.x, .y, model_dir)
+        ~ build_transition_model_path(.x, .y, model_dir)
       ),
       model_file_exists = file.exists(model_path),
       model_status = dplyr::case_when(
         fs_status == "failed" ~ "not_attempted_fs_failed",
         fs_status == "missing" ~ "not_attempted_fs_missing",
-        fs_status == "success" & (
-          is.na(selected_predictors) ||
+        fs_status == "success" &
+          (is.na(selected_predictors) ||
             selected_predictors == "" ||
-            nchar(trimws(selected_predictors)) == 0
-        ) ~ "skipped_no_predictors",
+            nchar(trimws(selected_predictors)) == 0) ~ "skipped_no_predictors",
         fs_status == "success" & model_file_exists ~ "success",
         fs_status == "success" &
           result_status == "skipped_no_predictors" ~ "skipped_no_predictors",
@@ -873,8 +899,13 @@ model_single_transition <- function(
   save_debug = FALSE,
   log_file = NULL,
   fs_summary,
-  model_specs_path = config[["model_specs_path"]]
+  model_specs_path = NULL
 ) {
+  # Extract model_specs_path from config if not provided
+  if (is.null(model_specs_path)) {
+    model_specs_path <- config[["model_specs_path"]]
+  }
+
   log_msg(
     sprintf(
       "modelling transition: %s | Region: %s\n",
