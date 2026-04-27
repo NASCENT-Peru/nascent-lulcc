@@ -41,7 +41,7 @@ dependencies:
   - r-tune         # Hyperparameter tuning
   - r-workflows    # modelling workflows
   - r-recipes      # Data preprocessing
-  - r-parsnip      # Unified model interface
+  - r-parsnip>=1.2.1  # Unified model interface (>=1.2.0 fixes xgboost 1.7/2.x API deprecations)
   - r-rsample      # Resampling
   - r-dials        # Tuning parameters
   
