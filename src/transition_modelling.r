@@ -27,19 +27,19 @@ transition_modelling <- function(
 ) {
   # Extract values from config if not provided
   if (is.null(model_dir)) {
-    model_dir <- config[["transition_model_dir"]]
+    model_dir <- config[["output_dirs"]][["transition_model_dir"]]
   }
   if (is.null(eval_dir)) {
-    eval_dir <- config[["transition_model_eval_dir"]]
+    eval_dir <- config[["output_dirs"]][["transition_model_eval_dir"]]
   }
   if (is.null(use_regions)) {
-    use_regions <- config[["regionalization"]]
+    use_regions <- config[["configuration_settings"]][["regionalization"]]
   }
   if (is.null(model_specs_path)) {
-    model_specs_path <- config[["model_specs_path"]]
+    model_specs_path <- config[["config_files_paths"]][["model_specs_path"]]
   }
   if (is.null(periods_to_process)) {
-    periods_to_process <- config[["data_periods"]]
+    periods_to_process <- config[["configuration_settings"]][["data_periods"]]
   }
 
   # create model and eval directories if they do not exist
@@ -69,7 +69,8 @@ transition_modelling <- function(
         config = config,
         model_dir = model_dir,
         eval_dir = eval_dir,
-        refresh_cache = refresh_cache
+        refresh_cache = refresh_cache,
+        model_specs_path = model_specs_path
       )
     }
   )
@@ -125,13 +126,15 @@ reconcile_period_transitions <- function(
   config
 ) {
   rate_col <- paste0("rate_", period)
-  viable_path <- config[["viable_transitions_lists"]]
+  viable_path <- config[["input_output_files_paths"]][[
+    "viable_transitions_lists"
+  ]]
   fs_success_path <- file.path(
-    config[["feature_selection_dir"]],
+    config[["output_dirs"]][["feature_selection_dir"]],
     sprintf("transition_feature_selection_summary_%s.rds", period)
   )
   fs_failed_path <- file.path(
-    config[["feature_selection_dir"]],
+    config[["output_dirs"]][["feature_selection_dir"]],
     sprintf("feature_selection_failed_%s.rds", period)
   )
 
@@ -442,30 +445,30 @@ perform_transition_modelling <- function(
   refresh_cache = FALSE,
   model_specs_path = NULL
 ) {
-  # Extract model_specs_path from config if not provided
+  # Extract values from config if not provided
+  if (is.null(model_dir)) {
+    model_dir <- config[["output_dirs"]][["transition_model_dir"]]
+  }
+  if (is.null(eval_dir)) {
+    eval_dir <- config[["output_dirs"]][["transition_model_eval_dir"]]
+  }
   if (is.null(model_specs_path)) {
-    model_specs_path <- config[["model_specs_path"]]
+    model_specs_path <- config[["config_files_paths"]][["model_specs_path"]]
   }
 
   # Directories for saving models, evaluations, and debug info
-  model_dir <- file.path(
-    config[["transition_model_dir"]],
-    period
-  )
-  eval_dir <- file.path(
-    config[["transition_model_eval_dir"]],
-    period
-  )
-  debug_dir <- file.path(
-    model_dir,
-    "debug_logs"
-  )
+  model_dir <- file.path(model_dir, period)
+  eval_dir <- file.path(eval_dir, period)
+  debug_dir <- file.path(model_dir, "debug_logs")
+
   ensure_dir(model_dir)
   ensure_dir(eval_dir)
   ensure_dir(debug_dir)
 
   # Load predictor table
-  pred_table_raw <- yaml::yaml.load_file(config[["pred_table_path"]])
+  pred_table_raw <- yaml::yaml.load_file(config[["config_files_paths"]][[
+    "pred_table_path"
+  ]])
   message("Loaded predictor table")
 
   # remove all entries without a path
@@ -488,11 +491,11 @@ perform_transition_modelling <- function(
 
   # Parquet file paths
   transitions_pq_path <- file.path(
-    config[["trans_dataset_dir"]],
+    config[["output_dirs"]][["trans_dataset_dir"]],
     period
   )
   static_preds_pq_path <- file.path(
-    config[["predictors_prepped_dir"]],
+    config[["input_dirs"]][["predictors_prepped_dir"]],
     "parquet_data",
     "static"
   )
@@ -501,7 +504,7 @@ perform_transition_modelling <- function(
   period_start_year <- as.integer(stringr::str_extract(period, "^[0-9]{4}"))
 
   dynamic_preds_pq_path <- file.path(
-    config[["predictors_prepped_dir"]],
+    config[["input_dirs"]][["predictors_prepped_dir"]],
     "parquet_data",
     "dynamic",
     period_start_year
@@ -559,7 +562,7 @@ perform_transition_modelling <- function(
   # --- Set up regions ---
   if (use_regions) {
     regions <- jsonlite::fromJSON(file.path(
-      config[["reg_dir"]],
+      config[["input_dirs"]][["reg_dir"]],
       "regions.json"
     ))
     region_names <- regions$label
@@ -735,7 +738,8 @@ perform_transition_modelling <- function(
             model_dir = model_dir,
             eval_dir = eval_dir,
             log_file = log_file,
-            fs_summary = fs_summary
+            fs_summary = fs_summary,
+            model_specs_path = model_specs_path
           )
         },
         error = function(e) {
@@ -899,13 +903,8 @@ model_single_transition <- function(
   save_debug = FALSE,
   log_file = NULL,
   fs_summary,
-  model_specs_path = NULL
+  model_specs_path
 ) {
-  # Extract model_specs_path from config if not provided
-  if (is.null(model_specs_path)) {
-    model_specs_path <- config[["model_specs_path"]]
-  }
-
   log_msg(
     sprintf(
       "modelling transition: %s | Region: %s\n",
@@ -949,7 +948,7 @@ model_single_transition <- function(
   region_value <- NULL
   if (use_regions) {
     regions <- jsonlite::fromJSON(file.path(
-      config[["reg_dir"]],
+      config[["input_dirs"]][["reg_dir"]],
       "regions.json"
     ))
     region_value <- as.integer(regions$value[match(region, regions$label)])
