@@ -125,7 +125,14 @@ format_reconciliation_preview <- function(data, cols, max_rows = 5) {
     return(character(0))
   }
 
-  preview <- utils::head(data[, cols, drop = FALSE], max_rows)
+  preview <- utils::head(
+    if (data.table::is.data.table(data)) {
+      data[, ..cols]
+    } else {
+      data[, cols, drop = FALSE]
+    },
+    max_rows
+  )
   apply(preview, 1, function(row) paste(row, collapse = " | "))
 }
 
@@ -3343,9 +3350,6 @@ fit_and_save_best_model <- function(
 
   tryCatch(
     {
-      # Use enhanced model saving with tidypredict support
-      source(file.path("src", "enhanced_model_saving.r"))
-
       saved_model <- save_minimal_model(
         final_workflow = final_workflow,
         best_model_name = best_model_name,
@@ -3412,8 +3416,6 @@ predict_with_saved_model <- function(model_path, new_data, type = "prob") {
       model_obj$model_type %in%
         c("tidypredict_glm", "tidypredict_rf", "tidypredict_xgboost")
   ) {
-    # Source enhanced prediction functions
-    source(file.path("src", "enhanced_model_saving.r"))
     return(predict_minimal_model(model_path, new_data, type))
   }
 

@@ -1406,7 +1406,13 @@ grrff_filter <- function(
   log_file = NULL
 ) {
   # Extract only the needed predictors
-  cov_mat <- as.data.frame(joined[, predictor_cols, drop = FALSE])
+  cov_mat <- as.data.frame(
+    if (data.table::is.data.table(joined)) {
+      joined[, ..predictor_cols]
+    } else {
+      joined[, predictor_cols, drop = FALSE]
+    }
+  )
   response_fac <- droplevels(as.factor(response_vec))
 
   rm(response_vec)
