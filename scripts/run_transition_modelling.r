@@ -227,12 +227,8 @@ tryCatch(
   {
     transition_modelling(
       config = config,
-      refresh_cache = FALSE, # Skip existing models
-      model_dir = config[["output_dirs"]][["transition_model_dir"]],
-      eval_dir = config[["output_dirs"]][["transition_model_eval_dir"]],
-      use_regions = config[["configuration_settings"]][["regionalization"]],
-      model_specs_path = config[["config_files_paths"]][["model_specs_path"]],
-      periods_to_process = config[["configuration_settings"]][["data_periods"]]
+      refresh_cache = FALSE # Skip existing models
+      # All other parameters will be extracted from config automatically
     )
   },
   error = function(e) {
