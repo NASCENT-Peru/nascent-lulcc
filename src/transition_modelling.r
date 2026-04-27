@@ -737,38 +737,56 @@ perform_transition_modelling <- function(
       log_msg("Arrow datasets opened successfully\n", log_file)
 
       # --- Run the actual model ---
+      captured_trace <- NULL
       tryCatch(
-        {
-          model_single_transition(
-            trans_name = trans_name,
-            refresh_cache = refresh_cache,
-            region = region,
-            use_regions = use_regions,
-            ds_transitions = ds_transitions,
-            ds_static = ds_static,
-            ds_dynamic = ds_dynamic,
-            period = period,
-            config = config,
-            model_dir = model_dir,
-            eval_dir = eval_dir,
-            log_file = log_file,
-            fs_summary = fs_summary,
-            model_specs_path = model_specs_path
-          )
-        },
+        withCallingHandlers(
+          {
+            model_single_transition(
+              trans_name = trans_name,
+              refresh_cache = refresh_cache,
+              region = region,
+              use_regions = use_regions,
+              ds_transitions = ds_transitions,
+              ds_static = ds_static,
+              ds_dynamic = ds_dynamic,
+              period = period,
+              config = config,
+              model_dir = model_dir,
+              eval_dir = eval_dir,
+              log_file = log_file,
+              fs_summary = fs_summary,
+              model_specs_path = model_specs_path
+            )
+          },
+          error = function(e) {
+            # Capture the call stack while it is still intact, before
+            # tryCatch unwinds it. sys.calls() works without rlang.
+            captured_trace <<- sys.calls()
+          }
+        ),
         error = function(e) {
           error_msg <- sprintf(
             "ERROR in transition modelling for %s-%s: %s",
             trans_name,
             region,
-            e$message
+            conditionMessage(e)
           )
           log_msg(error_msg, log_file)
+
+          trace_text <- if (!is.null(captured_trace)) {
+            paste(
+              vapply(
+                captured_trace,
+                function(cl) paste(deparse(cl), collapse = " "),
+                character(1)
+              ),
+              collapse = "\n"
+            )
+          } else {
+            "<no trace captured>"
+          }
           log_msg(
-            sprintf(
-              "Full error traceback: %s",
-              paste(traceback(), collapse = "\n")
-            ),
+            sprintf("Full error traceback:\n%s", trace_text),
             log_file
           )
 
@@ -777,7 +795,7 @@ perform_transition_modelling <- function(
             transition = trans_name,
             region = region,
             status = "error",
-            error_message = e$message,
+            error_message = conditionMessage(e),
             cv_metrics = NULL,
             test_metrics = NULL
           )
