@@ -1,11 +1,3 @@
-# library(tidymodels)
-# library(ranger)
-# library(glmnet)
-# library(xgboost)
-# library(purrr)
-# library(dplyr)
-# library(yardstick)
-
 #' Transition modelling for Land Use Land Cover Change
 #' @param config A list containing configuration parameters
 #' @param refresh_cache Logical, whether to refresh cached datasets and overwrite existing model files
@@ -71,11 +63,346 @@ transition_modelling <- function(
   # Save results
   output_path <- file.path(
     eval_dir,
-    "transition_modelling_evalaution_summary.rds"
+    "transition_modelling_evaluation_summary.rds"
   )
   saveRDS(final_summary, output_path)
 
   message("Transition modelling completed for all specified periods.")
+}
+
+#' Build the expected saved model path for a transition-region pair
+build_transition_model_path <- function(trans_name, region, model_dir) {
+  region_suffix <- ifelse(
+    is.null(region) || identical(region, "National extent"),
+    "national",
+    gsub(" ", "_", tolower(region))
+  )
+
+  file.path(model_dir, sprintf("%s_%s.rds", trans_name, region_suffix))
+}
+
+#' Read an RDS file if it exists, otherwise return NULL
+read_optional_rds <- function(path) {
+  if (!file.exists(path)) {
+    return(NULL)
+  }
+
+  readRDS(path)
+}
+
+#' Format a compact character preview of a data frame for logging
+format_reconciliation_preview <- function(data, cols, max_rows = 5) {
+  if (nrow(data) == 0) {
+    return(character(0))
+  }
+
+  preview <- utils::head(data[, cols, drop = FALSE], max_rows)
+  apply(preview, 1, function(row) paste(row, collapse = " | "))
+}
+
+#' Reconcile viable transitions against feature-selection outputs for a period
+reconcile_period_transitions <- function(period, region_names, use_regions, config) {
+  rate_col <- paste0("rate_", period)
+  viable_path <- config[["viable_transitions_lists"]]
+  fs_success_path <- file.path(
+    config[["feature_selection_dir"]],
+    sprintf("transition_feature_selection_summary_%s.rds", period)
+  )
+  fs_failed_path <- file.path(
+    config[["feature_selection_dir"]],
+    sprintf("feature_selection_failed_%s.rds", period)
+  )
+
+  if (!file.exists(viable_path)) {
+    stop(sprintf("Viable transitions list not found: %s", viable_path))
+  }
+
+  viable_transitions <- utils::read.csv(
+    viable_path,
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+
+  if (!rate_col %in% names(viable_transitions)) {
+    stop(sprintf(
+      "Rate column '%s' not found in viable transitions list: %s",
+      rate_col,
+      viable_path
+    ))
+  }
+
+  expected_transitions <- viable_transitions %>%
+    dplyr::filter(
+      region_name == "whole_map",
+      from_lulc != to_lulc,
+      !is.na(.data[[rate_col]])
+    ) %>%
+    dplyr::transmute(
+      period = period,
+      transition = paste(from_lulc, to_lulc, sep = "-"),
+      from_lulc = from_lulc,
+      to_lulc = to_lulc,
+      id_trans = id_trans,
+      From. = .data[["From."]],
+      To. = .data[["To."]]
+    ) %>%
+    dplyr::distinct()
+
+  expected_pairs <- tidyr::crossing(
+    expected_transitions,
+    region = region_names
+  ) %>%
+    dplyr::select(
+      period,
+      region,
+      transition,
+      from_lulc,
+      to_lulc,
+      id_trans,
+      From.,
+      To.
+    )
+
+  fs_success <- read_optional_rds(fs_success_path)
+  if (is.null(fs_success)) {
+    fs_success <- tibble::tibble(
+      region = character(),
+      transition = character(),
+      n_observations = numeric(),
+      n_transitions = numeric(),
+      n_initial_predictors = numeric(),
+      n_after_collinearity = numeric(),
+      n_after_grrf = numeric(),
+      selected_predictors = character()
+    )
+  }
+
+  fs_failed <- read_optional_rds(fs_failed_path)
+  if (is.null(fs_failed)) {
+    fs_failed <- tibble::tibble(
+      region = character(),
+      transition = character(),
+      error_details = character(),
+      status = character()
+    )
+  }
+
+  fs_success_reduced <- if (nrow(fs_success) > 0) {
+    fs_success %>%
+      dplyr::mutate(region = as.character(region)) %>%
+      dplyr::select(
+        region,
+        transition,
+        n_observations,
+        n_transitions,
+        n_initial_predictors,
+        n_after_collinearity,
+        n_after_grrf,
+        selected_predictors,
+        dplyr::any_of(c(
+          "focal_predictors",
+          "selected_predictors_collinearity",
+          "selected_predictors_grrf"
+        ))
+      ) %>%
+      dplyr::distinct()
+  } else {
+    tibble::tibble(
+      region = character(),
+      transition = character(),
+      n_observations = numeric(),
+      n_transitions = numeric(),
+      n_initial_predictors = numeric(),
+      n_after_collinearity = numeric(),
+      n_after_grrf = numeric(),
+      selected_predictors = character()
+    )
+  }
+
+  fs_failed_reduced <- if (nrow(fs_failed) > 0) {
+    fs_failed %>%
+      dplyr::mutate(region = as.character(region)) %>%
+      dplyr::select(
+        region,
+        transition,
+        fs_error_details = error_details,
+        fs_failure_status = status
+      ) %>%
+      dplyr::distinct()
+  } else {
+    tibble::tibble(
+      region = character(),
+      transition = character(),
+      fs_error_details = character(),
+      fs_failure_status = character()
+    )
+  }
+
+  reconciliation <- expected_pairs %>%
+    dplyr::left_join(
+      fs_success_reduced,
+      by = c("region", "transition")
+    ) %>%
+    dplyr::left_join(
+      fs_failed_reduced,
+      by = c("region", "transition")
+    ) %>%
+    dplyr::mutate(
+      fs_status = dplyr::case_when(
+        !is.na(selected_predictors) ~ "success",
+        !is.na(fs_failure_status) ~ "failed",
+        TRUE ~ "missing"
+      ),
+      fs_error_details = dplyr::if_else(
+        fs_status == "failed",
+        fs_error_details,
+        NA_character_
+      )
+    ) %>%
+    dplyr::select(
+      period,
+      region,
+      transition,
+      from_lulc,
+      to_lulc,
+      id_trans,
+      From.,
+      To.,
+      fs_status,
+      fs_error_details,
+      n_observations,
+      n_transitions,
+      n_initial_predictors,
+      n_after_collinearity,
+      n_after_grrf,
+      dplyr::any_of(c(
+        "focal_predictors",
+        "selected_predictors_collinearity",
+        "selected_predictors_grrf"
+      )),
+      selected_predictors
+    ) %>%
+    dplyr::arrange(region, transition)
+
+  message(sprintf(
+    "Pre-modelling reconciliation for %s: expected=%d, fs_success=%d, fs_failed=%d, fs_missing=%d",
+    period,
+    nrow(reconciliation),
+    sum(reconciliation$fs_status == "success", na.rm = TRUE),
+    sum(reconciliation$fs_status == "failed", na.rm = TRUE),
+    sum(reconciliation$fs_status == "missing", na.rm = TRUE)
+  ))
+
+  failed_preview <- reconciliation %>%
+    dplyr::filter(fs_status == "failed")
+  if (nrow(failed_preview) > 0) {
+    preview_lines <- format_reconciliation_preview(
+      failed_preview,
+      c("transition", "region", "fs_error_details")
+    )
+    message("  Feature-selection failures (first few):")
+    purrr::walk(preview_lines, ~message(sprintf("    %s", .x)))
+  }
+
+  missing_preview <- reconciliation %>%
+    dplyr::filter(fs_status == "missing")
+  if (nrow(missing_preview) > 0) {
+    preview_lines <- format_reconciliation_preview(
+      missing_preview,
+      c("transition", "region")
+    )
+    message("  Missing from feature-selection outputs (first few):")
+    purrr::walk(preview_lines, ~message(sprintf("    %s", .x)))
+  }
+
+  reconciliation
+}
+
+#' Write a human-readable period summary log
+write_transition_modelling_summary_log <- function(
+  reconciliation,
+  period,
+  region_names,
+  log_path
+) {
+  if (file.exists(log_path)) {
+    file.remove(log_path)
+  }
+
+  log_msg(
+    sprintf(
+      "Transition modelling summary | period=%s | regions=%d",
+      period,
+      length(region_names)
+    ),
+    log_path
+  )
+
+  counts <- c(
+    expected_pairs = nrow(reconciliation),
+    fs_success = sum(reconciliation$fs_status == "success", na.rm = TRUE),
+    fs_failed = sum(reconciliation$fs_status == "failed", na.rm = TRUE),
+    fs_missing = sum(reconciliation$fs_status == "missing", na.rm = TRUE),
+    model_success = sum(reconciliation$model_status == "success", na.rm = TRUE),
+    model_error = sum(reconciliation$model_status == "error", na.rm = TRUE),
+    skipped_no_predictors = sum(
+      reconciliation$model_status == "skipped_no_predictors",
+      na.rm = TRUE
+    ),
+    missing_no_file = sum(
+      reconciliation$model_status == "missing_no_file",
+      na.rm = TRUE
+    ),
+    not_attempted_fs_failed = sum(
+      reconciliation$model_status == "not_attempted_fs_failed",
+      na.rm = TRUE
+    ),
+    not_attempted_fs_missing = sum(
+      reconciliation$model_status == "not_attempted_fs_missing",
+      na.rm = TRUE
+    )
+  )
+
+  purrr::iwalk(
+    counts,
+    function(value, name) {
+      log_msg(sprintf("%s: %d", name, value), log_path)
+    }
+  )
+
+  status_breakdown <- reconciliation %>%
+    dplyr::filter(model_status != "success") %>%
+    dplyr::select(
+      transition,
+      region,
+      fs_status,
+      model_status,
+      fs_error_details,
+      model_error_message
+    )
+
+  if (nrow(status_breakdown) > 0) {
+    log_msg("Non-success transition-region pairs:", log_path)
+    preview_lines <- apply(
+      status_breakdown,
+      1,
+      function(row) paste(row, collapse = " | ")
+    )
+    purrr::walk(preview_lines, ~log_msg(.x, log_path))
+  }
+
+  fitted_models <- sum(reconciliation$model_status == "success", na.rm = TRUE)
+  total_pairs <- nrow(reconciliation)
+  pct <- if (total_pairs == 0) 0 else 100 * fitted_models / total_pairs
+  log_msg(
+    sprintf(
+      "%d of %d viable transition-region pairs have fitted models (%.1f%%)",
+      fitted_models,
+      total_pairs,
+      pct
+    ),
+    log_path
+  )
 }
 
 #' Wrapper function to perform transition modelling for a given period
@@ -83,7 +410,7 @@ transition_modelling <- function(
 #' @param use_regions Logical, whether to use regionalization
 #' @param config A list containing configuration parameters
 #' @param refresh_cache Logical, whether to refresh cached datasets
-#' @return A list of model evaluation results
+#' @return A reconciliation data frame summarizing final model status
 perform_transition_modelling <- function(
   period,
   use_regions,
@@ -131,47 +458,6 @@ perform_transition_modelling <- function(
 
   # Combine predictor lists
   pred_table <- c(static_preds, period_preds)
-
-  # load summary of transition feature selection
-  fs_summary <- readRDS(
-    file.path(
-      config[["feature_selection_dir"]],
-      sprintf(
-        "transition_feature_selection_summary_%s.rds",
-        period
-      )
-    )
-  )
-
-  # Filter out transitions that failed feature selection
-  fs_summary_all <- fs_summary
-  fs_summary <- fs_summary %>%
-    dplyr::filter(
-      !is.na(selected_predictors) &
-        selected_predictors != "" &
-        nchar(trimws(selected_predictors)) > 0
-    ) %>%
-    # Order by increasing number of observations for quick testing
-    dplyr::arrange(n_observations)
-
-  message(sprintf(
-    "Loaded feature selection summary: %d total combinations, %d passed feature selection",
-    nrow(fs_summary_all),
-    nrow(fs_summary)
-  ))
-
-  if (nrow(fs_summary) == 0) {
-    stop(
-      "No transitions passed feature selection. Check feature selection results."
-    )
-  }
-
-  message(sprintf(
-    "Processing %d successful transitions, ordered by n_observations (%d to %d)",
-    nrow(fs_summary),
-    min(fs_summary$n_observations),
-    max(fs_summary$n_observations)
-  ))
 
   # Parquet file paths
   transitions_pq_path <- file.path(
@@ -260,6 +546,79 @@ perform_transition_modelling <- function(
     message("Processing national extent (no regionalization)\n")
   }
 
+  reconciliation <- reconcile_period_transitions(
+    period = period,
+    region_names = region_names,
+    use_regions = use_regions,
+    config = config
+  )
+
+  fs_summary <- reconciliation %>%
+    dplyr::filter(
+      fs_status == "success",
+      !is.na(selected_predictors),
+      selected_predictors != "",
+      nchar(trimws(selected_predictors)) > 0
+    ) %>%
+    dplyr::arrange(n_observations)
+
+  reconciliation_csv_path <- file.path(
+    eval_dir,
+    sprintf("transition_modelling_reconciliation_%s.csv", period)
+  )
+  reconciliation_rds_path <- file.path(
+    eval_dir,
+    sprintf("transition_modelling_reconciliation_%s.rds", period)
+  )
+  summary_log_path <- file.path(
+    eval_dir,
+    sprintf("transition_modelling_summary_%s.log", period)
+  )
+
+  if (nrow(fs_summary) == 0) {
+    message(sprintf(
+      "No successful feature-selection rows available for modelling in %s. Writing summary outputs only.",
+      period
+    ))
+
+    reconciliation <- reconciliation %>%
+      dplyr::mutate(
+        model_path = purrr::map2_chr(
+          transition,
+          region,
+          ~build_transition_model_path(.x, .y, model_dir)
+        ),
+        model_status = dplyr::case_when(
+          fs_status == "failed" ~ "not_attempted_fs_failed",
+          fs_status == "missing" ~ "not_attempted_fs_missing",
+          TRUE ~ "skipped_no_predictors"
+        ),
+        model_error_message = dplyr::if_else(
+          model_status == "skipped_no_predictors",
+          "Feature selection success row did not include usable predictors.",
+          NA_character_
+        )
+      )
+
+    utils::write.csv(reconciliation, reconciliation_csv_path, row.names = FALSE)
+    saveRDS(reconciliation, reconciliation_rds_path)
+    write_transition_modelling_summary_log(
+      reconciliation = reconciliation,
+      period = period,
+      region_names = region_names,
+      log_path = summary_log_path
+    )
+
+    return(reconciliation)
+  }
+
+  message(sprintf(
+    "Processing %d successful transitions, ordered by n_observations (%d to %d)",
+    nrow(fs_summary),
+    min(fs_summary$n_observations, na.rm = TRUE),
+    max(fs_summary$n_observations, na.rm = TRUE)
+  ))
+
   # --- Parallel processing of transitions ---
 
   # Determine number of cores from SLURM or fallback (default to 1 for safety)
@@ -291,7 +650,7 @@ perform_transition_modelling <- function(
   ))
 
   # Parallel over region × transition combinations from fs_summary
-  transitions_model_results <- furrr::future_map_dfr(
+  transitions_model_results <- furrr::future_map(
     task_ids,
     function(i) {
       # Extract the row (this row defines ONE task)
@@ -383,41 +742,92 @@ perform_transition_modelling <- function(
     .options = furrr::furrr_options(seed = TRUE)
   )
 
-  future::plan(future::sequential) # Reset to sequential
+  future::plan(future::sequential)
 
-  # Log summary of processed vs skipped models
-  total_tasks <- length(task_ids)
-  skipped_models <- sum(
-    sapply(transitions_model_results, function(x) {
-      !is.null(x$skipped) && x$skipped == TRUE
-    }),
-    na.rm = TRUE
+  results_summary <- purrr::map_dfr(
+    transitions_model_results,
+    function(result) {
+      tibble::tibble(
+        transition = result$transition %||% NA_character_,
+        region = result$region %||% NA_character_,
+        result_status = result$status %||% NA_character_,
+        error_message = result$error_message %||% NA_character_,
+        skipped = isTRUE(result$skipped)
+      )
+    }
   )
-  processed_models <- total_tasks - skipped_models
 
-  message(sprintf(
-    "\nModel processing summary for period %s:",
-    periods_to_process
-  ))
-  message(sprintf(
-    "  Total transition-region combinations: %d",
-    total_tasks
-  ))
-  message(sprintf(
-    "  Models processed: %d",
-    processed_models
-  ))
-  message(sprintf(
-    "  Models skipped (existing): %d",
-    skipped_models
-  ))
-  if (skipped_models > 0) {
-    message(sprintf(
-      "  To reprocess existing models, set refresh_cache = TRUE"
-    ))
-  }
+  reconciliation <- reconciliation %>%
+    dplyr::left_join(
+      results_summary,
+      by = c("transition", "region")
+    ) %>%
+    dplyr::mutate(
+      model_path = purrr::map2_chr(
+        transition,
+        region,
+        ~build_transition_model_path(.x, .y, model_dir)
+      ),
+      model_file_exists = file.exists(model_path),
+      model_status = dplyr::case_when(
+        fs_status == "failed" ~ "not_attempted_fs_failed",
+        fs_status == "missing" ~ "not_attempted_fs_missing",
+        fs_status == "success" & (
+          is.na(selected_predictors) ||
+            selected_predictors == "" ||
+            nchar(trimws(selected_predictors)) == 0
+        ) ~ "skipped_no_predictors",
+        fs_status == "success" & model_file_exists ~ "success",
+        fs_status == "success" &
+          result_status == "skipped_no_predictors" ~ "skipped_no_predictors",
+        fs_status == "success" &
+          result_status == "error" ~ "error",
+        fs_status == "success" ~ "missing_no_file",
+        TRUE ~ "missing_no_file"
+      ),
+      model_error_message = dplyr::case_when(
+        model_status %in% c("error", "skipped_no_predictors") ~ error_message,
+        TRUE ~ NA_character_
+      )
+    ) %>%
+    dplyr::select(-skipped, -model_file_exists, -result_status, -error_message)
 
-  return(transitions_model_results)
+  utils::write.csv(reconciliation, reconciliation_csv_path, row.names = FALSE)
+  saveRDS(reconciliation, reconciliation_rds_path)
+  write_transition_modelling_summary_log(
+    reconciliation = reconciliation,
+    period = period,
+    region_names = region_names,
+    log_path = summary_log_path
+  )
+
+  message(sprintf("\nModel processing summary for period %s:", period))
+  message(sprintf(
+    "  Expected viable transition-region pairs: %d",
+    nrow(reconciliation)
+  ))
+  message(sprintf(
+    "  Feature-selection success / failed / missing: %d / %d / %d",
+    sum(reconciliation$fs_status == "success", na.rm = TRUE),
+    sum(reconciliation$fs_status == "failed", na.rm = TRUE),
+    sum(reconciliation$fs_status == "missing", na.rm = TRUE)
+  ))
+  message(sprintf(
+    "  Model success / error / skipped-no-predictors / missing-no-file: %d / %d / %d / %d",
+    sum(reconciliation$model_status == "success", na.rm = TRUE),
+    sum(reconciliation$model_status == "error", na.rm = TRUE),
+    sum(reconciliation$model_status == "skipped_no_predictors", na.rm = TRUE),
+    sum(reconciliation$model_status == "missing_no_file", na.rm = TRUE)
+  ))
+  message(sprintf(
+    "  Not attempted because feature selection failed / missing: %d / %d",
+    sum(reconciliation$model_status == "not_attempted_fs_failed", na.rm = TRUE),
+    sum(reconciliation$model_status == "not_attempted_fs_missing", na.rm = TRUE)
+  ))
+  message(sprintf("  Reconciliation CSV: %s", reconciliation_csv_path))
+  message(sprintf("  Summary log: %s", summary_log_path))
+
+  reconciliation
 }
 
 #' Model a single transition for a given region
@@ -475,13 +885,7 @@ model_single_transition <- function(
   )
 
   # Construct model file path for existence check
-  region_suffix <- ifelse(
-    is.null(region),
-    "national",
-    gsub(" ", "_", tolower(region))
-  )
-  model_filename <- sprintf("%s_%s.rds", trans_name, region_suffix)
-  model_path <- file.path(model_dir, model_filename)
+  model_path <- build_transition_model_path(trans_name, region, model_dir)
 
   # Check if model file already exists and skip if refresh_cache = FALSE
   if (!refresh_cache && file.exists(model_path)) {
