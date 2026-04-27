@@ -32,12 +32,13 @@ output_dirs:
   trans_dataset_dir: "outputs/transition_datasets"
   feature_selection_dir: "outputs/feature_selection"
   transition_model_dir: "outputs/transition_models"
+  transition_model_eval_dir: "outputs/transition_model_evaluation"
   validation_dir: "outputs/validation"
   simulation_output_dir: "outputs/simulations"
 
 # Seperate file path entries for important individual files that are used in multiple places or need to be easily referenced
 input_output_files_paths:
-  viable_transitions_lists: "outputs/transition_identification/viable_transitions_lists.rds"
+  viable_transitions_lists: "outputs/transition_identification/viable_transitions_lists.csv"
   ref_grid_path: "inputs/spatial_reference_grid/ref_grid_aggregated.tif"
   ref_grid_agg_path: "inputs/spatial_reference_grid/ref_grid_aggregated.tif"
   lulc_initial_areas_path: "inputs/lulc/future_demand/lulc_initial_areas.csv"

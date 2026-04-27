@@ -32,6 +32,7 @@ output_dirs:
   trans_dataset_dir: "outputs/transition_datasets"
   feature_selection_dir: "outputs/feature_selection"
   transition_model_dir: "outputs/transition_models"
+  transition_model_eval_dir: "outputs/transition_model_evaluation"
   validation_dir: "outputs/validation"
   simulation_output_dir: "outputs/simulations"
 
