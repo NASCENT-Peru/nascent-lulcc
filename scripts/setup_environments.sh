@@ -112,6 +112,14 @@ else
     exit 1
 fi
 
+# Create allocation environment
+if [ -f "$ENVS_DIR/allocation_env.yml" ]; then
+    create_env "$ENVS_DIR/allocation_env.yml" "allocation_env"
+else
+    echo "ERROR: allocation_env.yml not found"
+    exit 1
+fi
+
 # Create climate data environment (if exists)
 if [ -f "$ENVS_DIR/clim_data_env.yml" ]; then
     create_env "$ENVS_DIR/clim_data_env.yml" "clim_data_env"
@@ -130,6 +138,7 @@ echo "To activate an environment, use:"
 echo "  micromamba activate $ENV_BASE_PATH/feat_select_env"
 echo "  micromamba activate $ENV_BASE_PATH/transition_model_env"
 echo "  micromamba activate $ENV_BASE_PATH/allocation_params_env"
+echo "  micromamba activate $ENV_BASE_PATH/allocation_env"
 echo "  micromamba activate $ENV_BASE_PATH/dist_calc_env"
 echo "  micromamba activate $ENV_BASE_PATH/data_prep_env"
 echo
