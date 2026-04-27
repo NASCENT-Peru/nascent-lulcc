@@ -6,13 +6,410 @@
 #' @author Ben Black
 #'
 #'
-# testing vars
-scenario <- "BAU"
-i <- 1
-idx <- 1
-#work_dir = region_work_dir
-j <- 1
-k <- 1
+
+# testing values
+# scenario <- config[["scenario_names"]][1]
+# i <- 1
+# idx <- 1
+# j <- 1
+
+# ---------------------------------------------------------------------------
+# Profiling helpers (opt-in via ALLOCATION_PROFILE env var).
+# When the env var is unset/FALSE, prof_tic() returns NULL and prof_toc() is a
+# no-op — no Sys.time() call, no log line, zero overhead beyond a single
+# env-var read. When enabled, prof_toc() emits one `PROFILE ... elapsed=...s`
+# line via log_msg (so it lands in both the per-region log file and stdout,
+# the latter captured by the SLURM .out).
+#
+# Usage:
+#   t0 <- prof_tic()
+#   ...stage body, with whatever assignments it needs...
+#   prof_toc(t0, "region=foo stage=bar", log_file)
+.profile_on <- function() {
+  isTRUE(as.logical(Sys.getenv("ALLOCATION_PROFILE", unset = "FALSE")))
+}
+
+prof_tic <- function() {
+  if (.profile_on()) Sys.time() else NULL
+}
+
+prof_toc <- function(t0, tag, log_file = NULL) {
+  if (is.null(t0)) {
+    return(invisible(NULL))
+  }
+  dt <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
+  log_msg(sprintf("PROFILE %s elapsed=%.3fs", tag, dt), log_file)
+  invisible(dt)
+}
+
+#' Detect if a loaded model object is in the "minimal saved transition model" format
+#' (contains only a recipe and a fitted model, without the full workflow structure).
+#' This is used to maintain backward compatibility with previously saved models that were stored in a more minimal format.
+is_minimal_saved_transition_model <- function(model_obj) {
+  is.list(model_obj) &&
+    "recipe" %in% names(model_obj) &&
+    "model" %in% names(model_obj)
+}
+
+#' Restore importance.mode to "none" for ranger models that were saved with importance.mode=NULL (the default in ranger 0.15.1), which causes prediction to fail after loading because the importance.mode field is missing. This is a workaround for previously saved models that were stored with the default importance.mode, and should have no effect on models saved with an explicit importance.mode or with newer versions of ranger where the default is "none".
+#' The importance.mode field is required for prediction with ranger models, and if it is missing (as is the case when loading models saved with ranger 0.15.1's default importance.mode=NULL), then prediction will fail with an error about importance.mode being missing. By restoring importance.mode to "none" for loaded models that were saved with the default, we can ensure that prediction works correctly after loading, while still allowing models that were saved with an explicit importance.mode or with newer versions of ranger to retain their original importance.mode settings.
+restore_ranger_importance_mode <- function(model_obj) {
+  if (
+    is.list(model_obj) &&
+      !is.null(model_obj$fit) &&
+      inherits(model_obj$fit, "ranger") &&
+      !length(model_obj$fit$importance.mode)
+  ) {
+    model_obj$fit$importance.mode <- "none"
+  }
+
+  model_obj
+}
+
+#' Get the predictor names used in a saved transition model object, handling both the minimal saved format and the full workflow format.
+#' This is used to determine which predictor columns need to be loaded from the parquet datasets.
+get_saved_transition_predictors <- function(model_obj) {
+  predictor_names <- model_obj$predictor_names
+  if (!is.null(predictor_names)) {
+    return(predictor_names)
+  }
+
+  if (is_minimal_saved_transition_model(model_obj)) {
+    return(tryCatch(
+      setdiff(model_obj$recipe$var_info$variable, "response"),
+      error = function(e) character()
+    ))
+  }
+
+  tryCatch(
+    setdiff(
+      workflows::extract_recipe(model_obj)$var_info$variable,
+      "response"
+    ),
+    error = function(e) character()
+  )
+}
+
+subset_saved_transition_data <- function(new_data, predictor_names) {
+  if (data.table::is.data.table(new_data)) {
+    new_data[, ..predictor_names]
+  } else {
+    new_data[, predictor_names, drop = FALSE]
+  }
+}
+
+predict_saved_tidypredict_prob <- function(model_obj, processed_data) {
+  if (model_obj$model_type == "tidypredict_glm") {
+    linear_pred <- eval(model_obj$prediction_expr, envir = processed_data)
+    prob_1 <- 1 / (1 + exp(-linear_pred))
+  } else if (model_obj$model_type == "tidypredict_rf") {
+    n_trees <- length(model_obj$prediction_expr)
+    prob_1 <- numeric(nrow(processed_data))
+
+    for (i in seq_len(n_trees)) {
+      tree_result <- eval(
+        model_obj$prediction_expr[[i]],
+        envir = processed_data
+      )
+      if (is.character(tree_result)) {
+        tree_result <- as.numeric(tree_result == model_obj$response_levels[2])
+      }
+      prob_1 <- prob_1 + tree_result
+    }
+
+    prob_1 <- prob_1 / n_trees
+  } else if (model_obj$model_type == "tidypredict_xgboost") {
+    if (is.list(model_obj$prediction_expr)) {
+      logits <- numeric(nrow(processed_data))
+      for (i in seq_along(model_obj$prediction_expr)) {
+        logits <- logits +
+          eval(model_obj$prediction_expr[[i]], envir = processed_data)
+      }
+    } else {
+      logits <- eval(model_obj$prediction_expr, envir = processed_data)
+    }
+    prob_1 <- 1 / (1 + exp(-logits))
+  } else {
+    stop("Unsupported tidypredict model type: ", model_obj$model_type)
+  }
+
+  data.frame(.pred_0 = 1 - prob_1, .pred_1 = prob_1)
+}
+
+predict_saved_butchered_prob <- function(model_obj, processed_data) {
+  original_model_type <- sub("^butchered_", "", model_obj$model_type)
+
+  # XGBoost models saved via save_minimal_model() are serialized to raw bytes
+  # (model_obj$model$fit is NULL, model_obj$model$xgb_raw holds the booster).
+  # Reload the booster and predict directly — bypassing parsnip/workflows.
+  if (
+    original_model_type == "xgboost" &&
+      is.list(model_obj$model) &&
+      !is.null(model_obj$model$xgb_raw)
+  ) {
+    xgb_model <- xgboost::xgb.load.raw(model_obj$model$xgb_raw)
+    dtest <- xgboost::xgb.DMatrix(data = as.matrix(processed_data))
+    raw_predictions <- predict(xgb_model, dtest)
+    prob_1 <- 1 / (1 + exp(-raw_predictions))
+    return(data.frame(.pred_0 = 1 - prob_1, .pred_1 = prob_1))
+  }
+
+  if (!original_model_type %in% c("glm", "rf", "xgboost")) {
+    stop("Unknown butchered model type: ", original_model_type)
+  }
+
+  inner_model <- model_obj$model
+  if (is.null(inner_model)) {
+    stop(sprintf(
+      "Butchered model object is missing inner '$model' (type='%s')",
+      original_model_type
+    ))
+  }
+
+  # `processed_data` has already been baked through model_obj$recipe by the
+  # caller, so no workflow/recipe reconstruction is needed — and trying to do so
+  # fails on recent `workflows` versions because the saved recipe is trained
+  # and `workflows::add_recipe()` refuses trained recipes.
+  # `inner_model` is a parsnip `model_fit`; predict.model_fit accepts baked data.
+  predictions <- tryCatch(
+    predict(inner_model, processed_data, type = "prob"),
+    error = function(e) {
+      stop(sprintf(
+        "predict() failed on butchered %s model: %s",
+        original_model_type,
+        conditionMessage(e)
+      ))
+    }
+  )
+
+  # Normalize to the .pred_<level> column convention expected by callers
+  # (caller in predict_saved_transition_prob takes pred_result[[2L]] as prob_1).
+  if (
+    !is.null(model_obj$response_levels) &&
+      ncol(predictions) == length(model_obj$response_levels)
+  ) {
+    expected <- paste0(".pred_", model_obj$response_levels)
+    if (!identical(names(predictions), expected)) {
+      if (all(expected %in% names(predictions))) {
+        predictions <- predictions[, expected, drop = FALSE]
+      } else {
+        names(predictions) <- expected
+      }
+    }
+  }
+
+  predictions
+}
+
+#' Predict transition probabilities using a saved transition model object, handling both the minimal saved format
+#'  and the full workflow format.
+#'
+#' @param model_obj Saved transition model object (workflow, minimal list, butchered, tidypredict, etc.)
+#' @param new_data Data frame / data.table of predictor values
+#' @param log_file Optional path to a per-worker log file. When supplied,
+#'   progress messages and any errors raised inside this function (or in the
+#'   helpers it calls) are written to the log before being re-thrown.
+predict_saved_transition_prob <- function(model_obj, new_data, log_file = NULL) {
+  # Logs `msg`, then raises an error with the same text. Used so that any
+  # failure inside this function (or its helpers) shows up in the worker log
+  # next to the surrounding progress messages, instead of only in the top-level
+  # stderr where it's easy to miss.
+  log_and_stop <- function(msg) {
+    log_msg(msg, log_file)
+    stop(msg, call. = FALSE)
+  }
+
+  log_msg(
+    sprintf(
+      "        predict_saved_transition_prob: starting (n_rows=%d)",
+      NROW(new_data)
+    ),
+    log_file
+  )
+
+  if (is.list(model_obj)) {
+    predictor_names <- get_saved_transition_predictors(model_obj)
+    log_msg(
+      sprintf(
+        "        Resolved %d predictor name(s) from saved model",
+        length(predictor_names)
+      ),
+      log_file
+    )
+    if (length(predictor_names) > 0L) {
+      if (!all(predictor_names %in% names(new_data))) {
+        missing_predictors <- predictor_names[
+          !predictor_names %in% names(new_data)
+        ]
+        log_and_stop(sprintf(
+          "Missing predictor columns in new_data: %s",
+          paste(missing_predictors, collapse = ", ")
+        ))
+      }
+    }
+
+    if (
+      !is.null(model_obj$model_type) &&
+        grepl("^tidypredict_", model_obj$model_type)
+    ) {
+      log_msg(
+        sprintf(
+          "        Path: tidypredict (model_type='%s'); subsetting + baking predictors",
+          model_obj$model_type
+        ),
+        log_file
+      )
+      new_data_processed <- subset_saved_transition_data(
+        new_data,
+        predictor_names
+      )
+      preprocessed_data <- tryCatch(
+        recipes::bake(model_obj$recipe, new_data_processed),
+        error = function(e) {
+          log_and_stop(sprintf(
+            "recipes::bake() failed for tidypredict model: %s",
+            conditionMessage(e)
+          ))
+        }
+      )
+      result <- tryCatch(
+        predict_saved_tidypredict_prob(model_obj, preprocessed_data),
+        error = function(e) {
+          log_and_stop(sprintf(
+            "predict_saved_tidypredict_prob() failed: %s",
+            conditionMessage(e)
+          ))
+        }
+      )
+      log_msg("        Path: tidypredict — prediction complete", log_file)
+      return(result)
+    }
+
+    if (
+      !is.null(model_obj$model_type) &&
+        grepl("^butchered_", model_obj$model_type)
+    ) {
+      log_msg(
+        sprintf(
+          "        Path: butchered (model_type='%s'); subsetting + baking predictors",
+          model_obj$model_type
+        ),
+        log_file
+      )
+      new_data_processed <- subset_saved_transition_data(
+        new_data,
+        predictor_names
+      )
+      preprocessed_data <- tryCatch(
+        recipes::bake(model_obj$recipe, new_data_processed),
+        error = function(e) {
+          log_and_stop(sprintf(
+            "recipes::bake() failed for butchered model: %s",
+            conditionMessage(e)
+          ))
+        }
+      )
+      model_obj$model <- restore_ranger_importance_mode(model_obj$model)
+      result <- tryCatch(
+        predict_saved_butchered_prob(model_obj, preprocessed_data),
+        error = function(e) {
+          log_and_stop(sprintf(
+            "predict_saved_butchered_prob() failed: %s",
+            conditionMessage(e)
+          ))
+        }
+      )
+      log_msg("        Path: butchered — prediction complete", log_file)
+      return(result)
+    }
+
+    if (is_minimal_saved_transition_model(model_obj)) {
+      log_msg(
+        "        Path: minimal saved transition model; subsetting + baking predictors",
+        log_file
+      )
+      new_data_processed <- subset_saved_transition_data(
+        new_data,
+        predictor_names
+      )
+      preprocessed_data <- tryCatch(
+        recipes::bake(model_obj$recipe, new_data_processed),
+        error = function(e) {
+          log_and_stop(sprintf(
+            "recipes::bake() failed for minimal saved model: %s",
+            conditionMessage(e)
+          ))
+        }
+      )
+      model_obj$model <- restore_ranger_importance_mode(model_obj$model)
+      result <- tryCatch(
+        predict(model_obj$model, preprocessed_data, type = "prob"),
+        error = function(e) {
+          log_and_stop(sprintf(
+            "predict() on minimal saved model failed: %s",
+            conditionMessage(e)
+          ))
+        }
+      )
+      log_msg(
+        "        Path: minimal saved transition model — prediction complete",
+        log_file
+      )
+      return(result)
+    }
+  }
+
+  if (is.list(model_obj) && "model" %in% names(model_obj)) {
+    log_msg("        Path: legacy saved-list model", log_file)
+    model_obj$model <- restore_ranger_importance_mode(model_obj$model)
+    if (identical(class(model_obj$model), "list")) {
+      log_and_stop(paste0(
+        "Unsupported saved model format: inner `model` is a plain list with no ",
+        "predict() method. Consider re-saving this transition model in the current format."
+      ))
+    }
+    result <- tryCatch(
+      predict(model_obj$model, new_data, type = "prob"),
+      error = function(e) {
+        log_and_stop(sprintf(
+          "predict() on legacy saved-list model failed: %s",
+          conditionMessage(e)
+        ))
+      }
+    )
+    log_msg("        Path: legacy saved-list — prediction complete", log_file)
+    return(result)
+  }
+
+  if (
+    inherits(model_obj, "workflow") &&
+      !is.null(model_obj$fit) &&
+      !is.null(model_obj$fit$fit)
+  ) {
+    log_msg("        Path: full workflow model", log_file)
+    model_obj$fit$fit <- restore_ranger_importance_mode(model_obj$fit$fit)
+  } else {
+    log_msg(
+      sprintf(
+        "        Path: fallback predict() (class='%s')",
+        paste(class(model_obj), collapse = "/")
+      ),
+      log_file
+    )
+  }
+
+  result <- tryCatch(
+    predict(model_obj, new_data, type = "prob"),
+    error = function(e) {
+      log_and_stop(sprintf(
+        "predict() on workflow / fallback path failed: %s",
+        conditionMessage(e)
+      ))
+    }
+  )
+  log_msg("        Prediction complete", log_file)
+  result
+}
 
 #' Top-level entry point for the allocation step
 #'
@@ -97,6 +494,29 @@ run_allocation_for_scenario <- function(
   # Build timestep pairs
   year_starts <- seq(start_year, end_year - step_length, by = step_length)
   year_ends <- year_starts + step_length
+
+  profile_timestep_index <- config[["profile_timestep_index"]]
+  if (!is.null(profile_timestep_index)) {
+    if (
+      profile_timestep_index < 1L ||
+        profile_timestep_index > length(year_starts)
+    ) {
+      stop(sprintf(
+        "profile_timestep_index=%d is outside the valid range 1..%d",
+        profile_timestep_index,
+        length(year_starts)
+      ))
+    }
+    year_starts <- year_starts[profile_timestep_index]
+    year_ends <- year_ends[profile_timestep_index]
+    message(sprintf(
+      "Profile mode: restricting scenario '%s' to timestep index %d (%d -> %d)",
+      scenario,
+      profile_timestep_index,
+      year_starts[[1]],
+      year_ends[[1]]
+    ))
+  }
 
   # Calibration period: use the last (most recent) data period
   calibration_period <- config[["data_periods"]][length(config[[
@@ -189,6 +609,9 @@ run_allocation_one_timestep <- function(
         log_file
       )
 
+      t_region_total <- prof_tic()
+      t_region_setup <- prof_tic()
+
       # load region raster
       region_rast <- terra::rast(region_rast_path)
 
@@ -213,8 +636,15 @@ run_allocation_one_timestep <- function(
         wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
       )
 
+      prof_toc(
+        t_region_setup,
+        sprintf("region=%s stage=region_setup", region_suffix),
+        log_file
+      )
+
       #todo pass the log_file to the functions called within setup_allocation_inputs and run_allocation_dinamica so they can log messages there as well, instead of just in this main loop. This will give us more visibility into what's happening inside those functions, especially if something goes wrong.
       # Prepare all Dinamica input files
+      t_setup_inputs <- prof_tic()
       setup_allocation_inputs(
         work_dir = region_work_dir,
         region_label = region_label,
@@ -227,16 +657,33 @@ run_allocation_one_timestep <- function(
         config = config,
         log_file = log_file
       )
+      prof_toc(
+        t_setup_inputs,
+        sprintf("region=%s stage=setup_inputs", region_suffix),
+        log_file
+      )
 
       # Run Dinamica
+      t_dinamica <- prof_tic()
       posterior_path <- run_allocation_dinamica(region_work_dir)
+      prof_toc(
+        t_dinamica,
+        sprintf("region=%s stage=dinamica", region_suffix),
+        log_file
+      )
       log_msg(
         sprintf("    Completed region: %s (ID=%d)", region_label, region_val),
         log_file
       )
 
-      rm(lulc_region, region_mask)
+      rm(lulc_region, current_lulc, region_rast)
       gc(verbose = FALSE)
+
+      prof_toc(
+        t_region_total,
+        sprintf("region=%s stage=region_total", region_suffix),
+        log_file
+      )
 
       return(posterior_path)
     },
@@ -248,7 +695,7 @@ run_allocation_one_timestep <- function(
   region_rasters <- lapply(posterior_paths, terra::rast)
 
   # Extend all to the full extent of the original LULC, then merge
-  full_extent <- terra::ext(current_lulc)
+  full_extent <- terra::ext(terra::rast(current_lulc_path))
   region_rasters <- lapply(region_rasters, function(r) {
     terra::extend(r, full_extent)
   })
@@ -555,7 +1002,7 @@ generate_probability_maps <- function(
     model_info[["id_trans"]]
   )
   if (length(missing_models) > 0L) {
-    stop(log_msg(
+    warning(log_msg(
       sprintf(
         "The following id_trans values are present in trans_rates_df but missing from model_info (i.e. no fitted model found for these transitions, likely due to zero-rate or not being in this scenario): %s",
         paste(missing_models, collapse = ", ")
@@ -657,6 +1104,10 @@ generate_probability_maps <- function(
     }
     get(pred_name, envir = nhood_raster_cache)
   }
+  log_msg(
+    "    Prepared for probability map generation: model metadata, anterior cell index, neighood raster cache and Parquet datasets ready.",
+    log_file
+  )
 
   # Map (from_val, to_val) pairs to their trans_rates.csv row index so we can
   # write TIFs with the row-number prefix that Dinamica's probability-map
@@ -672,6 +1123,13 @@ generate_probability_maps <- function(
     trans_name <- mi$trans_name
     from_val <- mi$from_val
     to_val <- mi$to_val
+    trans_tag <- sprintf(
+      "region=%s stage=trans_total from=%d to=%d",
+      region_suffix,
+      from_val,
+      to_val
+    )
+    t_trans_total <- prof_tic()
     log_msg(
       sprintf(
         "      Transition %d -> %d: predicting with model '%s'",
@@ -690,6 +1148,7 @@ generate_probability_maps <- function(
         ),
         log_file
       ))
+      prof_toc(t_trans_total, trans_tag, log_file)
       next
     }
 
@@ -700,6 +1159,7 @@ generate_probability_maps <- function(
     ]
     if (length(row_idx_row) == 0L) {
       # Not in trans_rates (e.g. zero-rate or not in this scenario) - skip
+      prof_toc(t_trans_total, trans_tag, log_file)
       next
     }
     row_idx <- row_idx_row[[1L]]
@@ -707,28 +1167,32 @@ generate_probability_maps <- function(
     # Sparse set of cells currently in this "from" class
     from_idx <- anterior_dt[lulc_class == from_val]
     if (nrow(from_idx) == 0L) {
+      prof_toc(t_trans_total, trans_tag, log_file)
       next
     }
 
     # Load model (we need its predictor names anyway, so load once + use
     # immediately + release at end of iteration).
+    t_model_load <- prof_tic()
     fitted_wf <- readRDS(mi$file_path)
-    preds_needed <- fitted_wf$predictor_names
-    if (is.null(preds_needed)) {
-      preds_needed <- tryCatch(
-        setdiff(
-          workflows::extract_recipe(fitted_wf)$var_info$variable,
-          "response"
-        ),
-        error = function(e) character()
-      )
-    }
+    prof_toc(
+      t_model_load,
+      sprintf(
+        "region=%s stage=model_load from=%d to=%d",
+        region_suffix,
+        from_val,
+        to_val
+      ),
+      log_file
+    )
+    preds_needed <- get_saved_transition_predictors(fitted_wf)
     nhood_needed <- grep("_nhood_", preds_needed, value = TRUE)
     parquet_needed <- setdiff(preds_needed, nhood_needed)
 
     # Start from_data with the sparse index (copy so we can augment with
     # predictors without mutating anterior_dt).
     from_data <- data.table::copy(from_idx)
+    pred_data <- NULL
 
     if (length(parquet_needed) > 0L) {
       log_msg(
@@ -738,6 +1202,7 @@ generate_probability_maps <- function(
         ),
         log_file
       )
+      t_predictor_load <- prof_tic()
       pred_data <- data.table::as.data.table(load_predictor_data(
         ds_static = ds_static,
         ds_dynamic = ds_dynamic,
@@ -746,6 +1211,16 @@ generate_probability_maps <- function(
         region_value = region_val,
         scenario = ssp_name
       ))
+      prof_toc(
+        t_predictor_load,
+        sprintf(
+          "region=%s stage=predictor_load from=%d to=%d",
+          region_suffix,
+          from_val,
+          to_val
+        ),
+        log_file
+      )
       if ("cell_id" %in% names(pred_data)) {
         data.table::setnames(pred_data, "cell_id", "ref_cell_id")
       }
@@ -761,6 +1236,7 @@ generate_probability_maps <- function(
         ),
         log_file
       )
+      t_nhood_extract <- prof_tic()
       nhood_stack <- terra::rast(lapply(nhood_needed, get_nhood_raster))
       nhood_vals <- terra::extract(
         nhood_stack,
@@ -771,20 +1247,35 @@ generate_probability_maps <- function(
         nhood_vals[, ID := NULL]
       }
       from_data[, (nhood_needed) := nhood_vals[, nhood_needed, with = FALSE]]
+      prof_toc(
+        t_nhood_extract,
+        sprintf(
+          "region=%s stage=nhood_extract from=%d to=%d",
+          region_suffix,
+          from_val,
+          to_val
+        ),
+        log_file
+      )
     }
 
-    # Predict, then release the model
-    # ranger's predict.ranger accesses $importance.mode unconditionally; if the
-    # slot was dropped during model-trimming or a ranger version change, the
-    # `%in%` test returns logical(0) and the enclosing `if` errors. Restore a
-    # safe default so prediction proceeds.
-    if (
-      inherits(fitted_wf$model$fit, "ranger") &&
-        !length(fitted_wf$model$fit$importance.mode)
-    ) {
-      fitted_wf$model$fit$importance.mode <- "none"
-    }
-    pred_result <- predict(fitted_wf$model, from_data, type = "prob")
+    # Predict, then release the model.
+    t_predict <- prof_tic()
+    pred_result <- predict_saved_transition_prob(
+      fitted_wf,
+      from_data,
+      log_file = log_file
+    )
+    prof_toc(
+      t_predict,
+      sprintf(
+        "region=%s stage=predict from=%d to=%d",
+        region_suffix,
+        from_val,
+        to_val
+      ),
+      log_file
+    )
     prob_values <- pred_result[[2L]]
     prob_values[is.na(prob_values)] <- 0
     prob_values <- pmax(0, pmin(1, prob_values))
@@ -805,6 +1296,7 @@ generate_probability_maps <- function(
 
     rm(fitted_wf, pred_result, from_data, pred_data)
     gc(verbose = FALSE)
+    prof_toc(t_trans_total, trans_tag, log_file)
   }
 
   # Normalize across transitions per cell (long-format, sparse)
@@ -826,6 +1318,7 @@ generate_probability_maps <- function(
   # Prefixing with 001, 002... so these files are sorted the same as the
   # transition, expansion, and patcher tables on all sorts of filesystems.
   log_msg("    Saving probability maps...", log_file)
+  t_write_total <- prof_tic()
   for (k in seq_len(nrow(trans_rates_dt))) {
     from_val <- trans_rates_dt[["From*"]][k]
     to_val <- trans_rates_dt[["To*"]][k]
@@ -846,6 +1339,7 @@ generate_probability_maps <- function(
       sprintf("%03d_id_trans_%d.tif", k, id_trans)
     )
 
+    t_raster_write <- prof_tic()
     terra::rasterize(
       x = as.matrix(dt_j[, .(x, y)]),
       y = anterior,
@@ -857,6 +1351,16 @@ generate_probability_maps <- function(
         overwrite = TRUE,
         NAflag = -999
       )
+    prof_toc(
+      t_raster_write,
+      sprintf(
+        "region=%s stage=raster_write from=%d to=%d",
+        region_suffix,
+        from_val,
+        to_val
+      ),
+      log_file
+    )
     log_msg(
       sprintf(
         "      Transition %d -> %d (id_trans=%d): %d cells, mean prob=%.4f, saved to %s",
@@ -870,6 +1374,11 @@ generate_probability_maps <- function(
       log_file
     )
   }
+  prof_toc(
+    t_write_total,
+    sprintf("region=%s stage=write_total", region_suffix),
+    log_file
+  )
 
   log_msg(sprintf("    Probability maps saved to: %s", prob_map_dir), log_file)
   return(prob_map_dir)

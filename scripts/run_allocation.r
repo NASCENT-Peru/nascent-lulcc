@@ -125,6 +125,42 @@ config <- tryCatch(
 
 cat("Configuration loaded successfully.\n\n")
 
+profile_enabled <- isTRUE(as.logical(
+  Sys.getenv("ALLOCATION_PROFILE", unset = "FALSE")
+))
+if (profile_enabled) {
+  profile_scenario <- Sys.getenv("ALLOCATION_PROFILE_SCENARIO", unset = "")
+  if (nzchar(profile_scenario)) {
+    if (!(profile_scenario %in% config[["scenario_names"]])) {
+      stop(sprintf(
+        "ALLOCATION_PROFILE_SCENARIO='%s' is not in config$scenario_names",
+        profile_scenario
+      ))
+    }
+    config[["scenario_names"]] <- profile_scenario
+    cat(sprintf(
+      "Profile mode: restricting to scenario '%s'\n",
+      profile_scenario
+    ))
+  }
+
+  profile_timestep_index <- Sys.getenv(
+    "ALLOCATION_PROFILE_TIMESTEP_INDEX",
+    unset = ""
+  )
+  if (nzchar(profile_timestep_index)) {
+    config[["profile_timestep_index"]] <- as.integer(profile_timestep_index)
+    if (is.na(config[["profile_timestep_index"]])) {
+      stop("ALLOCATION_PROFILE_TIMESTEP_INDEX must be an integer")
+    }
+    cat(sprintf(
+      "Profile mode: restricting to timestep index %d\n",
+      config[["profile_timestep_index"]]
+    ))
+  }
+  cat("Profile mode enabled.\n\n")
+}
+
 # Set up parallel processing
 num_workers <- as.integer(Sys.getenv("ALLOCATION_NUM_WORKERS", unset = "4"))
 cat(sprintf("Setting up parallel processing with %d workers\n", num_workers))
@@ -169,8 +205,13 @@ if (result$status == "error") {
 summary_file <- file.path(
   "logs",
   sprintf(
-    "allocation_summary_%s.txt",
-    Sys.getenv("SLURM_JOB_ID", unset = "local")
+    "allocation_summary_%s%s.txt",
+    Sys.getenv("SLURM_JOB_ID", unset = "local"),
+    ifelse(
+      nzchar(Sys.getenv("ALLOCATION_PROFILE_RUN_LABEL", unset = "")),
+      paste0("_", Sys.getenv("ALLOCATION_PROFILE_RUN_LABEL")),
+      ""
+    )
   )
 )
 
