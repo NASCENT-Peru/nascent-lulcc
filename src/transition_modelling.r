@@ -28,18 +28,29 @@ transition_modelling <- function(
   # Extract values from config if not provided (keys are flattened by build_full_config)
   if (is.null(model_dir)) {
     model_dir <- config[["transition_model_dir"]]
+    message(sprintf("Model directory set to: %s", model_dir))
   }
   if (is.null(eval_dir)) {
     eval_dir <- config[["transition_model_eval_dir"]]
+    message(sprintf("Evaluation directory set to: %s", eval_dir))
   }
   if (is.null(use_regions)) {
     use_regions <- config[["regionalization"]]
+    message(sprintf(
+      "Regionalization set to: %s",
+      ifelse(use_regions, "ENABLED", "DISABLED")
+    ))
   }
   if (is.null(model_specs_path)) {
     model_specs_path <- config[["model_specs_path"]]
+    message(sprintf("Model specifications path set to: %s", model_specs_path))
   }
   if (is.null(periods_to_process)) {
     periods_to_process <- config[["data_periods"]]
+    message(sprintf(
+      "Periods to process set to: %s",
+      paste(periods_to_process, collapse = ", ")
+    ))
   }
 
   # create model and eval directories if they do not exist
