@@ -17,9 +17,23 @@
 # Profiling helpers (opt-in via ALLOCATION_PROFILE env var).
 # When the env var is unset/FALSE, prof_tic() returns NULL and prof_toc() is a
 # no-op — no Sys.time() call, no log line, zero overhead beyond a single
-# env-var read. When enabled, prof_toc() emits one `PROFILE ... elapsed=...s`
-# line via log_msg (so it lands in both the per-region log file and stdout,
-# the latter captured by the SLURM .out).
+# env-var read. When enabled, prof_toc() emits one `PROFILE ... elapsed=...s
+# rss_before=...MB rss_after=...MB rss_delta=+/-...MB peak_rss=...MB
+# gc_max_ncells=...MB gc_max_vcells=...MB` line via log_msg (so it lands in
+# both the per-region log file and stdout, the latter captured by the SLURM
+# .out).
+#
+# Memory fields (Linux only; NA on Windows / non-/proc systems):
+#   rss_before/after  — VmRSS at stage entry/exit (resident memory, includes
+#                       native allocations from terra/arrow/xgboost — gc()
+#                       alone misses these)
+#   peak_rss          — VmHWM since the most recent prof_tic() reset, i.e.
+#                       per-stage peak resident memory
+#   gc_max_*          — R-managed cell maxes since prof_tic() (R-objects only)
+#
+# Caveat: external-process stages (e.g. Dinamica EGO) only show R-side RSS
+# during the call. Use SLURM's cgroup view (sacct MaxRSS) for total job
+# memory including child processes.
 #
 # Usage:
 #   t0 <- prof_tic()
@@ -29,17 +43,120 @@
   isTRUE(as.logical(Sys.getenv("ALLOCATION_PROFILE", unset = "FALSE")))
 }
 
+# Read VmRSS / VmHWM / VmSize from /proc/self/status, in MiB.
+# Returns NA fields on platforms without /proc (e.g. Windows dev machines).
+.read_proc_status <- function() {
+  if (!file.exists("/proc/self/status")) {
+    return(list(rss = NA_real_, vmhwm = NA_real_, vsize = NA_real_))
+  }
+  lines <- readLines("/proc/self/status", warn = FALSE)
+  parse_kb <- function(prefix) {
+    m <- grep(paste0("^", prefix, ":"), lines, value = TRUE)
+    if (!length(m)) {
+      return(NA_real_)
+    }
+    kb <- suppressWarnings(as.numeric(
+      regmatches(m[[1]], regexpr("[0-9]+", m[[1]]))
+    ))
+    if (length(kb) == 0L || is.na(kb)) NA_real_ else kb / 1024
+  }
+  list(
+    rss = parse_kb("VmRSS"),
+    vmhwm = parse_kb("VmHWM"),
+    vsize = parse_kb("VmSize")
+  )
+}
+
+# Reset Linux per-process VmHWM to current VmRSS so the next VmHWM read
+# reflects peak-since-now. Best-effort: silently no-ops on platforms without
+# /proc/self/clear_refs or if writing fails.
+.reset_vmhwm <- function() {
+  cf <- "/proc/self/clear_refs"
+  if (!file.exists(cf)) {
+    return(invisible(FALSE))
+  }
+  ok <- tryCatch(
+    {
+      con <- file(cf, "w")
+      on.exit(close(con), add = TRUE)
+      writeLines("5", con)
+      TRUE
+    },
+    error = function(e) FALSE,
+    warning = function(w) FALSE
+  )
+  invisible(ok)
+}
+
 prof_tic <- function() {
-  if (.profile_on()) Sys.time() else NULL
+  if (!.profile_on()) {
+    return(NULL)
+  }
+  .reset_vmhwm()
+  list(
+    t = Sys.time(),
+    mem = .read_proc_status(),
+    gc = gc(reset = TRUE, full = FALSE)
+  )
 }
 
 prof_toc <- function(t0, tag, log_file = NULL) {
   if (is.null(t0)) {
     return(invisible(NULL))
   }
-  dt <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
-  log_msg(sprintf("PROFILE %s elapsed=%.3fs", tag, dt), log_file)
-  invisible(dt)
+  dt <- as.numeric(difftime(Sys.time(), t0$t, units = "secs"))
+  after <- .read_proc_status()
+  gc_after <- gc(full = FALSE)
+  rss_delta <- after$rss - t0$mem$rss
+  # gc() returns a matrix with columns: used, (Mb), gc trigger, (Mb), max
+  # used, (Mb). Both "(Mb)" columns share a name, so we index by position
+  # (col 6) to get the max-used MB readout directly without re-deriving it
+  # from cell counts.
+  ncells_max_mb <- as.numeric(gc_after["Ncells", 6L])
+  vcells_max_mb <- as.numeric(gc_after["Vcells", 6L])
+  log_msg(
+    sprintf(
+      paste0(
+        "PROFILE %s elapsed=%.3fs rss_before=%.1fMB rss_after=%.1fMB ",
+        "rss_delta=%+.1fMB peak_rss=%.1fMB gc_max_ncells=%.1fMB ",
+        "gc_max_vcells=%.1fMB"
+      ),
+      tag,
+      dt,
+      t0$mem$rss,
+      after$rss,
+      rss_delta,
+      after$vmhwm,
+      ncells_max_mb,
+      vcells_max_mb
+    ),
+    log_file
+  )
+  invisible(list(
+    elapsed = dt,
+    rss_delta = rss_delta,
+    peak_rss = after$vmhwm
+  ))
+}
+
+# One-shot memory summary line — useful at the end of a region's worker run
+# so the post-job summariser doesn't have to scan every stage to find the
+# per-region max.
+prof_mem_summary <- function(tag, log_file = NULL) {
+  if (!.profile_on()) {
+    return(invisible(NULL))
+  }
+  m <- .read_proc_status()
+  log_msg(
+    sprintf(
+      "PROFILE_MEM %s summary rss=%.1fMB peak_rss=%.1fMB",
+      tag,
+      m$rss,
+      m$vmhwm
+    ),
+    log_file
+  )
+  invisible(m)
 }
 
 #' Detect if a loaded model object is in the "minimal saved transition model" format
@@ -682,6 +799,10 @@ run_allocation_one_timestep <- function(
       prof_toc(
         t_region_total,
         sprintf("region=%s stage=region_total", region_suffix),
+        log_file
+      )
+      prof_mem_summary(
+        sprintf("region=%s", region_suffix),
         log_file
       )
 

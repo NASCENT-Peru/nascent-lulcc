@@ -51,6 +51,24 @@ echo "Profile timestep index: $ALLOCATION_PROFILE_TIMESTEP_INDEX"
 echo "Allocated CPUs: ${SLURM_CPUS_PER_TASK:-8}"
 echo
 
+print_slurm_mem_snapshot() {
+    local label=$1
+    echo "----- SLURM memory snapshot ($label) -----"
+    if command -v sstat >/dev/null 2>&1; then
+        echo "[sstat — running step]"
+        sstat -j "$SLURM_JOB_ID" \
+            --format=JobID,MaxRSS,AveRSS,MaxVMSize \
+            --units=M 2>&1 || true
+    fi
+    if command -v sacct >/dev/null 2>&1; then
+        echo "[sacct — completed steps]"
+        sacct -j "$SLURM_JOB_ID" \
+            --format=JobID,JobName,MaxRSS,AveRSS,MaxVMSize,Elapsed,State \
+            --units=M 2>&1 || true
+    fi
+    echo "------------------------------------------"
+}
+
 run_profile_pass() {
     local run_label=$1
     local worker_count=$2
@@ -68,6 +86,7 @@ run_profile_pass() {
 
     echo
     echo "Profile pass '$run_label' exit code: $exit_code"
+    print_slurm_mem_snapshot "after pass=$run_label"
     echo
 
     return $exit_code
@@ -80,5 +99,7 @@ if [ $EXIT_CODE -eq 0 ]; then
     run_profile_pass parallel "${SLURM_CPUS_PER_TASK:-8}"
     EXIT_CODE=$?
 fi
+
+print_slurm_mem_snapshot "final"
 
 exit $EXIT_CODE
