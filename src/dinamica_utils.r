@@ -200,11 +200,83 @@ process_dinamica_script <- function(
 #' Copies the .ego-decoded model + submodels into work_dir, encodes to .ego,
 #' executes DinamicaConsole, and returns the path to the posterior.tif output.
 #'
-#' @param work_dir Working directory containing anterior.tif and all input CSVs
+#' Logging contract (Plan 01-03 Task 2; D-05, D-07, OBS-03):
+#'   - When `log_file` is supplied, the helper mirrors critical Dinamica
+#'     lifecycle events into that per-region log as structured one-line
+#'     breadcrumbs:
+#'         DINAMICA_START      model launch about to begin
+#'         DINAMICA_LOG_PATH   resolved Dinamica subprocess log path
+#'         DINAMICA_EXIT       successful exit; carries posterior path
+#'         DINAMICA_FAIL       failure exit; carries reason
+#'   - When `dry_run = TRUE`, the helper emits the same breadcrumb sequence
+#'     WITHOUT spawning DinamicaConsole or copying any model files. This
+#'     supports the plan's verification gate and lets test callers assert
+#'     the breadcrumb contract on hosts that lack Dinamica.
+#'
+#' @param work_dir Working directory containing anterior.tif and all input CSVs.
+#'   Either `work_dir` or `model_path` must be supplied. When both are present,
+#'   `model_path` takes precedence (used by dry-run/smoke-test paths).
 #' @param project_root Project root (to find dinamica model files)
+#' @param log_file Optional path to a per-region log; structured DINAMICA_*
+#'   breadcrumbs are appended here when supplied.
+#' @param dry_run Logical; when TRUE, emit the breadcrumb sequence but do not
+#'   actually launch DinamicaConsole. Default FALSE.
+#' @param model_path Optional explicit path to a `.ego` or `.ego-decoded`
+#'   model. Used by dry-run callers (and tests) that don't have a fully
+#'   prepared `work_dir` tree.
 #' @param ... additional args passed to exec_dinamica
-#' @return Path to posterior.tif
-run_allocation_dinamica <- function(work_dir, project_root = NULL, ...) {
+#' @return Path to posterior.tif (real run) or invisible NULL (dry run).
+run_allocation_dinamica <- function(work_dir = NULL,
+                                    project_root = NULL,
+                                    log_file = NULL,
+                                    dry_run = FALSE,
+                                    model_path = NULL,
+                                    ...) {
+  # Helper: emit a structured DINAMICA_* breadcrumb to log_file (if any) and
+  # also mirror it into the worker breadcrumb state so a later sentinel
+  # records the most recent stage.
+  emit <- function(event, ...) {
+    parts <- list(...)
+    body <- if (length(parts)) {
+      paste(
+        sprintf("%s=%s", names(parts), unlist(parts, use.names = FALSE)),
+        collapse = " "
+      )
+    } else {
+      ""
+    }
+    line <- paste0("DINAMICA_", event,
+                   if (nzchar(body)) paste0(" ", body) else "")
+    if (!is.null(log_file)) {
+      log_msg(line, log_file)
+    } else {
+      message(line)
+    }
+    if (exists("worker_state_set", mode = "function", inherits = TRUE)) {
+      try(worker_state_set(stage = paste0("dinamica_", tolower(event))),
+          silent = TRUE)
+    }
+  }
+
+  # Dry-run: emit the contract breadcrumbs and return without invoking
+  # DinamicaConsole. We resolve a synthetic Dinamica log path under work_dir
+  # (if supplied) or alongside model_path so DINAMICA_LOG_PATH carries a
+  # value that downstream tools can correlate.
+  if (isTRUE(dry_run)) {
+    base_dir <- if (!is.null(work_dir) && nzchar(work_dir)) work_dir
+                else if (!is.null(model_path)) dirname(model_path)
+                else tempdir()
+    log_path <- resolve_dinamica_log_path(base_dir)
+    emit("START", model = if (!is.null(model_path)) model_path else "<work_dir>")
+    emit("LOG_PATH", path = log_path)
+    emit("EXIT", status = 0, dry_run = "TRUE")
+    return(invisible(NULL))
+  }
+
+  if (is.null(work_dir)) {
+    stop("run_allocation_dinamica(): work_dir is required for non-dry runs")
+  }
+
   if (is.null(project_root)) {
     project_root <- find_project_root()
   }
@@ -215,10 +287,12 @@ run_allocation_dinamica <- function(work_dir, project_root = NULL, ...) {
       "DinamicaConsole not found on PATH; ",
       "Copying anterior.tif to posterior.tif as fallback so we can test."
     )
+    emit("START", model = "<fallback-copy>")
     file.copy(
       file.path(work_dir, "anterior.tif"),
       file.path(work_dir, "posterior.tif")
     )
+    emit("EXIT", status = 0, fallback = "TRUE")
     return(invisible(file.path(work_dir, "posterior.tif")))
   }
 
@@ -228,6 +302,7 @@ run_allocation_dinamica <- function(work_dir, project_root = NULL, ...) {
   submodels_src <- file.path(model_dir, "evoland_ego_Submodels")
 
   if (!file.exists(decoded_file)) {
+    emit("FAIL", reason = "decoded-model-missing", path = decoded_file)
     stop("allocation.ego-decoded not found at: ", decoded_file)
   }
 
@@ -259,13 +334,62 @@ run_allocation_dinamica <- function(work_dir, project_root = NULL, ...) {
 
   process_dinamica_script(ego_decoded, ego_encoded)
 
+  # Resolve where the Dinamica subprocess log will land. Plan 01-03 Task 2
+  # mirrors the path into the per-region log via DINAMICA_LOG_PATH so a
+  # post-mortem run can correlate the two artifacts.
+  dinamica_log_path <- resolve_dinamica_log_path(work_dir)
+
+  emit("START", model = ego_encoded)
+  emit("LOG_PATH", path = dinamica_log_path)
   message("Starting Dinamica allocation model in: ", work_dir)
-  exec_dinamica(model_path = ego_encoded, ...)
+
+  res <- tryCatch(
+    exec_dinamica(model_path = ego_encoded, ...),
+    error = function(e) e
+  )
+
+  if (inherits(res, "error")) {
+    emit("FAIL", reason = "exec_dinamica-error",
+         message = shQuote(conditionMessage(res)))
+    stop(res)
+  }
 
   posterior_path <- file.path(work_dir, "posterior.tif")
   if (!file.exists(posterior_path)) {
+    emit("FAIL", reason = "no-posterior-tif", work_dir = work_dir)
     stop("Dinamica did not produce posterior.tif in: ", work_dir)
   }
 
+  emit("EXIT", status = 0, posterior = posterior_path)
   invisible(posterior_path)
+}
+
+#' Resolve where Dinamica subprocess logs should land for a given work_dir.
+#'
+#' Returns a timestamped path under the central `logs/` directory at the
+#' project root (D-07: keep raw Dinamica logs in one place). Falls back to
+#' `<work_dir>/<timestamp>_dinamica.log` if the central logs directory
+#' cannot be created.
+#'
+#' @param work_dir Region work directory.
+#' @return Absolute path to the intended Dinamica subprocess log file.
+resolve_dinamica_log_path <- function(work_dir) {
+  ts <- format(Sys.time(), "%Y-%m-%d_%Hh%Mm%Ss")
+  central <- tryCatch({
+    root <- find_project_root()
+    logs_dir <- file.path(root, "logs", "dinamica")
+    if (!dir.exists(logs_dir)) {
+      dir.create(logs_dir, recursive = TRUE, showWarnings = FALSE)
+    }
+    if (dir.exists(logs_dir)) {
+      file.path(logs_dir, sprintf("%s_dinamica.log", ts))
+    } else {
+      NULL
+    }
+  }, error = function(e) NULL)
+
+  if (!is.null(central)) {
+    return(central)
+  }
+  file.path(work_dir, sprintf("%s_dinamica.log", ts))
 }

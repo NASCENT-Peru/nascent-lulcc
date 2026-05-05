@@ -904,11 +904,30 @@ run_allocation_one_timestep <- function(
         region_suffix
       )
 
+      # Breadcrumb state for this worker (Plan 01-03 Task 2; D-06, OBS-02).
+      # If the worker dies before reaching the explicit on.exit() below
+      # (e.g. SIGKILL), the in-memory state is lost — but lifecycle STATE
+      # lines are flushed to log_file at every transition so the latest
+      # known state is always durable on disk.
+      worker_state_init(
+        scenario = scenario,
+        region = region_label,
+        timestep = year_post,
+        log_file = log_file
+      )
+      sentinel_reason <- "incomplete"
+      on.exit({
+        # Reachable on R-level errors and on normal exit. Sentinel reason
+        # is "ok" only if we set it explicitly at the bottom of the worker.
+        worker_state_flush_sentinel(log_file, reason = sentinel_reason)
+      }, add = TRUE)
+
       log_msg(
         sprintf("    Region: %s (ID=%d)", region_label, region_val),
         log_file
       )
 
+      worker_state_set(stage = "region_setup", log_file = log_file)
       t_region_total <- prof_tic()
       t_region_setup <- prof_tic()
 
@@ -942,8 +961,10 @@ run_allocation_one_timestep <- function(
         log_file
       )
 
-      #todo pass the log_file to the functions called within setup_allocation_inputs and run_allocation_dinamica so they can log messages there as well, instead of just in this main loop. This will give us more visibility into what's happening inside those functions, especially if something goes wrong.
-      # Prepare all Dinamica input files
+      # Prepare all Dinamica input files. log_file is threaded both into
+      # setup_allocation_inputs() and (D-05, OBS-03) into run_allocation_dinamica()
+      # so structured DINAMICA_* breadcrumbs land in this same per-region log.
+      worker_state_set(stage = "setup_inputs", log_file = log_file)
       t_setup_inputs <- prof_tic()
       setup_allocation_inputs(
         work_dir = region_work_dir,
@@ -964,8 +985,12 @@ run_allocation_one_timestep <- function(
       )
 
       # Run Dinamica
+      worker_state_set(stage = "dinamica_launch", log_file = log_file)
       t_dinamica <- prof_tic()
-      posterior_path <- run_allocation_dinamica(region_work_dir)
+      posterior_path <- run_allocation_dinamica(
+        work_dir = region_work_dir,
+        log_file = log_file
+      )
       prof_toc(
         t_dinamica,
         sprintf("region=%s stage=dinamica", region_suffix),
@@ -989,6 +1014,8 @@ run_allocation_one_timestep <- function(
         log_file
       )
 
+      # Worker reached the end successfully — sentinel will record reason="ok".
+      sentinel_reason <- "ok"
       return(posterior_path)
     },
     .options = furrr::furrr_options(seed = TRUE)
@@ -1434,6 +1461,12 @@ generate_probability_maps <- function(
       to_val
     )
     t_trans_total <- prof_tic()
+    # Update breadcrumb state so a sentinel emitted on SIGKILL records which
+    # transition the worker was on (D-06, OBS-02).
+    if (exists("worker_state_set", mode = "function", inherits = TRUE)) {
+      try(worker_state_set(stage = "predict", transition = trans_name),
+          silent = TRUE)
+    }
     log_msg(
       sprintf(
         "      Transition %d -> %d: predicting with model '%s'",

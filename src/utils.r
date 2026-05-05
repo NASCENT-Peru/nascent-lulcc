@@ -1036,3 +1036,128 @@ initialize_worker_log <- function(log_dir, trans_name) {
   log_msg(sprintf("Initialized log file for %s", trans_name), log_file)
   return(log_file)
 }
+
+# ---------------------------------------------------------------------------
+# Worker breadcrumb / sentinel state (Plan 01-03 Task 2; D-06, D-08, OBS-02).
+#
+# Each allocation worker maintains a small in-memory state record describing
+# its last-known scenario/region/timestep/transition. The state is updated
+# at lifecycle boundaries via worker_state_set() and flushed as a single
+# "SENTINEL" log line on handled errors or worker termination paths.
+#
+# The state lives in a per-process environment so future::multisession
+# workers (each their own R process) keep an independent copy. We do NOT
+# normalize every log line in Phase 1 (D-08); only critical lifecycle
+# events are emitted via STATE / SENTINEL messages.
+# ---------------------------------------------------------------------------
+.worker_state_env <- new.env(parent = emptyenv())
+
+#' Initialize the breadcrumb state for a worker (one-time, top of region run).
+#' @param scenario Scenario name (e.g. "BAU")
+#' @param region Region label (e.g. "Andes")
+#' @param timestep Year_post for the current allocation step (integer or string)
+#' @return invisible NULL
+worker_state_init <- function(scenario = NA_character_, region = NA_character_,
+                              timestep = NA, log_file = NULL) {
+  assign("scenario", as.character(scenario), envir = .worker_state_env)
+  assign("region", as.character(region), envir = .worker_state_env)
+  assign("timestep", as.character(timestep), envir = .worker_state_env)
+  assign("transition", NA_character_, envir = .worker_state_env)
+  assign("stage", "init", envir = .worker_state_env)
+  if (!is.null(log_file)) {
+    log_msg(
+      sprintf(
+        "STATE stage=init scenario=%s region=%s timestep=%s",
+        scenario, region, timestep
+      ),
+      log_file
+    )
+  }
+  invisible(NULL)
+}
+
+#' Update the breadcrumb state at a lifecycle boundary.
+#'
+#' @param stage Lifecycle stage name (e.g. "region_setup", "setup_inputs",
+#'   "predict", "dinamica_launch", "dinamica_exit").
+#' @param transition Optional transition name (e.g. "forest_to_crop").
+#' @param log_file Optional per-region log to mirror the STATE line into.
+#' @return invisible NULL
+worker_state_set <- function(stage, transition = NA_character_, log_file = NULL) {
+  assign("stage", as.character(stage), envir = .worker_state_env)
+  if (!is.na(transition)) {
+    assign("transition", as.character(transition), envir = .worker_state_env)
+  }
+  if (!is.null(log_file)) {
+    s <- worker_state_get()
+    log_msg(
+      sprintf(
+        "STATE stage=%s scenario=%s region=%s timestep=%s transition=%s",
+        s$stage, s$scenario, s$region, s$timestep, s$transition
+      ),
+      log_file
+    )
+  }
+  invisible(NULL)
+}
+
+#' Get the current breadcrumb state as a named list.
+worker_state_get <- function() {
+  get_or <- function(key, default = NA_character_) {
+    if (exists(key, envir = .worker_state_env, inherits = FALSE)) {
+      get(key, envir = .worker_state_env, inherits = FALSE)
+    } else {
+      default
+    }
+  }
+  list(
+    scenario = get_or("scenario"),
+    region = get_or("region"),
+    timestep = get_or("timestep"),
+    transition = get_or("transition"),
+    stage = get_or("stage")
+  )
+}
+
+#' Flush a one-line SENTINEL record to the per-worker log.
+#'
+#' Designed to be called from `on.exit()` or an error handler so worker
+#' termination always leaves durable evidence even when SIGKILL eats the
+#' parent (the log is already on disk by then).
+#'
+#' Emits a single line of form:
+#'   SENTINEL reason=<reason> stage=<stage> scenario=<...> region=<...> timestep=<...> transition=<...>
+#'
+#' followed by a JSON-encoded payload on a second line for machine parsing.
+#'
+#' @param log_file Path to the per-worker log.
+#' @param reason Short reason tag ("error", "sigkill-suspected", "test-injected", ...).
+#' @return invisible NULL
+worker_state_flush_sentinel <- function(log_file, reason = "unknown") {
+  s <- worker_state_get()
+  reason <- as.character(reason)
+  log_msg(
+    sprintf(
+      "SENTINEL reason=%s stage=%s scenario=%s region=%s timestep=%s transition=%s",
+      reason, s$stage, s$scenario, s$region, s$timestep, s$transition
+    ),
+    log_file
+  )
+  # Second line is a JSON object so post-mortem tooling can parse cleanly.
+  if (requireNamespace("jsonlite", quietly = TRUE)) {
+    payload <- list(
+      event = "SENTINEL",
+      reason = reason,
+      stage = s$stage,
+      scenario = s$scenario,
+      region = s$region,
+      timestep = s$timestep,
+      transition = s$transition
+    )
+    log_msg(
+      jsonlite::toJSON(payload, auto_unbox = TRUE, na = "string"),
+      log_file
+    )
+  }
+  invisible(NULL)
+}
