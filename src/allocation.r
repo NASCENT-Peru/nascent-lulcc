@@ -43,28 +43,58 @@
   isTRUE(as.logical(Sys.getenv("ALLOCATION_PROFILE", unset = "FALSE")))
 }
 
-# Read VmRSS / VmHWM / VmSize from /proc/self/status, in MiB.
-# Returns NA fields on platforms without /proc (e.g. Windows dev machines).
+# Portable process memory reader (OBS-01, Plan 01-03).
+#
+# Returns a list with elements (all in MiB):
+#   rss    — current resident set size from `ps::ps_memory_info()$rss`
+#   vmhwm  — Linux-only peak resident size (VmHWM since most recent
+#            .reset_vmhwm()), NA on non-/proc hosts
+#   vsize  — current virtual memory size from `ps::ps_memory_info()$vmem`
+#
+# Why portable: the previous implementation parsed `/proc/self/status`,
+# which is Linux-only and silently returned NA on Windows local dev runs.
+# The `ps` package documents `rss` and `vmem` as portable across UNIX and
+# Windows, so we use it as the authoritative RSS source. Linux-specific
+# VmHWM remains as opt-in enrichment for per-stage peak reporting.
+#
+# Failure mode: if `ps` is missing (which the pre-flight catches before any
+# work starts) or its call fails, we fall back to NA fields so callers
+# continue to format profile lines without crashing — but the canonical
+# expectation is that pre-flight has already validated `ps` availability.
 .read_proc_status <- function() {
-  if (!file.exists("/proc/self/status")) {
-    return(list(rss = NA_real_, vmhwm = NA_real_, vsize = NA_real_))
-  }
-  lines <- readLines("/proc/self/status", warn = FALSE)
-  parse_kb <- function(prefix) {
-    m <- grep(paste0("^", prefix, ":"), lines, value = TRUE)
-    if (!length(m)) {
-      return(NA_real_)
+  rss <- NA_real_
+  vsize <- NA_real_
+  if (requireNamespace("ps", quietly = TRUE)) {
+    info <- tryCatch(ps::ps_memory_info(), error = function(e) NULL)
+    if (!is.null(info)) {
+      r <- unname(info[["rss"]])
+      v <- unname(info[["vmem"]])
+      if (length(r) && is.numeric(r) && !is.na(r)) rss <- r / (1024 * 1024)
+      if (length(v) && is.numeric(v) && !is.na(v)) vsize <- v / (1024 * 1024)
     }
-    kb <- suppressWarnings(as.numeric(
-      regmatches(m[[1]], regexpr("[0-9]+", m[[1]]))
-    ))
-    if (length(kb) == 0L || is.na(kb)) NA_real_ else kb / 1024
   }
-  list(
-    rss = parse_kb("VmRSS"),
-    vmhwm = parse_kb("VmHWM"),
-    vsize = parse_kb("VmSize")
-  )
+
+  vmhwm <- NA_real_
+  if (file.exists("/proc/self/status")) {
+    lines <- readLines("/proc/self/status", warn = FALSE)
+    parse_kb <- function(prefix) {
+      m <- grep(paste0("^", prefix, ":"), lines, value = TRUE)
+      if (!length(m)) {
+        return(NA_real_)
+      }
+      kb <- suppressWarnings(as.numeric(
+        regmatches(m[[1]], regexpr("[0-9]+", m[[1]]))
+      ))
+      if (length(kb) == 0L || is.na(kb)) NA_real_ else kb / 1024
+    }
+    # Prefer the procfs RSS reading on Linux only when ps did not produce one
+    # (so the portable path remains the canonical source).
+    if (is.na(rss)) rss <- parse_kb("VmRSS")
+    if (is.na(vsize)) vsize <- parse_kb("VmSize")
+    vmhwm <- parse_kb("VmHWM")
+  }
+
+  list(rss = rss, vmhwm = vmhwm, vsize = vsize)
 }
 
 # Reset Linux per-process VmHWM to current VmRSS so the next VmHWM read
@@ -158,6 +188,148 @@ prof_mem_summary <- function(tag, log_file = NULL) {
   )
   invisible(m)
 }
+
+# ---------------------------------------------------------------------------
+# Stage 7 pre-flight gate (Plan 01-03, locked decisions D-01..D-04).
+#
+# Operator gate that runs before any allocation work starts and aggregates
+# every missing prerequisite into ONE actionable failure list. Categories
+# checked:
+#   - env vars (the contract surface from `get_stage7_runtime_paths()` plus
+#     anything else the caller injects)
+#   - R packages (pre-flight tests `requireNamespace()`, never installs)
+#   - files (model RDS, parquet roots, transition rates, etc.)
+#   - Dinamica backend availability (executable on PATH, container artifact
+#     for HPC backends)
+#
+# The function NEVER calls `install.packages()` or modifies the environment;
+# environment provisioning belongs in `setup_environments.sh`. Callers MUST
+# stop on any non-empty result before `future::plan()` or any region work.
+#
+# Args:
+#   config: optional config list (from get_config()); used to derive default
+#     prerequisite expectations when no fixture is supplied.
+#   fixture: optional named list with keys `env`, `packages`, `files`,
+#     `dinamica` (with sub-keys `backend`, `runtime`, `artifact`). When
+#     supplied, the function validates ONLY the fixture-declared expectations
+#     so verification can assert the consolidated-failure-list contract
+#     without mutating the host. When NULL, the function derives defaults
+#     from `config` and the Stage 7 contract.
+#
+# Returns: character vector of human-readable error lines; empty vector
+# means "pre-flight passed".
+validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
+  errors <- character(0)
+
+  # Resolve the four prerequisite buckets from either the fixture or the
+  # contract+config. Fixtures are EXACT (no defaults merged in) so that test
+  # callers can isolate single failure modes.
+  env_expected <- character(0)
+  packages_expected <- character(0)
+  files_expected <- character(0)
+  dinamica_expected <- NULL
+
+  if (!is.null(fixture)) {
+    env_expected <- as.character(fixture[["env"]] %||% character(0))
+    packages_expected <- as.character(fixture[["packages"]] %||% character(0))
+    files_expected <- as.character(fixture[["files"]] %||% character(0))
+    dinamica_expected <- fixture[["dinamica"]]
+  } else {
+    # Default contract: the Stage 7 path/env vars from Plan 01-01, the
+    # prediction-time package set from Plan 01-02 (MEM-06), and a Dinamica
+    # backend assertion derived from the env contract.
+    env_expected <- c("HPC_SCRATCH_ROOT", "HPC_TMP_ROOT", "TERRA_TEMP",
+                      "DINAMICA_EGO_8_HOME")
+    packages_expected <- c(
+      "ps", "terra", "arrow", "data.table", "future", "furrr",
+      "processx", "base64enc", "dplyr", "stringr", "yaml", "jsonlite",
+      "workflows", "parsnip", "recipes", "ranger", "xgboost",
+      "tidypredict", "butcher", "bundle", "qs", "lobstr", "RhpcBLASctl"
+    )
+    if (!is.null(config)) {
+      # Best-effort file expectations from the live config — only include
+      # files that the config actually points at, so a partial config does
+      # not produce noise.
+      maybe <- function(key) {
+        v <- config[[key]]
+        if (is.character(v) && length(v) == 1L && nzchar(v)) v else NULL
+      }
+      files_expected <- c(
+        maybe("ref_grid_path"),
+        maybe("lulc_aggregation_path")
+      )
+    }
+    dinamica_backend <- Sys.getenv("DINAMICA_BACKEND", unset = "auto")
+    dinamica_artifact <- Sys.getenv("DINAMICA_EGO_8_HOME", unset = "")
+    dinamica_expected <- list(
+      backend = dinamica_backend,
+      runtime = if (identical(dinamica_backend, "hpc")) "apptainer" else "DinamicaConsole",
+      artifact = dinamica_artifact
+    )
+  }
+
+  # 1. env vars
+  for (key in env_expected) {
+    val <- Sys.getenv(key, unset = NA_character_)
+    if (is.na(val) || !nzchar(val)) {
+      errors <- c(errors, sprintf("env: missing or empty %s", key))
+    }
+  }
+
+  # 2. packages (test-only, never install)
+  for (pkg in packages_expected) {
+    ok <- suppressWarnings(requireNamespace(pkg, quietly = TRUE))
+    if (!isTRUE(ok)) {
+      errors <- c(errors, sprintf(
+        "package: %s not installed (pre-flight does not install — fix the env file)",
+        pkg
+      ))
+    }
+  }
+
+  # 3. files
+  for (f in files_expected) {
+    if (!nzchar(f)) next
+    if (!file.exists(f)) {
+      errors <- c(errors, sprintf("file: missing %s", f))
+    }
+  }
+
+  # 4. Dinamica backend availability
+  if (!is.null(dinamica_expected)) {
+    backend <- dinamica_expected[["backend"]] %||% "auto"
+    runtime <- dinamica_expected[["runtime"]] %||%
+      (if (identical(backend, "hpc")) "apptainer" else "DinamicaConsole")
+    artifact <- dinamica_expected[["artifact"]] %||% ""
+
+    if (identical(backend, "hpc")) {
+      # HPC: container runtime probe + container artifact must exist.
+      have_runtime <- any(nzchar(Sys.which(c(runtime, "singularity", "apptainer"))))
+      if (!have_runtime) {
+        errors <- c(errors, sprintf(
+          "dinamica: container runtime '%s' not on PATH (HPC backend)", runtime
+        ))
+      }
+      if (!nzchar(artifact)) {
+        errors <- c(errors, "dinamica: HPC backend selected but DINAMICA_EGO_8_HOME (artifact path) is empty")
+      } else if (!file.exists(artifact)) {
+        errors <- c(errors, sprintf("dinamica: container artifact missing: %s", artifact))
+      }
+    } else if (identical(backend, "local")) {
+      if (!nzchar(Sys.which("DinamicaConsole"))) {
+        errors <- c(errors, "dinamica: DinamicaConsole not on PATH (local backend)")
+      }
+    }
+    # backend == "auto" intentionally does no positive probe at pre-flight
+    # time; later work selects the backend explicitly.
+  }
+
+  errors
+}
+
+# Small null-coalesce operator local to this file; avoids importing rlang
+# just for its `%||%`.
+`%||%` <- function(x, y) if (is.null(x) || (is.atomic(x) && length(x) == 0L)) y else x
 
 #' Detect if a loaded model object is in the "minimal saved transition model" format
 #' (contains only a recipe and a fitted model, without the full workflow structure).
@@ -536,6 +708,17 @@ run_allocation <- function(config = get_config()) {
   message("\n========================================")
   message("Starting LULC Allocation Simulations")
   message("========================================\n")
+
+  # Stage 7 operator gate (Plan 01-03, D-01..D-04). One actionable list, then
+  # stop BEFORE any future::plan(), worker-log init, or region work runs.
+  preflight_errors <- validate_allocation_runtime(config = config)
+  if (length(preflight_errors) > 0L) {
+    msg <- paste(
+      c("Allocation pre-flight failed:", paste0("  - ", preflight_errors)),
+      collapse = "\n"
+    )
+    stop(msg, call. = FALSE)
+  }
 
   # Load regions
   regions <- jsonlite::fromJSON(file.path(config[["reg_dir"]], "regions.json"))
