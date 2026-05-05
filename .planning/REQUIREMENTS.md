@@ -27,6 +27,10 @@
 - [ ] **PERF-02**: Predictor Parquet reads inside workers use lazy `arrow::open_dataset()` with column projection — not `read_parquet()` in the parent
 - [ ] **PERF-03**: Completed (scenario, timestep, region, transition) combinations are skipped on restart — outputs are written atomically via `<name>.tmp.tif` → `file.rename()`
 
+### Infrastructure
+
+- [ ] **INFRA-01**: Dinamica EGO 8 runs inside a Singularity container on ETH Euler HPC — container built from the `ethzplus/rocker-geospatial-dinamica` Rocker image (reference: https://github.com/ethzplus/rocker-geospatial-dinamica), tested with a minimal allocation model, and invocable from `exec_dinamica()` via `DINAMICA_EGO_8_HOME` pointing to the container binary
+
 ### Pipeline Correctness
 
 - [ ] **PIPE-01**: `simulation_trans_rates_prep.r` reads LULC demand from the config-driven CSV path (`config[["lulc_demand_path"]]`) — the hardcoded Windows xlsx path is removed
@@ -65,32 +69,39 @@ Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| OBS-01 | — | Pending |
-| OBS-02 | — | Pending |
-| OBS-03 | — | Pending |
-| OBS-04 | — | Pending |
-| MEM-01 | — | Pending |
-| MEM-02 | — | Pending |
-| MEM-03 | — | Pending |
-| MEM-04 | — | Pending |
-| MEM-05 | — | Pending |
-| MEM-06 | — | Pending |
-| PERF-01 | — | Pending |
-| PERF-02 | — | Pending |
-| PERF-03 | — | Pending |
-| PIPE-01 | — | Pending |
-| PIPE-02 | — | Pending |
-| PIPE-03 | — | Pending |
-| PIPE-04 | — | Pending |
-| PIPE-05 | — | Pending |
-| PIPE-06 | — | Pending |
-| PIPE-07 | — | Pending |
+| OBS-01 | Phase 1 | Pending |
+| OBS-02 | Phase 1 | Pending |
+| OBS-03 | Phase 1 | Pending |
+| OBS-04 | Phase 1 | Pending |
+| MEM-01 | Phase 3 | Pending |
+| MEM-02 | Phase 3 | Pending |
+| MEM-03 | Phase 3 | Pending |
+| MEM-04 | Phase 2 | Pending |
+| MEM-05 | Phase 3 | Pending |
+| MEM-06 | Phase 1 | Pending |
+| PERF-01 | Phase 4 | Pending |
+| PERF-02 | Phase 4 | Pending |
+| PERF-03 | Phase 4 | Pending |
+| INFRA-01 | Phase 1 | Pending |
+| PIPE-01 | Phase 1 | Pending |
+| PIPE-02 | Phase 4 | Pending |
+| PIPE-03 | Phase 1 | Pending |
+| PIPE-04 | Phase 1 | Pending |
+| PIPE-05 | Phase 4 | Pending |
+| PIPE-06 | Phase 4 | Pending |
+| PIPE-07 | Phase 1 | Pending |
 
 **Coverage:**
-- v1 requirements: 20 total
-- Mapped to phases: 0 (updated during roadmap creation)
-- Unmapped: 20 ⚠️
+- v1 requirements: 21 total
+- Mapped to phases: 21 ✓
+- Unmapped: 0
+
+**Phase totals:**
+- Phase 1 (Repair & Visibility): 10 requirements — OBS-01, OBS-02, OBS-03, OBS-04, MEM-06, INFRA-01, PIPE-01, PIPE-03, PIPE-04, PIPE-07
+- Phase 2 (Model Size Reduction): 1 requirement — MEM-04
+- Phase 3 (Parallelism & Memory Architecture): 4 requirements — MEM-01, MEM-02, MEM-03, MEM-05
+- Phase 4 (End-to-End Correctness & Performance): 6 requirements — PERF-01, PERF-02, PERF-03, PIPE-02, PIPE-05, PIPE-06
 
 ---
 *Requirements defined: 2026-05-05*
-*Last updated: 2026-05-05 after initial definition*
+*Last updated: 2026-05-05 — phase mappings added during roadmap creation*

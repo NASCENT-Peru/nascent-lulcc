@@ -87,6 +87,7 @@ Stages 1–6 (data prep through spatial interventions) are functional. Stage 7 (
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
+| Run Dinamica EGO 8 inside Singularity on HPC | ETH Euler does not support arbitrary binaries natively; Singularity container from `ethzplus/rocker-geospatial-dinamica` (https://github.com/ethzplus/rocker-geospatial-dinamica) provides the required runtime | — Pending |
 | Use `future::multisession` for allocation parallelism | Was available, standard in R ecosystem | ⚠️ Revisit — causes full object duplication per worker; may need `multicore` (fork-based, Linux-only) or redesign |
 | tidymodels as modelling framework | Good ecosystem, unified interface | ⚠️ Revisit — model objects >1GB even after butchering; mlr3 under evaluation |
 | Sequential prediction per transition within each worker | Simple logic, easier to debug | ⚠️ Revisit — `predict` stage is 385–472s per transition; potential for batching or rasterisation |
