@@ -1,9 +1,51 @@
 #!/usr/bin/env Rscript
 # run_allocation.r
-# Run the LULC allocation simulations using Dinamica EGO
-
+# Run the LULC allocation simulations using Dinamica EGO.
+#
+# Phase 1 Plan 01-03 contract:
+#   - Pre-flight is the ONLY gate. We do NOT install missing packages at
+#     runtime — environment provisioning is done by `setup_environments.sh`
+#     and the `allocation_env.yml` contract. Self-healing installs hide
+#     env drift instead of failing fast (RESEARCH Pitfall 3).
+#   - Two operator-facing flags:
+#         --preflight-only           Run the consolidated pre-flight gate
+#                                    and exit (zero on PASS, non-zero on
+#                                    FAIL). Does not load region data,
+#                                    set up workers, or do any allocation.
+#         --preflight-fixture FILE   Optional JSON file describing a
+#                                    synthetic prerequisite world (env vars,
+#                                    packages, files, Dinamica backend
+#                                    expectations). When provided, the
+#                                    pre-flight uses the fixture exclusively
+#                                    so verification can assert one
+#                                    consolidated failure list without
+#                                    mutating the host.
+#
 # Capture start time
 start_time <- Sys.time()
+
+# ---------------------------------------------------------------------------
+# Argument parsing (very small, only the flags this entry script supports)
+# ---------------------------------------------------------------------------
+.cli_args <- commandArgs(trailingOnly = TRUE)
+preflight_only <- FALSE
+preflight_fixture_path <- NULL
+i <- 1L
+while (i <= length(.cli_args)) {
+  a <- .cli_args[[i]]
+  if (identical(a, "--preflight-only")) {
+    preflight_only <- TRUE
+  } else if (identical(a, "--preflight-fixture")) {
+    if (i + 1L > length(.cli_args)) {
+      stop("--preflight-fixture requires a path argument")
+    }
+    preflight_fixture_path <- .cli_args[[i + 1L]]
+    i <- i + 1L
+  } else if (startsWith(a, "--preflight-fixture=")) {
+    preflight_fixture_path <- sub("^--preflight-fixture=", "", a)
+  }
+  i <- i + 1L
+}
 
 cat("\n========================================\n")
 cat("Starting LULC Allocation Simulations\n")
@@ -18,62 +60,10 @@ cat(".libPaths():\n")
 print(.libPaths())
 cat("\n")
 
-# Load required packages (fail fast with informative messages)
-required_pkgs <- c(
-  "terra",
-  "arrow",
-  "data.table",
-  "future",
-  "furrr",
-  "processx",
-  "base64enc",
-  "dplyr",
-  "stringr",
-  "yaml",
-  "jsonlite",
-  "workflows",
-  "readr",
-  "purrr"
-)
-
-missing_pkgs <- setdiff(required_pkgs, rownames(installed.packages()))
-if (length(missing_pkgs) > 0) {
-  cat("WARNING: The following packages are missing in this R environment:\n")
-  print(missing_pkgs)
-  cat("Attempting to install missing packages into R_LIBS_USER...\n")
-  repos <- "https://cloud.r-project.org"
-  for (p in missing_pkgs) {
-    tryCatch(
-      {
-        install.packages(
-          p,
-          repos = repos,
-          lib = Sys.getenv("R_LIBS_USER", unset = .libPaths()[1])
-        )
-      },
-      error = function(e) {
-        cat(sprintf("ERROR installing package %s: %s\n", p, e$message))
-      }
-    )
-  }
-}
-
-# Load packages
-for (p in required_pkgs) {
-  if (!suppressWarnings(requireNamespace(p, quietly = TRUE))) {
-    stop(sprintf(
-      "Required package '%s' is not available even after attempted install.
-       Please install it in the environment: %s",
-      p,
-      Sys.getenv("CONDA_PREFIX", unset = "(unknown)")
-    ))
-  }
-  library(p, character.only = TRUE)
-}
-
-cat("All required packages loaded successfully.\n\n")
-
-# Set working directory to project root
+# ---------------------------------------------------------------------------
+# Set working directory to project root (needs to happen before sourcing
+# `src/*.r`).
+# ---------------------------------------------------------------------------
 script_path <- commandArgs(trailingOnly = FALSE)
 script_path <- script_path[grepl("--file=", script_path)]
 if (length(script_path) > 0) {
@@ -88,13 +78,18 @@ if (length(script_path) > 0) {
 setwd(project_root)
 cat(sprintf("Working directory set to: %s\n", getwd()))
 
-# Source all required functions from src/
+# ---------------------------------------------------------------------------
+# Source allocation source files.
+#
+# We deliberately do NOT call install.packages() here (Plan 01-03, D-01..D-04
+# + RESEARCH Pitfall 3). If a required package is missing, the pre-flight
+# gate below will surface it as ONE actionable failure line.
+# ---------------------------------------------------------------------------
 src_files <- c(
   "src/setup.r",
   "src/utils.r",
   "src/dinamica_utils.r",
-  "src/allocation.r",
-  "src/lulcc.spatprobmanipulation.r"
+  "src/allocation.r"
 )
 
 for (src_file in src_files) {
@@ -111,7 +106,56 @@ for (src_file in src_files) {
 }
 cat("\n")
 
-# Get configuration
+# ---------------------------------------------------------------------------
+# Pre-flight-only mode: load fixture (optional), run validate_allocation_runtime(),
+# print one consolidated failure list (or PASS), and exit. Does NOT load config,
+# set up workers, or do any allocation work.
+# ---------------------------------------------------------------------------
+run_preflight_and_print <- function(fixture = NULL, config = NULL) {
+  errors <- validate_allocation_runtime(config = config, fixture = fixture)
+  if (length(errors) == 0L) {
+    cat("Allocation pre-flight passed.\n")
+    return(0L)
+  }
+  cat("Allocation pre-flight failed:\n")
+  for (line in errors) {
+    cat(sprintf("  - %s\n", line))
+  }
+  return(1L)
+}
+
+if (preflight_only) {
+  fixture <- NULL
+  if (!is.null(preflight_fixture_path)) {
+    if (!file.exists(preflight_fixture_path)) {
+      cat(sprintf(
+        "ERROR: --preflight-fixture path does not exist: %s\n",
+        preflight_fixture_path
+      ))
+      quit(status = 2)
+    }
+    if (!requireNamespace("jsonlite", quietly = TRUE)) {
+      cat("ERROR: package 'jsonlite' is required to read --preflight-fixture\n")
+      quit(status = 2)
+    }
+    fixture <- jsonlite::fromJSON(
+      preflight_fixture_path,
+      simplifyVector = TRUE,
+      simplifyDataFrame = FALSE,
+      simplifyMatrix = FALSE
+    )
+  }
+
+  # Pre-flight-only path intentionally does not call get_config(); the
+  # fixture is the canonical input when supplied, and a no-fixture run uses
+  # the documented Stage 7 contract defaults from src/allocation.r.
+  exit_code <- run_preflight_and_print(fixture = fixture, config = NULL)
+  quit(status = exit_code)
+}
+
+# ---------------------------------------------------------------------------
+# Normal allocation run.
+# ---------------------------------------------------------------------------
 cat("Loading configuration...\n")
 config <- tryCatch(
   {
@@ -161,7 +205,16 @@ if (profile_enabled) {
   cat("Profile mode enabled.\n\n")
 }
 
-# Set up parallel processing
+# Set up parallel processing — but ONLY after run_allocation()'s pre-flight
+# would otherwise pass. We run the gate explicitly here so an early failure
+# does not leak into future::plan(). run_allocation() will run it again
+# (idempotent) before any region work; the redundant call is intentional so
+# that direct callers of run_allocation() (e.g. tests) still get gated.
+preflight_exit <- run_preflight_and_print(config = config)
+if (preflight_exit != 0L) {
+  quit(status = preflight_exit)
+}
+
 num_workers <- as.integer(Sys.getenv("ALLOCATION_NUM_WORKERS", unset = "4"))
 cat(sprintf("Setting up parallel processing with %d workers\n", num_workers))
 future::plan(future::multisession, workers = num_workers)
