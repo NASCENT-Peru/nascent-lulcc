@@ -142,86 +142,50 @@ simulation_trans_rates_prep <- function(
       )
     )
 
-  # --- CSV version (commented out for xlsx testing) ---
-  # # Load the results of the LULC demand elicitation excercise, which contains the slider values, confidence factors, initial rates, and curve types for each scenario and LULC class.
-  # file_demand <- config[["lulc_demand_path"]]
-  # if (!file.exists(file_demand)) {
-  #   stop(sprintf("File not found: %s", file_demand))
-  # }
-  # lulc_demand <- read.csv(file_demand) %>%
-  #   dplyr::mutate(
-  #     slider_value = clean_numeric(slider_value),
-  #     confidence_factor = clean_numeric(confidence_factor),
-  #     initial_rate = clean_numeric(initial_rate),
-  #     curve_type = dplyr::recode(
-  #       curve_type,
-  #       "Cambio constante" = "Constant change",
-  #       "Crecimiento instantáneo" = "Instant growth",
-  #       "Crecimiento retrasado" = "Delayed growth",
-  #       "Disminución instantánea" = "Instant decline",
-  #       "Disminución retrasada" = "Delayed decline",
-  #       "Immediate growth" = "Instant growth",
-  #       .default = curve_type
-  #     ),
-  #     lulc_name = dplyr::recode(
-  #       lulc_name,
-  #       !!!spanish_to_class,
-  #       .default = lulc_name
-  #     )
-  #   )
-  # message(sprintf("  ✓ Demand results: %d rows", nrow(lulc_demand)))
-
   clean_numeric <- function(x) {
     x <- as.character(x)
     x <- gsub(",", ".", x)
     as.numeric(x)
   }
 
-  # --- xlsx version (testing alternative) ---
-  file_demand <- "E:/nascent-lulcc-agg/inputs/lulc/future_demand/LULC_demand_results.xlsx"
+  # Load the LULC demand elicitation results from the config-driven CSV
+  # path (PIPE-01, D-12, D-13). The previous Windows-only `xlsx` shortcut
+  # has been removed: HPC and any other operator must use the same CSV
+  # path resolved by `get_config()` from `config[["lulc_demand_path"]]`.
+  file_demand <- config[["lulc_demand_path"]]
+  if (is.null(file_demand) || !nzchar(file_demand)) {
+    stop("Config key 'lulc_demand_path' is not set; cannot load LULC demand.")
+  }
   if (!file.exists(file_demand)) {
     stop(sprintf("File not found: %s", file_demand))
   }
-  lulc_demand <- readxl::read_xlsx(file_demand) %>%
+  lulc_demand <- read.csv(file_demand) %>%
     dplyr::mutate(
-      `Slider value` = clean_numeric(`Slider value`),
-      `Confidence factor` = clean_numeric(`Confidence factor`),
-      `Initial rate` = clean_numeric(`Initial rate`),
-      curve = dplyr::recode(
-        curve,
+      slider_value = clean_numeric(slider_value),
+      confidence_factor = clean_numeric(confidence_factor),
+      initial_rate = clean_numeric(initial_rate),
+      curve_type = dplyr::recode(
+        curve_type,
         "Cambio constante" = "Constant change",
         "Crecimiento instantáneo" = "Instant growth",
         "Crecimiento retrasado" = "Delayed growth",
         "Disminución instantánea" = "Instant decline",
         "Disminución retrasada" = "Delayed decline",
-        "Constant change" = "Constant change",
-        "Delayed growth" = "Delayed growth",
         "Immediate growth" = "Instant growth",
-        .default = curve
+        .default = curve_type
       ),
-      LULC = dplyr::recode(
-        LULC,
+      lulc_name = dplyr::recode(
+        lulc_name,
         !!!spanish_to_class,
-        .default = LULC
-      )
-    ) %>%
-    dplyr::rename(
-      slider_value = `Slider value`,
-      confidence_factor = `Confidence factor`,
-      initial_rate = `Initial rate`,
-      scenario = Scenario,
-      region_name = Region,
-      curve_type = curve,
-      lulc_name = LULC
-    ) %>%
-    dplyr::mutate(
+        .default = lulc_name
+      ),
       region_name = dplyr::recode(
         region_name,
         !!!setNames(regions_schema$label, regions_schema$pretty),
         .default = region_name
       )
     )
-  message(sprintf("  ✓ Demand results (xlsx): %d rows", nrow(lulc_demand)))
+  message(sprintf("  ✓ Demand results: %d rows", nrow(lulc_demand)))
 
   # Cross-check: every lulc_name in lulc_demand must exist in initial_lulc_areas and vice versa
   lulc_names_demand <- sort(unique(lulc_demand$lulc_name))
