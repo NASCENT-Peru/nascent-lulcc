@@ -12,9 +12,11 @@ calibration_predictor_prep <- function(
   refresh_cache = FALSE,
   ignore_excel = FALSE
 ) {
-  # Set temp directory for terra to another drive
-  # because the default is on C: which often has limited space
-  terra_temp <- "E:/terra_temp"
+  # Resolve terra temp via the shared Stage 7 path/env contract (PIPE-03,
+  # D-12, D-13). Operators set the TERRA_TEMP env var in `.env` (HPC) or
+  # leave it unset locally to fall back to the per-session `tempdir()`.
+  # There is no workstation-specific fallback here by design (D-14).
+  terra_temp <- get_stage7_runtime_paths(config)[["terra_temp"]]
   ensure_dir(terra_temp)
 
   terra::terraOptions(

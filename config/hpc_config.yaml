@@ -2,7 +2,10 @@
 environment: "hpc"
 
 # Base paths
-data_basepath: "/cluster/scratch/bblack/nascent-lulcc"
+# `data_basepath` is resolved at load time from the HPC_SCRATCH_ROOT env var
+# (set in .env / hpc_common.sh) so the same checked-in YAML works for any
+# operator on Euler without per-user edits (D-13, D-14, PIPE-04).
+data_basepath: "${HPC_SCRATCH_ROOT}"
 inputs_dir: "inputs"
 tools_dir: "tools"
 outputs_dir: "outputs"
