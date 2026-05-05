@@ -1,0 +1,75 @@
+Bootstrap: docker
+From: ghcr.io/ethzplus/rocker-geospatial-dinamica:latest
+
+# -----------------------------------------------------------------------------
+# Apptainer / Singularity definition file for the external Dinamica EGO 8
+# image used by Stage 7 on Euler.
+#
+# Phase 1 Plan 04 Task 2 — INFRA-01, D-09, D-10.
+#
+# Provenance
+# ----------
+# This definition is rooted in the upstream image
+# `ethzplus/rocker-geospatial-dinamica`
+# (https://github.com/ethzplus/rocker-geospatial-dinamica), which packages
+# Dinamica EGO 8 on top of the rocker-geospatial R toolchain. We pull from the
+# canonical GitHub Container Registry tag rather than vendoring the image
+# locally — the built `.sif` is treated as an external artifact (D-10) and is
+# NOT committed to this repository.
+#
+# Build flow (operators only)
+# ---------------------------
+# Apptainer (preferred on Euler):
+#   apptainer build dinamica-ego-8.sif \
+#       dinamica/container/rocker-geospatial-dinamica.def
+#
+# Singularity (fallback spelling):
+#   singularity build dinamica-ego-8.sif \
+#       dinamica/container/rocker-geospatial-dinamica.def
+#
+# After building, place the `.sif` outside the repository (typically under
+# `/cluster/project/<project>/containers/dinamica-ego-8.sif`) and export:
+#   export DINAMICA_EGO_8_HOME=/cluster/project/<project>/containers/dinamica-ego-8.sif
+#
+# `exec_dinamica()` and `scripts/smoke_test_dinamica.sh` consume that absolute
+# path verbatim as the image argument to `apptainer exec` / `singularity exec`.
+#
+# See dinamica/container/README.md for the full operator-facing build flow.
+# See docs/README_HPC.md for the DINAMICA_EGO_8_HOME contract and the dry-run
+# / live smoke-test commands.
+# -----------------------------------------------------------------------------
+
+%labels
+    org.opencontainers.image.title         "nascent-lulcc Dinamica EGO 8 runtime"
+    org.opencontainers.image.source        "https://github.com/ethzplus/rocker-geospatial-dinamica"
+    org.opencontainers.image.description   "External SIF for Stage 7 allocation; consumed by exec_dinamica() via apptainer/singularity exec."
+    nascent-lulcc.requirement              "INFRA-01"
+    nascent-lulcc.contract.env             "DINAMICA_EGO_8_HOME=/absolute/path/to/dinamica.sif"
+    nascent-lulcc.upstream                 "ethzplus/rocker-geospatial-dinamica"
+
+%post
+    # The upstream rocker-geospatial-dinamica image already provides
+    # Dinamica EGO 8 with `DinamicaConsole` on PATH. This %post block exists
+    # as the explicit extension seam if Phase 1 ever needs a deterministic
+    # in-container patch — keep it empty by default so the image stays a
+    # clean replication of the upstream build (provenance per D-10).
+    set -euo pipefail
+    DinamicaConsole -version || true
+
+%test
+    # Lightweight verification that the in-container Dinamica entrypoint is
+    # discoverable. The real Stage 7 smoke test runs from outside the
+    # container via `scripts/smoke_test_dinamica.sh --live`.
+    set -euo pipefail
+    command -v DinamicaConsole >/dev/null 2>&1
+    DinamicaConsole -version
+
+%help
+    # Build:   apptainer build dinamica-ego-8.sif dinamica/container/rocker-geospatial-dinamica.def
+    #          (or `singularity build` with the same arguments)
+    # Run:     scripts/smoke_test_dinamica.sh --live --runtime auto \
+    #              --artifact "$DINAMICA_EGO_8_HOME" \
+    #              --ego dinamica/dinamica_model/allocation.ego-decoded \
+    #              --require-log-under logs
+    # See:     dinamica/container/README.md
+    #          docs/README_HPC.md
