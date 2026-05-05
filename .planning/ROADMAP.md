@@ -30,7 +30,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. `simulation_trans_rates_prep.r` and `calibration_predictor_prep.r` execute on a fresh HPC checkout with no manual path edits; HPC shell scripts contain no hardcoded `bblack` references; Dinamica EGO logs land in `logs/`.
   5. Activating `allocation_env.yml` resolves on HPC with all prediction-time packages (`r-parsnip`, `r-recipes`, `r-ranger`, `r-xgboost`, `r-tidypredict`, `r-butcher`, `r-ps`, `r-lobstr`, `r-bundle`, `r-qs`, `r-rhpcblasctl`) loadable via `library()`.
   6. Dinamica EGO 8 executes successfully inside a Singularity container on Euler — a minimal allocation model completes and `exec_dinamica()` can invoke it via `DINAMICA_EGO_8_HOME`; container definition and build instructions are committed to the repository.
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [x] 01-01-PLAN.md - Establish the shared R path/env contract and repair the active hardcoded path hotspots.
+- [ ] 01-02-PLAN.md - Canonicalize `allocation_env` and align HPC shell/bootstrap scripts to the shared contract.
+- [ ] 01-03-PLAN.md - Add consolidated Stage 7 pre-flight, portable RSS profiling, crash sentinels, and one-command diagnosis.
+- [ ] 01-04-PLAN.md - Unify Dinamica local/HPC backends, centralize Dinamica logs, and add the Euler smoke-test contract.
 
 ### Phase 2: Model Size Reduction
 **Goal**: A freshly trained or re-saved transition model loads in well under a second and consumes a small fraction of worker RAM, so the parent process stays small enough that fork-based parallelism becomes viable.
@@ -75,7 +81,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Repair & Visibility | 0/TBD | Not started | - |
+| 1. Repair & Visibility | 0/4 | Not started | - |
 | 2. Model Size Reduction | 0/TBD | Not started | - |
 | 3. Parallelism & Memory Architecture | 0/TBD | Not started | - |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |

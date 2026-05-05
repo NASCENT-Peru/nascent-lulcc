@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 ## Current Position
 
 Phase: 1 of 4 (Repair & Visibility)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-05-05 — Roadmap created (4 coarse phases, 20/20 v1 requirements mapped)
+Plan: 1 of 4 in current phase
+Status: Executing
+Last activity: 2026-05-05 — 01-01 complete (shared path/env contract); Wave 2 starting
 
 Progress: [░░░░░░░░░░] 0%
 
