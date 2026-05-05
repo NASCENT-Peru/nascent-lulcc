@@ -16,7 +16,10 @@ source "$SCRIPT_DIR/hpc_common.sh"
 # ----------------------------------------------------------
 # Setup environment
 # ----------------------------------------------------------
-ENV_NAME="transition_model_env"
+# Stage 7 canonical environment per MEM-06. The profile entrypoint runs the
+# same allocation code path as the regular submit script and therefore MUST
+# activate the same canonical env (Phase 1 RESEARCH Pitfall 2).
+ENV_NAME="allocation_env"
 ENV_PATH="$ENV_BASE_PATH/$ENV_NAME"
 
 echo "========================================="

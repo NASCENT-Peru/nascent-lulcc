@@ -1,4 +1,26 @@
 name: allocation_env
+# -----------------------------------------------------------------------------
+# Canonical Stage 7 (allocation) runtime environment for nascent-lulcc.
+#
+# Activated by:
+#   - scripts/submit_allocation.sh
+#   - scripts/submit_allocation_profile.sh
+#
+# This file is the single source of truth for the prediction/runtime package
+# contract required by Phase 1 (MEM-06). The Stage 7 submit scripts MUST
+# activate this environment so that pre-flight validation and batch execution
+# evaluate the same package set; "fixing" this YAML while leaving the submit
+# scripts on a drifted env (e.g., transition_model_env) is explicitly called
+# out as a planning pitfall (Phase 1 RESEARCH Pitfall 2).
+#
+# Pinning policy:
+#   - r-base       : 4.3 (matches transition_model_env, the project runtime)
+#   - r-xgboost    : 1.7.x (MEM-06 — must match training-time pin so saved
+#                    booster objects load identically; transition_model_env.yml
+#                    pins the same major.minor)
+# All other packages are intentionally unpinned at this stage; Phase 2/3 will
+# tighten pins if reproducibility regressions are observed.
+# -----------------------------------------------------------------------------
 channels:
   - conda-forge
 dependencies:
@@ -41,5 +63,29 @@ dependencies:
   # Base64 encoding/decoding
   - r-base64enc
 
-  # Modelling workflows
+  # ---------------------------------------------------------------------------
+  # MEM-06: prediction-time package set
+  # ---------------------------------------------------------------------------
+  # These packages are required for Stage 7 to load and execute the
+  # tidymodels-trained transition probability models without runtime
+  # `install.packages()` calls. Order matches REQUIREMENTS.md MEM-06.
+
+  # tidymodels engines used at prediction time
+  - r-parsnip
+  - r-recipes
   - r-workflows
+  - r-ranger
+  - r-xgboost=1.7
+  - r-tidypredict
+
+  # Model object slimming + (de)serialisation
+  - r-butcher
+  - r-bundle
+  - r-qs
+
+  # Process/memory introspection (cross-platform RSS reporting; OBS-* uses ps)
+  - r-ps
+  - r-lobstr
+
+  # BLAS thread control inside parallel workers
+  - r-rhpcblasctl
