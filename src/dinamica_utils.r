@@ -5,97 +5,308 @@
 #'
 #' @author Ben Black
 
+# ---------------------------------------------------------------------------
+# Phase 1 Plan 04 Task 1 — Unified Dinamica launch contract (D-09, D-10, D-11)
+# ---------------------------------------------------------------------------
+# `exec_dinamica()` is the only caller-facing Dinamica entrypoint. Backend
+# selection (local direct DinamicaConsole vs. HPC apptainer/singularity exec
+# against the external `.sif` artifact named by DINAMICA_EGO_8_HOME) happens
+# entirely inside `resolve_dinamica_launch()`. No caller outside this file
+# should ever know about container details (D-09).
+#
+# HPC contract (INFRA-01):
+#   - On HPC, DINAMICA_EGO_8_HOME is the absolute path to the external
+#     Dinamica `.sif` image. The image is treated as an external artifact
+#     (D-10) and is consumed verbatim as the image argument to
+#     `apptainer exec`/`singularity exec`. No "SIF or wrapper" ambiguity.
+#   - The runtime is probed in the order `apptainer` -> `singularity`. Tests
+#     and dry-run callers pass `runtime_override` and `probe_runtime = FALSE`
+#     so HPC command resolution can be proven on a workstation that has
+#     neither runtime installed.
+#
+# Local contract:
+#   - DINAMICA_EGO_8_HOME points at the install directory. `DinamicaConsole`
+#     is invoked directly via `processx::run()`. LD_LIBRARY_PATH is set to
+#     `<DINAMICA_EGO_8_HOME>/usr/lib` for the child process.
+#
+# Logging contract (D-07, partial PIPE-07 closure):
+#   - Subprocess logs go to `<repo_root>/logs/<timestamp>_dinamica.log` via
+#     `resolve_dinamica_log_path()`. The legacy "log next to the model file"
+#     placement is gone for both backends.
+
+# Internal: resolved valid backends and runtimes.
+.DINAMICA_BACKENDS <- c("auto", "local", "hpc")
+.DINAMICA_RUNTIMES_HPC <- c("apptainer", "singularity")
+
+#' Detect which Dinamica backend should be used (D-09)
+#'
+#' Honours an explicit DINAMICA_BACKEND override; otherwise uses
+#' `detect_environment()` from `src/setup.r` to pick "local" or "hpc".
+#'
+#' @return One of "local" or "hpc".
+detect_dinamica_backend <- function() {
+  override <- Sys.getenv("DINAMICA_BACKEND", unset = "auto")
+  if (!override %in% .DINAMICA_BACKENDS) {
+    stop(
+      "DINAMICA_BACKEND must be one of: ",
+      paste(.DINAMICA_BACKENDS, collapse = ", "),
+      "; got '", override, "'.",
+      call. = FALSE
+    )
+  }
+  if (identical(override, "local") || identical(override, "hpc")) {
+    return(override)
+  }
+  # auto -> derive from runtime environment
+  env <- tryCatch(detect_environment(), error = function(e) "local")
+  if (identical(env, "hpc")) "hpc" else "local"
+}
+
+#' Probe for an HPC container runtime in the order apptainer -> singularity
+#'
+#' @return The runtime name ("apptainer" or "singularity") found on PATH.
+#' @note Stops with a clear error if neither is available.
+.probe_hpc_runtime <- function() {
+  for (cmd in .DINAMICA_RUNTIMES_HPC) {
+    if (nzchar(Sys.which(cmd))) {
+      return(cmd)
+    }
+  }
+  stop(
+    "No HPC container runtime found on PATH. ",
+    "Tried: ", paste(.DINAMICA_RUNTIMES_HPC, collapse = ", "), ". ",
+    "Install apptainer (preferred) or singularity, or override with the ",
+    "`runtime_override` argument.",
+    call. = FALSE
+  )
+}
+
+#' Resolve the full Dinamica launch contract without executing anything
+#'
+#' This is the single source of truth for the local/HPC backend decision,
+#' the runtime command, the resolved Dinamica artifact path, the full
+#' argument vector, and the central log file path. Both `exec_dinamica()`
+#' and the operator-facing smoke test consume this helper instead of
+#' deriving their own launch contract.
+#'
+#' On HPC, `DINAMICA_EGO_8_HOME` is treated as the absolute path to the
+#' external `.sif` image (INFRA-01); the resolved args take the shape
+#' `c("exec", <sif_path>, "DinamicaConsole", <ego model passthrough args>)`.
+#'
+#' On local, `DINAMICA_EGO_8_HOME` is the Dinamica install directory; the
+#' resolved args are simply the DinamicaConsole flags + model path.
+#'
+#' @param model_path Path to the `.ego` (or `.ego-decoded`) model file.
+#' @param backend One of "auto" (resolve from env), "local", or "hpc".
+#' @param disable_parallel Whether to add `-disable-parallel-steps`.
+#' @param log_level Optional `-log-level N` flag.
+#' @param runtime_override Optional explicit runtime name. If supplied for
+#'   the HPC backend, skips the live PATH probe (use this for verification
+#'   on hosts where neither apptainer nor singularity is installed).
+#' @param probe_runtime When TRUE (default) and the HPC backend is selected
+#'   without a `runtime_override`, probe `apptainer` then `singularity` on
+#'   PATH. When FALSE, refuse to probe and require `runtime_override`.
+#' @param work_dir Optional working directory used to anchor the central log
+#'   path; falls back to `dirname(model_path)`.
+#' @return Named list with elements `backend`, `runtime`, `artifact_path`,
+#'   `command`, `args`, `log_file`, `env`. `command` is the executable name
+#'   to pass to `processx::run()`; `args` is the corresponding argv vector.
+#' @export
+resolve_dinamica_launch <- function(
+  model_path,
+  backend = "auto",
+  disable_parallel = TRUE,
+  log_level = NULL,
+  runtime_override = NULL,
+  probe_runtime = TRUE,
+  work_dir = NULL
+) {
+  if (!is.character(model_path) || length(model_path) != 1L || !nzchar(model_path)) {
+    stop("resolve_dinamica_launch(): model_path must be a non-empty string.",
+         call. = FALSE)
+  }
+  if (!backend %in% .DINAMICA_BACKENDS) {
+    stop(
+      "resolve_dinamica_launch(): backend must be one of: ",
+      paste(.DINAMICA_BACKENDS, collapse = ", "),
+      "; got '", backend, "'.",
+      call. = FALSE
+    )
+  }
+
+  if (identical(backend, "auto")) {
+    backend <- detect_dinamica_backend()
+  }
+
+  dinamica_home <- Sys.getenv("DINAMICA_EGO_8_HOME", unset = "")
+  if (!nzchar(dinamica_home)) {
+    stop(
+      "DINAMICA_EGO_8_HOME is not set. On HPC this must be the absolute path ",
+      "to the external Dinamica .sif image; on local it must be the Dinamica ",
+      "install directory. See .env.template and docs/README_HPC.md.",
+      call. = FALSE
+    )
+  }
+
+  # Pass-through Dinamica flags + model path.
+  console_args <- character()
+  if (isTRUE(disable_parallel)) {
+    console_args <- c(console_args, "-disable-parallel-steps")
+  }
+  if (!is.null(log_level)) {
+    console_args <- c(console_args, "-log-level", as.character(log_level))
+  }
+  console_args <- c(console_args, model_path)
+
+  base_dir <- if (!is.null(work_dir) && nzchar(work_dir)) work_dir else dirname(model_path)
+  log_file <- resolve_dinamica_log_path(base_dir)
+
+  if (identical(backend, "hpc")) {
+    # On HPC the env var is the .sif image path, consumed directly as the
+    # container image argument to apptainer/singularity exec (INFRA-01).
+    artifact_path <- dinamica_home
+
+    if (!is.null(runtime_override)) {
+      if (!runtime_override %in% .DINAMICA_RUNTIMES_HPC) {
+        stop(
+          "runtime_override must be one of: ",
+          paste(.DINAMICA_RUNTIMES_HPC, collapse = ", "),
+          "; got '", runtime_override, "'.",
+          call. = FALSE
+        )
+      }
+      runtime <- runtime_override
+    } else if (isTRUE(probe_runtime)) {
+      runtime <- .probe_hpc_runtime()
+    } else {
+      stop(
+        "resolve_dinamica_launch(): probe_runtime=FALSE requires an explicit ",
+        "runtime_override on the HPC backend.",
+        call. = FALSE
+      )
+    }
+
+    # apptainer exec <sif> DinamicaConsole [-disable-parallel-steps] [-log-level N] <model>
+    container_args <- c("exec", artifact_path, "DinamicaConsole", console_args)
+    env_vec <- c("current")  # apptainer/singularity inherit env by default
+    return(list(
+      backend       = "hpc",
+      runtime       = runtime,
+      artifact_path = artifact_path,
+      command       = runtime,
+      args          = container_args,
+      log_file      = log_file,
+      env           = env_vec
+    ))
+  }
+
+  # Local backend: direct DinamicaConsole invocation.
+  artifact_path <- dinamica_home
+  ld_lib <- file.path(dinamica_home, "usr", "lib")
+  env_vec <- c(
+    "current",
+    DINAMICA_HOME   = dirname(model_path),
+    LD_LIBRARY_PATH = ld_lib
+  )
+  list(
+    backend       = "local",
+    runtime       = "DinamicaConsole",
+    artifact_path = artifact_path,
+    command       = "DinamicaConsole",
+    args          = console_args,
+    log_file      = log_file,
+    env           = env_vec
+  )
+}
+
 #' Execute a Dinamica .ego file using DinamicaConsole
+#'
+#' Single caller-facing entrypoint for both local and HPC Dinamica launches.
+#' Backend selection happens entirely inside `resolve_dinamica_launch()`
+#' (D-09); subprocess logs land under the central `logs/` surface (D-07).
 #'
 #' @param model_path Path to the .ego model file
 #' @param disable_parallel Whether to disable parallel steps (default TRUE)
 #' @param log_level Logging level (1-7, default NULL)
-#' @param write_logfile bool, write stdout & stderr to a file?
+#' @param write_logfile bool, write stdout & stderr to a central log file?
 #' @param echo bool, direct echo to console?
+#' @param backend One of "auto" (default), "local", or "hpc".
+#' @param runtime_override Optional runtime override forwarded to
+#'   `resolve_dinamica_launch()`. Use only for verification.
+#' @param work_dir Optional working directory to anchor central log path.
 #' @return invisible processx result
+#' @export
 exec_dinamica <- function(
   model_path,
   disable_parallel = TRUE,
   log_level = NULL,
   write_logfile = TRUE,
-  echo = FALSE
+  echo = FALSE,
+  backend = "auto",
+  runtime_override = NULL,
+  work_dir = NULL
 ) {
-  if (Sys.which("DinamicaConsole") == "") {
-    stop(
-      "DinamicaConsole not found on PATH. ",
-      "Please ensure Dinamica EGO is installed and DinamicaConsole is available."
-    )
-  }
+  launch <- resolve_dinamica_launch(
+    model_path        = model_path,
+    backend           = backend,
+    disable_parallel  = disable_parallel,
+    log_level         = log_level,
+    runtime_override  = runtime_override,
+    probe_runtime     = TRUE,
+    work_dir          = work_dir
+  )
 
-  args <- character()
-  if (disable_parallel) {
-    args <- c(args, "-disable-parallel-steps")
-  }
-  if (!is.null(log_level)) {
-    args <- c(args, paste0("-log-level ", log_level))
-  }
-  args <- c(args, model_path)
-
-  dinamica_home <- Sys.getenv("DINAMICA_EGO_8_HOME", unset = "")
-  if (!nzchar(dinamica_home)) {
+  # Pre-flight: verify the actual command exists on PATH before launching.
+  if (Sys.which(launch$command) == "") {
     stop(
-      "Environment variable DINAMICA_EGO_8_HOME is not set. ",
-      "Please set it to the Dinamica EGO installation directory.",
+      sprintf(
+        "Dinamica launch command '%s' not found on PATH for backend '%s'. ",
+        launch$command, launch$backend
+      ),
+      if (identical(launch$backend, "hpc"))
+        "Install apptainer or singularity on this host."
+      else
+        "Install Dinamica EGO and ensure DinamicaConsole is on PATH.",
       call. = FALSE
     )
   }
-  new_ld <- file.path(dinamica_home, "usr", "lib")
 
-  #todo - change log file location to use the generic logs dir that is used by other scripts. We can still use the timestamped filename, but it would be good to have all logs in the same place.
-  if (write_logfile) {
-    logfile_path <- file.path(
-      dirname(model_path),
-      format(Sys.time(), "%Y-%m-%d_%Hh%Mm%Ss_dinamica.log")
-    )
-    message("Logging to ", logfile_path)
+  if (isTRUE(write_logfile)) {
+    logfile_path <- launch$log_file
+    dir.create(dirname(logfile_path), recursive = TRUE, showWarnings = FALSE)
+    message("Logging Dinamica subprocess to ", logfile_path)
 
-    res <- processx::run(
-      command = "bash",
-      args = c(
-        "-c",
-        sprintf(
-          paste(
-            "set -o pipefail;",
-            "stdbuf -oL",
-            "DinamicaConsole %s 2>&1 |",
-            "sed 's/\\x1b\\[[0-9;]*m//g' |",
-            "tee '%s';",
-            "exit ${PIPESTATUS[0]}"
-          ),
-          paste(shQuote(args), collapse = " "),
-          logfile_path
-        )
+    # Run command + args under stdbuf -oL through bash so we can both stream
+    # to console and tee to the central log without losing the child exit
+    # code. shQuote() preserves arguments containing spaces/paths.
+    quoted <- paste(shQuote(c(launch$command, launch$args)), collapse = " ")
+    bash_script <- sprintf(
+      paste(
+        "set -o pipefail;",
+        "stdbuf -oL %s 2>&1 |",
+        "sed 's/\\x1b\\[[0-9;]*m//g' |",
+        "tee '%s';",
+        "exit ${PIPESTATUS[0]}"
       ),
+      quoted,
+      logfile_path
+    )
+    res <- processx::run(
+      command         = "bash",
+      args            = c("-c", bash_script),
       error_on_status = FALSE,
-      echo = echo,
-      spinner = TRUE,
-      env = c(
-        "current",
-        DINAMICA_HOME = dirname(model_path),
-        LD_LIBRARY_PATH = new_ld
-      )
+      echo            = echo,
+      spinner         = TRUE,
+      env             = launch$env
     )
   } else {
     res <- processx::run(
-      command = "stdbuf",
-      args = c(
-        "-oL",
-        "DinamicaConsole",
-        args
-      ),
+      command         = launch$command,
+      args            = launch$args,
       error_on_status = FALSE,
-      echo = echo,
-      spinner = TRUE,
-      env = c(
-        "current",
-        DINAMICA_HOME = dirname(model_path),
-        LD_LIBRARY_PATH = new_ld
-      )
+      echo            = echo,
+      spinner         = TRUE,
+      env             = launch$env
     )
   }
 
