@@ -16,7 +16,11 @@ source "$SCRIPT_DIR/hpc_common.sh"
 # ----------------------------------------------------------
 # Setup environment
 # ----------------------------------------------------------
-ENV_NAME="transition_model_env"
+# Stage 7 canonical environment per MEM-06. The package contract lives in
+# environments/allocation_env.yml; pre-flight (later Phase 1 plan) validates
+# this same env, so the submit script MUST activate it rather than a drifted
+# training env (Phase 1 RESEARCH Pitfall 2).
+ENV_NAME="allocation_env"
 ENV_PATH="$ENV_BASE_PATH/$ENV_NAME"
 
 echo "========================================="
