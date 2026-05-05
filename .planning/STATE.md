@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 ## Current Position
 
 Phase: 1 of 4 (Repair & Visibility)
-Plan: 1 of 4 in current phase
+Plan: 3 of 4 in current phase
 Status: Executing
-Last activity: 2026-05-05 — 01-01 complete (shared path/env contract); Wave 2 starting
+Last activity: 2026-05-05 — 01-02 + 01-03 complete (env/HPC shell, pre-flight, RSS, diagnosis); Wave 3 starting
 
 Progress: [░░░░░░░░░░] 0%
 
