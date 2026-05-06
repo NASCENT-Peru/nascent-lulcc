@@ -12,7 +12,7 @@ Hardening the 7-stage Peruvian LULCC pipeline so that `src/allocation.r` runs re
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Repair & Visibility** - Fix broken profiling, structured logs, env/path repairs, pre-flight validation, post-mortem tooling, Singularity container for Dinamica EGO 8
+- [x] **Phase 1: Repair & Visibility** - Fix broken profiling, structured logs, env/path repairs, pre-flight validation, post-mortem tooling, Singularity container for Dinamica EGO 8 *(completed 2026-05-05)*
 - [ ] **Phase 2: Model Size Reduction** - Shrink saved transition models from >1GB to <200MB via butcher/bundle/qs
 - [ ] **Phase 3: Parallelism & Memory Architecture** - Switch to fork-based multicore on Linux, share nhood rasters, eliminate OOM
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port
@@ -81,7 +81,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Repair & Visibility | 0/4 | Not started | - |
+| 1. Repair & Visibility | 4/4 | Complete | 2026-05-05 |
 | 2. Model Size Reduction | 0/TBD | Not started | - |
 | 3. Parallelism & Memory Architecture | 0/TBD | Not started | - |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
