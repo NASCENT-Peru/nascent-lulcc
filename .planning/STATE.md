@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 Phase: 2 of 4 (Model Size Reduction)
 Plan: 0 of TBD in current phase
 Status: Ready to plan
-Last activity: 2026-05-05 — Phase 1 complete (user approved); advancing to Phase 2
+Last activity: 2026-05-07 — Phase 2 discuss complete; CONTEXT.md written with 13 decisions (D-01–D-13); mlr3 full replacement decided
 
 Progress: [██░░░░░░░░] 25%
 
@@ -45,7 +45,7 @@ Progress: [██░░░░░░░░] 25%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- Init: Stay on tidymodels (mlr3 deferred to v2 — only triggered if Phase 2 cannot reach <200 MB models).
+- Init: Stay on tidymodels (mlr3 deferred to v2 — only triggered if Phase 2 cannot reach <200 MB models). **Superseded by Phase 2 discuss: full mlr3 replacement decided; trigger condition already met.**
 - Init: Linux HPC switches to `future::multicore`; Windows local stays on `future::multisession`.
 - Init: Pre-compute neighbourhood rasters in parent and pass file paths to workers (not SpatRaster objects).
 - Phase 1: `get_stage7_runtime_paths()` is the single resolver for HPC-specific paths; all env overrides flow through it.
@@ -69,6 +69,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-05
-Stopped at: Phase 1 approved complete — ready to plan Phase 2
+Last session: 2026-05-07
+Stopped at: Phase 2 discuss complete — CONTEXT.md committed; ready to run /gsd-plan-phase 2
 Resume file: None
