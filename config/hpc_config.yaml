@@ -75,6 +75,7 @@ configuration_settings:
   simulation_start_year: 2022
   simulation_end_year: 2060
   selected_scalar: 9.0
+  max_training_rows: 1000000  # Higher threshold on HPC nodes; operator should tune to actual node RAM (Phase 2, D-11)
 
 # Simulation transition rates preparation configuration
 simulation_trans_rates_params:

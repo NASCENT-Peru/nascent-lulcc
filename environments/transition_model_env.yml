@@ -36,6 +36,11 @@ dependencies:
   - r-tidymodels
   - r-ranger       # Random Forest
   - r-glmnet       # Regularized regression
+  - r-mlr3         # mlr3 training framework (Phase 2, MEM-04)
+  - r-mlr3learners # classif.ranger / classif.glmnet / classif.xgboost learners
+  - r-mlr3tuning   # AutoTuner for hyperparameter optimisation
+  - r-paradox      # Search space definitions for tuning
+  - r-bbotk        # Black-box optimisation toolkit (AutoTuner dependency)
   - r-xgboost=1.7  # Gradient boosting - pin to 1.7.x for tidypredict compatibility
   - r-yardstick    # Model evaluation metrics
   - r-tune         # Hyperparameter tuning
