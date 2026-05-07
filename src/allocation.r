@@ -1528,7 +1528,11 @@ generate_probability_maps <- function(
     # Load model (we need its predictor names anyway, so load once + use
     # immediately + release at end of iteration).
     t_model_load <- prof_tic()
-    fitted_wf <- readRDS(mi$file_path)
+    fitted_wf <- if (grepl("\\.qs$", mi$file_path, perl = TRUE)) {
+      qs::qread(mi$file_path)
+    } else {
+      readRDS(mi$file_path)
+    }
     prof_toc(
       t_model_load,
       sprintf(
