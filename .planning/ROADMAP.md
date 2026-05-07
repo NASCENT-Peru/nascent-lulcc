@@ -13,7 +13,7 @@ Hardening the 7-stage Peruvian LULCC pipeline so that `src/allocation.r` runs re
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Repair & Visibility** - Fix broken profiling, structured logs, env/path repairs, pre-flight validation, post-mortem tooling, Singularity container for Dinamica EGO 8 *(completed 2026-05-05)*
-- [ ] **Phase 2: Model Size Reduction** - Shrink saved transition models from >1GB to <200MB via butcher/bundle/qs
+- [ ] **Phase 2: Model Size Reduction** - Replace tidymodels with mlr3 in transition_modelling.r; save models as .qs via qs::qsave() with ranger save.memory=TRUE; all artefacts <200 MB
 - [ ] **Phase 3: Parallelism & Memory Architecture** - Switch to fork-based multicore on Linux, share nhood rasters, eliminate OOM
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port
 
@@ -42,12 +42,18 @@ Plans:
 **Goal**: A freshly trained or re-saved transition model loads in well under a second and consumes a small fraction of worker RAM, so the parent process stays small enough that fork-based parallelism becomes viable.
 **Depends on**: Phase 1
 **Requirements**: MEM-04
-**Success Criteria** (what must be TRUE):
-  1. Every model artefact written by `transition_modelling.r` is <200 MB on disk (verifiable via `ls -lh` on the model output directory).
-  2. A `rebutcher_existing_models.r` utility re-emits all currently trained models below the same 200 MB ceiling without re-training.
-  3. After loading a single butchered+bundled model in a fresh R session, `gc_max_vcells` stays under 2 GB (current baseline: ~12 GB).
-  4. A predict-equality check on a 5-row sample confirms the reduced model returns identical probabilities to the pre-butcher original.
-**Plans**: TBD
+**Success Criteria** (what must be TRUE — superseded by CONTEXT.md D-01–D-13; the mlr3 migration is the actual plan):
+  1. Every model artefact written by `transition_modelling.r` is <200 MB on disk (saved via qs::qsave() with ranger save.memory=TRUE; size gate D-12 logs a warning if exceeded).
+  2. `scripts/retrain_all_models.r` re-trains all ~140–160 transition-region pairs using the new mlr3 pipeline; existing tidymodels .rds files become obsolete once re-training completes (D-07, D-08).
+  3. `predict_saved_transition_prob()` in `allocation.r` dispatches to the new mlr3 branch when model_type == "mlr3"; existing branches stay for old files (D-04).
+  4. A 5-row predict sanity check after saving each mlr3 model asserts probabilities in [0,1] and non-NA (D-13).
+**Plans**: 4 plans
+
+Plans:
+- [ ] 02-01-PLAN.md - Add mlr3 packages to allocation_env.yml and max_training_rows to both config YAMLs.
+- [ ] 02-02-PLAN.md - Rewrite transition_modelling.r inner stack with mlr3 (train_mlr3_transition, build_mlr3_learner, size gate, sanity check).
+- [ ] 02-03-PLAN.md - Add mlr3 dispatch branch to predict_saved_transition_prob() in allocation.r.
+- [ ] 02-04-PLAN.md - Create scripts/retrain_all_models.r re-training utility (--force, --dry-run, --region flags).
 
 ### Phase 3: Parallelism & Memory Architecture
 **Goal**: A full allocation run on HPC completes for at least one scenario × region × timestep combination with bounded per-worker RAM and no OOM kills, by switching to copy-on-write `multicore` and passing file paths instead of in-memory raster objects to workers.
@@ -82,6 +88,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Repair & Visibility | 4/4 | Complete | 2026-05-05 |
-| 2. Model Size Reduction | 0/TBD | Not started | - |
+| 2. Model Size Reduction | 0/4 | Not started | - |
 | 3. Parallelism & Memory Architecture | 0/TBD | Not started | - |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
