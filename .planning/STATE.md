@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 ## Current Position
 
 Phase: 2 of 4 (Model Size Reduction)
-Plan: 4 of 4 in current phase (02-01, 02-02, and 02-03 complete; 02-04 Wave 3 pending)
-Status: In progress
-Last activity: 2026-05-07 — 02-02 complete; mlr3 inner stack in transition_modelling.r, build_mlr3_learner() + train_mlr3_transition() added, model_specs.yaml updated to mlr3 param names
+Plan: 4 of 4 in current phase (all complete: 02-01, 02-02, 02-03, 02-04)
+Status: Complete — advancing to Phase 3
+Last activity: 2026-05-07 — 02-04 complete; scripts/retrain_all_models.r operator utility added with --force, --dry-run, --region flags and region filter via temp CSV override
 
-Progress: [████░░░░░░] 37%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -28,13 +28,13 @@ Progress: [████░░░░░░] 37%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1. Repair & Visibility | 4 | ~0.5h | ~8 min |
-| 2. Model Size Reduction | 3 (02-01, 02-02, 02-03) | ~59 min combined | ~20 min |
+| 2. Model Size Reduction | 4 (02-01, 02-02, 02-03, 02-04) | ~71 min combined | ~18 min |
 | 3. Parallelism & Memory Architecture | 0 | — | — |
 | 4. End-to-End Correctness & Performance | 0 | — | — |
 
 **Recent Trend:**
-- Last 5 plans: 01-01, 01-02, 01-03, 01-04, 02-01, 02-03
-- Trend: Consistent completion, TDD RED→GREEN across all plans
+- Last 5 plans: 02-01, 02-02, 02-03, 02-04
+- Trend: Consistent completion across all Phase 2 plans; Phase 2 fully complete
 
 *Updated after each plan completion*
 
@@ -45,6 +45,7 @@ Progress: [████░░░░░░] 37%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- Phase 2 (02-04): Region filter via temp CSV override — read viable_transitions_lists.csv, filter by region_name, write tempfile, override config[["viable_transitions_lists"]] before calling transition_modelling(); dry-run respects region filter because filter runs first.
 - Phase 2 (02-02): Save `at$learner` not AutoTuner to avoid 3-5x size bloat; ranger `save.memory=TRUE` + `importance="none"` hardcoded (primary size reduction); step_normalize not replicated (classif.glmnet is scale-invariant); T-02-03 path injection guard in train_mlr3_transition().
 - Phase 2: Full mlr3 replacement of tidymodels in `transition_modelling.r`; `classif.glmnet` (not plain GLM) for logistic regression; `qs::qsave()` with `{model_type="mlr3", predictor_names, response_levels, learner}` list; `max_training_rows` YAML key for subsampling fallback.
 - Init: Linux HPC switches to `future::multicore`; Windows local stays on `future::multisession`.
@@ -71,5 +72,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-05-07
-Stopped at: Completed 02-02-PLAN.md — mlr3 inner stack (build_mlr3_learner + train_mlr3_transition) in transition_modelling.r; model_specs.yaml updated to mlr3 param names
+Stopped at: Completed 02-04-PLAN.md — Phase 2 fully complete; scripts/retrain_all_models.r created; all 4 Phase 2 plans executed
 Resume file: None

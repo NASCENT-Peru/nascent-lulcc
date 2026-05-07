@@ -13,7 +13,7 @@ Hardening the 7-stage Peruvian LULCC pipeline so that `src/allocation.r` runs re
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Repair & Visibility** - Fix broken profiling, structured logs, env/path repairs, pre-flight validation, post-mortem tooling, Singularity container for Dinamica EGO 8 *(completed 2026-05-05)*
-- [ ] **Phase 2: Model Size Reduction** - Replace tidymodels with mlr3 in transition_modelling.r; save models as .qs via qs::qsave() with ranger save.memory=TRUE; all artefacts <200 MB
+- [x] **Phase 2: Model Size Reduction** - Replace tidymodels with mlr3 in transition_modelling.r; save models as .qs via qs::qsave() with ranger save.memory=TRUE; all artefacts <200 MB *(completed 2026-05-07)*
 - [ ] **Phase 3: Parallelism & Memory Architecture** - Switch to fork-based multicore on Linux, share nhood rasters, eliminate OOM
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port
 
@@ -52,14 +52,14 @@ Plans:
 Plans:
 
 **Wave 1**
-- [ ] 02-01-PLAN.md - Add mlr3 packages to allocation_env.yml and max_training_rows to both config YAMLs.
+- [x] 02-01-PLAN.md - Add mlr3 packages to allocation_env.yml and max_training_rows to both config YAMLs.
 
 **Wave 2** *(blocked on Wave 1 completion — can run in parallel with each other)*
-- [ ] 02-02-PLAN.md - Rewrite transition_modelling.r inner stack with mlr3 (train_mlr3_transition, build_mlr3_learner, size gate, sanity check).
+- [x] 02-02-PLAN.md - Rewrite transition_modelling.r inner stack with mlr3 (train_mlr3_transition, build_mlr3_learner, size gate, sanity check).
 - [x] 02-03-PLAN.md - Add mlr3 dispatch branch to predict_saved_transition_prob() in allocation.r; update model loader to qs::qread() for .qs files.
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 02-04-PLAN.md - Create scripts/retrain_all_models.r re-training utility (--force, --dry-run, --region flags).
+- [x] 02-04-PLAN.md - Create scripts/retrain_all_models.r re-training utility (--force, --dry-run, --region flags).
 
 **Cross-cutting constraints:**
 - All plans: model_type = "mlr3" string is the dispatch key; must appear in every saved model list and predict branch
@@ -99,6 +99,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Repair & Visibility | 4/4 | Complete | 2026-05-05 |
-| 2. Model Size Reduction | 2/4 (02-01, 02-03) | In progress | - |
+| 2. Model Size Reduction | 4/4 | Complete | 2026-05-07 |
 | 3. Parallelism & Memory Architecture | 0/TBD | Not started | - |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
