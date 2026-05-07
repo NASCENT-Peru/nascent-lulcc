@@ -1,55 +1,40 @@
 global:
-  balance_adjustment: true
-  minority_multiplier: 1.5
-  minority_proportion: null
-  num_replicates: 2  # Reduced from 5 to 2 for faster testing
-  train_proportion: 0.75
-  cv_folds: 3        # Reduced from 5 to 3 for faster CV
+  num_replicates: 1     # Superseded by AutoTuner CV folds in mlr3 pipeline (Phase 2) — value ignored
+  cv_folds: 3
   random_seed: 123
-  max_final_fit_size: 100000
+  max_final_fit_size: 100000  # Superseded by max_training_rows in top-level config; kept for reference
 
 metrics:
-  metrics:
-    - roc_auc
-    - accuracy
-    - precision
-    - recall
-    - f_meas
-    - kap
-    - specificity
-    - sensitivity
-  optimization_metric: roc_auc
+  optimization_metric: classif.auc
 
 models:
   glm:
     parameters:
-      penalty:
-        - 0.01   # Single stable value for now
-      mixture:
-        - 1      # Single stable value for now
-  
+      alpha:
+        - 1      # Lasso (mixture=1 in tidymodels); matches current glmnet behaviour
+      s:
+        - 0.01   # penalty=0.01 in tidymodels; the lambda value for classif.glmnet
+
   rf:
     parameters:
-      trees:
-        - 500    # Single stable value
-      min_n:
-        - 5      # Single stable value
+      num.trees:
+        - 500
+      min.node.size:
+        - 5
       mtry:
-        - 4      # Single stable value
-      importance: impurity
-      replace: true
-      sample.fraction: 1.0
-      seed: 123
-  
+        - 4
+      # importance and save.memory are hardcoded in train_mlr3_transition() — not tunable
+
   xgboost:
     parameters:
-      trees:
-        - 100    # Single stable value
-      tree_depth:
-        - 6      # Single stable value
-      learn_rate:
-        - 0.1    # Single stable value
-      min_n:
-        - 5      # Single stable value
-      mtry:
-        - 4      # Single stable value
+      nrounds:
+        - 100
+      max_depth:
+        - 6
+      eta:
+        - 0.1
+      min_child_weight:
+        - 5
+      colsample_bytree:
+        - 0.8    # approx: mtry=4 of ~5 predictors = 0.8; operator should adjust
+      # nthread is hardcoded to 1 in train_mlr3_transition() — not tunable

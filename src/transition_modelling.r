@@ -107,7 +107,284 @@ build_transition_model_path <- function(trans_name, region, model_dir) {
     gsub(" ", "_", tolower(region))
   )
 
-  file.path(model_dir, sprintf("%s_%s.rds", trans_name, region_suffix))
+  file.path(model_dir, sprintf("%s_%s.qs", trans_name, region_suffix))
+}
+
+#' Build an mlr3 Learner for the given algorithm and parameters from model_specs.
+#' Detects single-value vs multi-value parameter grids to decide whether to use
+#' to_tune() (for AutoTuner) or direct assignment.
+build_mlr3_learner <- function(algo, params, predictor_count) {
+  if (algo == "glm") {
+    # classif.glmnet: regularised logistic regression matching current glmnet behaviour (D-03)
+    # No normalisation pipeline needed: classif.glmnet's L1/L2 regularisation is scale-invariant.
+    # step_normalize() from the tidymodels recipes stack is NOT replicated here.
+    alpha_vals <- params$alpha %||% c(1)
+    s_vals     <- params$s %||% c(0.01)
+    lrn_obj <- mlr3::lrn("classif.glmnet", predict_type = "prob")
+    if (length(alpha_vals) > 1L) {
+      lrn_obj$param_set$set_values(alpha = paradox::to_tune(min(alpha_vals), max(alpha_vals)))
+    } else {
+      lrn_obj$param_set$set_values(alpha = alpha_vals[[1]])
+    }
+    if (length(s_vals) > 1L) {
+      lrn_obj$param_set$set_values(s = paradox::to_tune(min(s_vals), max(s_vals), logscale = TRUE))
+    } else {
+      lrn_obj$param_set$set_values(s = s_vals[[1]])
+    }
+    return(lrn_obj)
+  }
+
+  if (algo == "rf") {
+    # classif.ranger: save.memory=TRUE and importance="none" are MANDATORY for <200MB files
+    num_trees_vals     <- params$num.trees %||% c(500L)
+    min_node_vals      <- params$min.node.size %||% c(5L)
+    mtry_vals          <- params$mtry %||% c(max(1L, floor(sqrt(predictor_count))))
+    lrn_obj <- mlr3::lrn("classif.ranger",
+      predict_type = "prob",
+      importance   = "none",    # suppresses importance vector (size reduction)
+      save.memory  = TRUE,      # suppresses OOB predictions matrix (primary size reduction)
+      num.threads  = 1L         # required for furrr parallel workers
+    )
+    if (length(num_trees_vals) > 1L) {
+      lrn_obj$param_set$set_values(num.trees = paradox::to_tune(
+        paradox::p_int(lower = min(num_trees_vals), upper = max(num_trees_vals))
+      ))
+    } else {
+      lrn_obj$param_set$set_values(num.trees = as.integer(num_trees_vals[[1]]))
+    }
+    if (length(min_node_vals) > 1L) {
+      lrn_obj$param_set$set_values(min.node.size = paradox::to_tune(
+        paradox::p_int(lower = min(min_node_vals), upper = max(min_node_vals))
+      ))
+    } else {
+      lrn_obj$param_set$set_values(min.node.size = as.integer(min_node_vals[[1]]))
+    }
+    if (length(mtry_vals) > 1L) {
+      lrn_obj$param_set$set_values(mtry = paradox::to_tune(
+        paradox::p_int(lower = min(mtry_vals), upper = min(max(mtry_vals), predictor_count))
+      ))
+    } else {
+      lrn_obj$param_set$set_values(mtry = min(as.integer(mtry_vals[[1]]), predictor_count))
+    }
+    return(lrn_obj)
+  }
+
+  if (algo == "xgboost") {
+    nrounds_vals    <- params$nrounds %||% c(100L)
+    max_depth_vals  <- params$max_depth %||% c(6L)
+    eta_vals        <- params$eta %||% c(0.1)
+    min_cw_vals     <- params$min_child_weight %||% c(5L)
+    # colsample_bytree = mtry / length(predictor_names); clamp to [0.05, 1]
+    # (XGBoost's mtry in tidymodels was an integer count; classif.xgboost uses a fraction [0,1])
+    cbt_vals        <- params$colsample_bytree %||% c(0.8)
+    lrn_obj <- mlr3::lrn("classif.xgboost",
+      predict_type = "prob",
+      nthread      = 1L   # required for furrr parallel workers
+    )
+    # Set single-value params directly; multi-value params via to_tune()
+    set_single_or_tune <- function(lrn, param, vals, is_int = FALSE) {
+      if (length(vals) > 1L) {
+        if (is_int) {
+          lrn$param_set$set_values(
+            .args = setNames(list(paradox::to_tune(paradox::p_int(min(vals), max(vals)))), param)
+          )
+        } else {
+          lrn$param_set$set_values(
+            .args = setNames(list(paradox::to_tune(paradox::p_dbl(min(vals), max(vals)))), param)
+          )
+        }
+      } else {
+        lrn$param_set$set_values(.args = setNames(list(if (is_int) as.integer(vals[[1]]) else vals[[1]]), param))
+      }
+      lrn
+    }
+    lrn_obj <- set_single_or_tune(lrn_obj, "nrounds",          nrounds_vals,   is_int = TRUE)
+    lrn_obj <- set_single_or_tune(lrn_obj, "max_depth",        max_depth_vals, is_int = TRUE)
+    lrn_obj <- set_single_or_tune(lrn_obj, "eta",              eta_vals)
+    lrn_obj <- set_single_or_tune(lrn_obj, "min_child_weight", min_cw_vals,    is_int = TRUE)
+    lrn_obj <- set_single_or_tune(lrn_obj, "colsample_bytree", cbt_vals)
+    return(lrn_obj)
+  }
+
+  stop(sprintf("Unknown algorithm '%s' in build_mlr3_learner()", algo))
+}
+
+#' Train one transition model using mlr3, save it as a .qs file, and return
+#' a result list compatible with perform_transition_modelling()'s aggregation.
+#'
+#' Implements: D-01 (mlr3 replacement), D-05 (save format), D-09/D-10 (subsampling),
+#' D-12 (size gate), D-13 (sanity check).
+#'
+#' @param transition_data data.frame with factor column "response" ("0"/"1") + predictor columns
+#' @param predictor_names character vector of predictor column names
+#' @param trans_name character; name of this transition (for logging and return value)
+#' @param region character or NULL; region name (for return value)
+#' @param output_path character; .qs file path to write
+#' @param config list; full config from get_config()
+#' @param model_specs list; parsed model_specs.yaml content
+#' @param log_file character or NULL; path to log file
+#' @return named list compatible with perform_transition_modelling() result aggregation
+train_mlr3_transition <- function(
+  transition_data,
+  predictor_names,
+  trans_name,
+  region,
+  output_path,
+  config,
+  model_specs,
+  log_file = NULL
+) {
+  library(mlr3)
+  library(mlr3learners)
+  library(mlr3tuning)
+  library(paradox)
+
+  `%||%` <- function(x, y) if (is.null(x) || (is.atomic(x) && length(x) == 0L)) y else x
+
+  # Path injection guard (T-02-03): output_path must be within configured model dir
+  model_dir_norm <- tryCatch(
+    normalizePath(config[["transition_model_dir"]], mustWork = FALSE),
+    error = function(e) NULL
+  )
+  if (!is.null(model_dir_norm)) {
+    out_norm <- normalizePath(output_path, mustWork = FALSE)
+    if (!startsWith(out_norm, model_dir_norm)) {
+      stop(sprintf(
+        "output_path outside configured transition_model_dir (path injection guard T-02-03): %s",
+        output_path
+      ))
+    }
+  }
+
+  # 1. Subsampling fallback (D-09, D-10)
+  max_rows <- config[["max_training_rows"]] %||% 500000L
+  if (nrow(transition_data) > max_rows) {
+    log_msg(sprintf(
+      "  Subsampling: %d rows -> %d (max_training_rows=%d, D-09)",
+      nrow(transition_data), max_rows, max_rows
+    ), log_file)
+    response_tbl <- table(transition_data$response)
+    minority_cls <- names(which.min(response_tbl))
+    majority_cls <- names(which.max(response_tbl))
+    n_minority   <- response_tbl[[minority_cls]]
+    n_majority   <- min(max_rows - n_minority, response_tbl[[majority_cls]])
+    set.seed(config[["random_seed"]] %||% 123L)  # D-10: seed from config
+    min_rows <- transition_data[transition_data$response == minority_cls, ]
+    maj_rows <- transition_data[transition_data$response == majority_cls, ]
+    maj_rows <- maj_rows[sample(nrow(maj_rows), n_majority, replace = FALSE), ]
+    transition_data <- rbind(min_rows, maj_rows)
+    log_msg(sprintf("  After subsampling: %d rows", nrow(transition_data)), log_file)
+  }
+
+  # 2. Subset to predictor columns + response
+  task_data <- transition_data[, c(predictor_names, "response"), drop = FALSE]
+
+  # 3. mlr3 Task creation (stratified on response for balanced CV folds)
+  task <- mlr3::as_task_classif(task_data, target = "response", positive = "1")
+  task$col_roles$stratum <- "response"  # stratified resampling (see RESEARCH §2)
+  log_msg(sprintf("  Task created: %d rows, %d features", task$nrow, task$ncol - 1L), log_file)
+
+  # 4. Train one learner per algorithm in model_specs$models
+  algo_results <- list()
+  trained_learners <- list()
+
+  for (algo in names(model_specs$models)) {
+    params <- model_specs$models[[algo]]$parameters
+    log_msg(sprintf("  Training %s learner...", algo), log_file)
+
+    lrn_spec <- build_mlr3_learner(algo, params, length(predictor_names))
+
+    # Detect single-value vs multi-value grid (Risk 2 in RESEARCH)
+    has_tunable <- any(sapply(params, function(v) length(v) > 1L))
+
+    if (has_tunable) {
+      n_combos <- prod(sapply(params, length))
+      at <- mlr3tuning::auto_tuner(
+        tuner      = mlr3tuning::tnr("grid_search"),
+        learner    = lrn_spec,
+        resampling = mlr3::rsmp("cv", folds = as.integer(model_specs$global$cv_folds %||% 3L)),
+        measure    = mlr3::msr("classif.auc"),
+        term_evals = as.integer(n_combos)
+      )
+      at$train(task)
+      lrn_fitted <- at$learner  # inner Learner only — NOT the AutoTuner (Pitfall 1)
+    } else {
+      # Single-value grid: train directly without AutoTuner overhead (Risk 2)
+      lrn_fitted <- lrn_spec$clone(deep = TRUE)  # clone before training (Risk 7)
+      lrn_fitted$train(task)
+    }
+
+    trained_learners[[algo]] <- lrn_fitted
+    log_msg(sprintf("  %s trained", algo), log_file)
+  }
+
+  # 5. Select best learner (by classif.auc on a holdout or use first trained)
+  # For single-value grids, all learners are comparably trained; pick RF if available,
+  # else the first algorithm. In future, add CV-based selection here.
+  best_algo <- if ("rf" %in% names(trained_learners)) "rf" else names(trained_learners)[[1L]]
+  lrn_final <- trained_learners[[best_algo]]
+  log_msg(sprintf("  Selected learner: %s (algo=%s)", class(lrn_final)[[1L]], best_algo), log_file)
+
+  # 6. Build save object (D-05 contract)
+  model_obj <- list(
+    model_type      = "mlr3",
+    predictor_names = task$feature_names,  # Task's view is authoritative (Risk 5)
+    response_levels = task$class_names,
+    learner         = lrn_final
+  )
+
+  # 7. Save
+  ensure_dir(dirname(output_path))
+  qs::qsave(model_obj, output_path)
+  log_msg(sprintf("  Saved model: %s", output_path), log_file)
+
+  # 8. Size gate (D-12) — warn only, do not stop
+  size_bytes <- file.size(output_path)
+  if (size_bytes > 200 * 1024^2) {
+    log_msg(sprintf(
+      "WARNING: model file exceeds 200MB: %.1f MB — %s",
+      size_bytes / 1024^2, output_path
+    ), log_file)
+  } else {
+    log_msg(sprintf("  Size OK: %.1f MB", size_bytes / 1024^2), log_file)
+  }
+
+  # 9. Predict sanity check (D-13): 5-row predict, assert [0,1] non-NA
+  model_check <- qs::qread(output_path)
+  fixture_rows <- utils::head(transition_data[, predictor_names, drop = FALSE], 5L)
+  pred_check <- tryCatch(
+    model_check$learner$predict_newdata(newdata = fixture_rows),
+    error = function(e) {
+      log_msg(sprintf("ERROR: sanity predict_newdata() failed: %s", conditionMessage(e)), log_file)
+      stop(sprintf("Sanity check predict_newdata() failed: %s", conditionMessage(e)))
+    }
+  )
+  prob_check <- pred_check$prob[, "1"]  # always by name, not position (Risk 6, Pitfall 2)
+  if (any(is.na(prob_check)) || any(prob_check < 0) || any(prob_check > 1)) {
+    log_msg(sprintf(
+      "ERROR: 5-row sanity check failed for %s — probs: %s",
+      output_path, paste(round(prob_check, 4), collapse = ", ")
+    ), log_file)
+    stop(sprintf("Sanity check failed: probabilities not in [0,1] or contain NA: %s", output_path))
+  }
+  log_msg(sprintf("  Sanity check passed (5-row predict OK)", ), log_file)
+
+  # 10. Return result compatible with perform_transition_modelling() aggregation
+  list(
+    transition  = trans_name,
+    region      = ifelse(is.null(region), "National extent", region),
+    status      = "success",
+    model_path  = output_path,
+    cv_metrics  = NULL,
+    test_metrics = NULL,
+    final_model = list(
+      model_path   = output_path,
+      model_type   = "mlr3",
+      size_bytes   = size_bytes,
+      n_predictors = length(predictor_names),
+      algo         = best_algo
+    )
+  )
 }
 
 #' Read an RDS file if it exists, otherwise return NULL
@@ -1107,30 +1384,35 @@ model_single_transition <- function(
   model_specs <- yaml::yaml.load_file(model_specs_path)
   log_msg("Loaded model specifications", log_file)
 
-  # call multi_spec_trans_modelling
-  results <- multi_spec_trans_modelling(
-    transition_data = transition_data,
-    model_specs = model_specs,
-    log_file = log_file
+  # Dispatch to mlr3 training pipeline (D-01: replaces multi_spec_trans_modelling +
+  # fit_and_save_best_model; old functions retained below for reference but not called)
+  results <- tryCatch(
+    withCallingHandlers(
+      train_mlr3_transition(
+        transition_data = transition_data,
+        predictor_names = pred_names,
+        trans_name      = trans_name,
+        region          = region,
+        output_path     = model_path,
+        config          = config,
+        model_specs     = model_specs,
+        log_file        = log_file
+      ),
+      error = function(e) { captured_trace <<- sys.calls() }
+    ),
+    error = function(e) {
+      log_msg(sprintf("  ERROR in train_mlr3_transition: %s", conditionMessage(e)), log_file)
+      list(
+        transition    = trans_name,
+        region        = ifelse(is.null(region), "National extent", region),
+        status        = "error",
+        error_message = conditionMessage(e),
+        cv_metrics    = NULL,
+        test_metrics  = NULL,
+        final_model   = NULL
+      )
+    }
   )
-
-  # # save the result object as rds
-  # saveRDS(
-  #   results,
-  #   file = "test_results.rds"
-  # )
-
-  # Fit best model to full dataset and save (model_path already constructed above)
-  best_model_info <- fit_and_save_best_model(
-    results = results,
-    full_data = transition_data,
-    output_path = model_path,
-    log_file = log_file,
-    max_final_fit_size = model_specs$global$max_final_fit_size
-  )
-
-  # Add best model info to results
-  results$final_model <- best_model_info
   return(results)
 }
 
