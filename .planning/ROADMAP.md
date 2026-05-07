@@ -56,7 +56,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion — can run in parallel with each other)*
 - [ ] 02-02-PLAN.md - Rewrite transition_modelling.r inner stack with mlr3 (train_mlr3_transition, build_mlr3_learner, size gate, sanity check).
-- [ ] 02-03-PLAN.md - Add mlr3 dispatch branch to predict_saved_transition_prob() in allocation.r; update model loader to qs::qread() for .qs files.
+- [x] 02-03-PLAN.md - Add mlr3 dispatch branch to predict_saved_transition_prob() in allocation.r; update model loader to qs::qread() for .qs files.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 02-04-PLAN.md - Create scripts/retrain_all_models.r re-training utility (--force, --dry-run, --region flags).
@@ -99,6 +99,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Repair & Visibility | 4/4 | Complete | 2026-05-05 |
-| 2. Model Size Reduction | 0/4 | Ready to execute | - |
+| 2. Model Size Reduction | 2/4 (02-01, 02-03) | In progress | - |
 | 3. Parallelism & Memory Architecture | 0/TBD | Not started | - |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
