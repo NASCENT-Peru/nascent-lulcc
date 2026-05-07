@@ -50,10 +50,21 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
+
+**Wave 1**
 - [ ] 02-01-PLAN.md - Add mlr3 packages to allocation_env.yml and max_training_rows to both config YAMLs.
+
+**Wave 2** *(blocked on Wave 1 completion — can run in parallel with each other)*
 - [ ] 02-02-PLAN.md - Rewrite transition_modelling.r inner stack with mlr3 (train_mlr3_transition, build_mlr3_learner, size gate, sanity check).
-- [ ] 02-03-PLAN.md - Add mlr3 dispatch branch to predict_saved_transition_prob() in allocation.r.
+- [ ] 02-03-PLAN.md - Add mlr3 dispatch branch to predict_saved_transition_prob() in allocation.r; update model loader to qs::qread() for .qs files.
+
+**Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 02-04-PLAN.md - Create scripts/retrain_all_models.r re-training utility (--force, --dry-run, --region flags).
+
+**Cross-cutting constraints:**
+- All plans: model_type = "mlr3" string is the dispatch key; must appear in every saved model list and predict branch
+- 02-02 + 02-03: save format contract — {model_type, predictor_names, response_levels, learner} list saved by 02-02, read by 02-03 loader
+- 02-02 + 02-03: file extension contract — build_transition_model_path() returns .qs (02-02); loader detects .qs and uses qs::qread() (02-03)
 
 ### Phase 3: Parallelism & Memory Architecture
 **Goal**: A full allocation run on HPC completes for at least one scenario × region × timestep combination with bounded per-worker RAM and no OOM kills, by switching to copy-on-write `multicore` and passing file paths instead of in-memory raster objects to workers.
@@ -88,6 +99,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Repair & Visibility | 4/4 | Complete | 2026-05-05 |
-| 2. Model Size Reduction | 0/4 | Not started | - |
+| 2. Model Size Reduction | 0/4 | Ready to execute | - |
 | 3. Parallelism & Memory Architecture | 0/TBD | Not started | - |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
