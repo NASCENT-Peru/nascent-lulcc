@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 ## Current Position
 
 Phase: 2 of 4 (Model Size Reduction)
-Plan: 3 of 4 in current phase (02-01 and 02-03 complete; 02-02 in parallel Wave 2; 02-04 Wave 3 pending)
+Plan: 4 of 4 in current phase (02-01, 02-02, and 02-03 complete; 02-04 Wave 3 pending)
 Status: In progress
-Last activity: 2026-05-07 — 02-03 complete; mlr3 dispatch branch and qs::qread() loader added to allocation.r
+Last activity: 2026-05-07 — 02-02 complete; mlr3 inner stack in transition_modelling.r, build_mlr3_learner() + train_mlr3_transition() added, model_specs.yaml updated to mlr3 param names
 
 Progress: [████░░░░░░] 37%
 
@@ -28,7 +28,7 @@ Progress: [████░░░░░░] 37%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1. Repair & Visibility | 4 | ~0.5h | ~8 min |
-| 2. Model Size Reduction | 2 (02-01, 02-03) | ~14 min combined | ~7 min |
+| 2. Model Size Reduction | 3 (02-01, 02-02, 02-03) | ~59 min combined | ~20 min |
 | 3. Parallelism & Memory Architecture | 0 | — | — |
 | 4. End-to-End Correctness & Performance | 0 | — | — |
 
@@ -45,6 +45,7 @@ Progress: [████░░░░░░] 37%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- Phase 2 (02-02): Save `at$learner` not AutoTuner to avoid 3-5x size bloat; ranger `save.memory=TRUE` + `importance="none"` hardcoded (primary size reduction); step_normalize not replicated (classif.glmnet is scale-invariant); T-02-03 path injection guard in train_mlr3_transition().
 - Phase 2: Full mlr3 replacement of tidymodels in `transition_modelling.r`; `classif.glmnet` (not plain GLM) for logistic regression; `qs::qsave()` with `{model_type="mlr3", predictor_names, response_levels, learner}` list; `max_training_rows` YAML key for subsampling fallback.
 - Init: Linux HPC switches to `future::multicore`; Windows local stays on `future::multisession`.
 - Init: Pre-compute neighbourhood rasters in parent and pass file paths to workers (not SpatRaster objects).
@@ -70,5 +71,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-05-07
-Stopped at: Completed 02-03-PLAN.md — mlr3 dispatch branch and qs::qread() loader added to allocation.r
+Stopped at: Completed 02-02-PLAN.md — mlr3 inner stack (build_mlr3_learner + train_mlr3_transition) in transition_modelling.r; model_specs.yaml updated to mlr3 param names
 Resume file: None
