@@ -708,22 +708,25 @@ if (!is.null(model_obj$model_type) && model_obj$model_type == "mlr3") {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **classif.log_reg vs. classif.glmnet for GLM**
    - What we know: Current code uses glmnet (penalty=0.01, mixture=1 = Lasso). mlr3 has both options. `r-glmnet` is not in `allocation_env.yml`.
    - What's unclear: Does the researcher want regularisation preserved? Or is plain logistic regression acceptable?
    - Recommendation: Use `classif.glmnet` (matches current behaviour); add `r-glmnet` to `allocation_env.yml` in Plan 02-01.
+   - **RESOLVED:** Plan 02-01 adds `r-glmnet` to `allocation_env.yml`; Plan 02-02 uses `classif.glmnet` with alpha/s parameters matching the current Lasso configuration.
 
 2. **Should model_specs.yaml be restructured for mlr3?**
    - What we know: Current YAML uses tidymodels-style names (`trees`, `learn_rate`, `min_n`). mlr3 uses native names (`nrounds`, `eta`, `min_child_weight`).
    - What's unclear: Scope of YAML change — in-place rename, or new mlr3_model_specs.yaml?
    - Recommendation: In-place rename with comments; keep the same structure. One source of truth.
+   - **RESOLVED:** Plan 02-02 renames all keys in-place in `config/model_specs.yaml` (trees→num.trees, learn_rate→eta, etc.) while preserving the single-file structure.
 
 3. **Does `retrain_all_models.r` run models in parallel?**
    - What we know: The existing `perform_transition_modelling()` already uses `furrr::future_map()` over transitions. Parallelism is currently `SLURM_CPUS_PER_TASK`-driven.
    - What's unclear: `retrain_all_models.r` is a new utility script — does it call `transition_modelling()` (which has parallel internals) or does it submit SLURM jobs?
    - Recommendation: Call `transition_modelling()` directly (which handles parallel internally). The utility script is a wrapper that sets up config/paths and calls the existing entry point.
+   - **RESOLVED:** Plan 02-04 creates `scripts/retrain_all_models.r` that calls `transition_modelling()` directly; parallelism is handled by `perform_transition_modelling()` internals via `furrr::future_map()`.
 
 ---
 
