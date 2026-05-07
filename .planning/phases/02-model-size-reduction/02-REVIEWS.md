@@ -126,6 +126,8 @@ Two concerns merit attention before execution: the silent drop of the `num_repli
 
 ### Agreed Concerns (Priority Order)
 
+0. **CRITICAL — transition_model_env.yml missing from Wave 1** (02-01): `environments/transition_model_env.yml` is the conda environment used when training transition models (it contains the tidymodels stack — r-tidymodels, r-ranger, r-xgboost=1.7, etc.). Plan 02-01 only adds mlr3 packages to `allocation_env.yml` (the prediction/main-pipeline environment). The training environment also needs r-mlr3, r-mlr3learners, r-mlr3tuning, r-paradox, and r-bbotk added. r-glmnet is already present in transition_model_env.yml. Without this fix, the rewritten transition_modelling.r will fail with "there is no package called 'mlr3'" when run inside the transition_model_env. This is a runtime blocker.
+
 1. **HIGH — Replicate concept silently dropped** (02-02): `num_replicates: 2` in model_specs.yaml becomes a dead config key. The plan doesn't document this behavioural change. Recommend either removing `num_replicates` from model_specs.yaml (preferred — eliminates dead config) or adding a comment explaining it's superseded by AutoTuner CV folds. **This is a documentation gap, not a correctness issue** — AutoTuner CV is the correct replacement for replicate averaging.
 
 2. **MEDIUM — glmnet normalisation not documented** (02-02): The old tidymodels stack applied `step_normalize()` via recipes. The mlr3 migration drops this. classif.glmnet's regularisation works without normalisation, so predictions will differ numerically from the old models (which is acceptable — re-training from scratch per D-07). But this should be explicitly noted in the plan.
@@ -143,13 +145,16 @@ Two concerns merit attention before execution: the silent drop of the `num_repli
 
 | Priority | Plan | Action |
 |----------|------|--------|
+| CRITICAL | 02-01 | Add `environments/transition_model_env.yml` to files_modified and task actions — the training environment is missing the mlr3 packages |
 | HIGH | 02-02 | Document replicate drop in plan action or model_specs.yaml comment |
 | MEDIUM | 02-02 | Specify mtry → colsample_bytree fraction conversion explicitly in action |
 | MEDIUM | 02-02 | Note glmnet normalisation drop (step_normalize removed, glmnet handles internally) |
 | LOW | 02-01 | Add one-line comment in env.yml: r-mlr3pipelines not required |
 | LOW | 02-04 | Add file.exists() validation for viable_transitions_lists path |
 
-The HIGH item (replicates) is the most important — it affects model selection logic and should be documented even if the design decision is correct.
+The CRITICAL item (transition_model_env.yml missing) is a blocker — without adding r-mlr3, r-mlr3learners, r-mlr3tuning, r-paradox, and r-bbotk to the training environment, the rewritten transition_modelling.r will fail at runtime because these packages won't be available in the conda environment used for model training. Note: r-glmnet is already present in transition_model_env.yml.
+
+The HIGH item (replicates) is the most important documentation gap — it affects model selection logic and should be documented even if the design decision is correct.
 
 ---
 
