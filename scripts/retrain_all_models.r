@@ -66,6 +66,27 @@ setwd(project_root)
 cat(sprintf("Working directory set to: %s\n", getwd()))
 
 # ---------------------------------------------------------------------------
+# Load required packages
+# Must be loaded before sourcing transition_modelling.r so that %>% and other
+# operators are available in the global search path for furrr workers.
+# Mirrors the loading block in run_transition_modelling.r.
+# ---------------------------------------------------------------------------
+required_pkgs <- c(
+  "dplyr", "stringr", "future", "furrr", "yaml", "jsonlite",
+  "arrow", "tibble", "tidyselect", "tidyr", "purrr",
+  "ranger", "glmnet", "xgboost", "qs",
+  "mlr3", "mlr3learners", "mlr3tuning", "paradox", "bbotk"
+)
+for (.pkg in required_pkgs) {
+  if (!requireNamespace(.pkg, quietly = TRUE)) {
+    cat(sprintf("ERROR: required package '%s' is not installed.\n", .pkg))
+    quit(status = 1)
+  }
+  suppressPackageStartupMessages(library(.pkg, character.only = TRUE))
+}
+cat("All required packages loaded successfully.\n\n")
+
+# ---------------------------------------------------------------------------
 # Source required files
 # No runtime package installation — environment provisioning is done externally
 # (run_allocation.r Plan 01-03, RESEARCH Pitfall 3).
@@ -162,12 +183,12 @@ if (dry_run) {
     !is.na(viable$rate_2018_2022) &
     viable$rate_2018_2022 != 0 &
     viable$region_name != "whole_map" &
-    viable$from_class != viable$to_class,
+    viable$from_lulc != viable$to_lulc,
   ]
   cat(sprintf("[DRY RUN] Would re-train %d transition-region pairs:\n", nrow(viable)))
   for (i in seq_len(nrow(viable))) {
     cat(sprintf("  %s -> %s (%s)\n",
-      viable$from_class[[i]], viable$to_class[[i]], viable$region_name[[i]]))
+      viable$from_lulc[[i]], viable$to_lulc[[i]], viable$region_name[[i]]))
   }
   cat("\nRe-run without --dry-run to execute training.\n")
   quit(status = 0)
