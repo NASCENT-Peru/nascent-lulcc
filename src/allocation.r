@@ -537,6 +537,23 @@ predict_saved_transition_prob <- function(model_obj, new_data, log_file = NULL) 
       }
     }
 
+    if (!is.null(model_obj$model_type) && model_obj$model_type == "mlr3") {
+      log_msg("        Path: mlr3 learner; predict_newdata()", log_file)
+      new_data_subset <- subset_saved_transition_data(new_data, predictor_names)
+      pred <- tryCatch(
+        model_obj$learner$predict_newdata(newdata = new_data_subset),
+        error = function(e) log_and_stop(sprintf(
+          "mlr3 predict_newdata() failed: %s", conditionMessage(e)
+        ))
+      )
+      # pred$prob is a matrix; columns are named by class label ("0", "1")
+      # Always index by name, not position — factor levels may vary (Risk 6, RESEARCH)
+      prob_1 <- pred$prob[, "1"]
+      result <- data.frame(.pred_0 = 1 - prob_1, .pred_1 = prob_1)
+      log_msg("        Path: mlr3 — prediction complete", log_file)
+      return(result)
+    }
+
     if (
       !is.null(model_obj$model_type) &&
         grepl("^tidypredict_", model_obj$model_type)
