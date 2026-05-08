@@ -183,19 +183,13 @@ build_mlr3_learner <- function(algo, params, predictor_count) {
     )
     # Set single-value params directly; multi-value params via to_tune()
     set_single_or_tune <- function(lrn, param, vals, is_int = FALSE) {
-      if (length(vals) > 1L) {
-        if (is_int) {
-          lrn$param_set$set_values(
-            .args = setNames(list(paradox::to_tune(paradox::p_int(min(vals), max(vals)))), param)
-          )
-        } else {
-          lrn$param_set$set_values(
-            .args = setNames(list(paradox::to_tune(paradox::p_dbl(min(vals), max(vals)))), param)
-          )
-        }
+      val <- if (length(vals) > 1L) {
+        if (is_int) paradox::to_tune(paradox::p_int(min(vals), max(vals)))
+        else        paradox::to_tune(paradox::p_dbl(min(vals), max(vals)))
       } else {
-        lrn$param_set$set_values(.args = setNames(list(if (is_int) as.integer(vals[[1]]) else vals[[1]]), param))
+        if (is_int) as.integer(vals[[1]]) else vals[[1]]
       }
+      do.call(lrn$param_set$set_values, setNames(list(val), param))
       lrn
     }
     lrn_obj <- set_single_or_tune(lrn_obj, "nrounds",          nrounds_vals,   is_int = TRUE)
