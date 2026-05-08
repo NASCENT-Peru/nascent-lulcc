@@ -279,6 +279,22 @@ train_mlr3_transition <- function(
   # 2. Subset to predictor columns + response
   task_data <- transition_data[, c(predictor_names, "response"), drop = FALSE]
 
+  # 2a. Drop rows with any NA in predictors (mlr3 learners do not impute by default;
+  #     mirrors step_naomit() in the old tidymodels recipe).
+  n_before <- nrow(task_data)
+  task_data <- task_data[stats::complete.cases(task_data), ]
+  n_dropped <- n_before - nrow(task_data)
+  if (n_dropped > 0L) {
+    log_msg(sprintf(
+      "  NA rows dropped: %d of %d (%.1f%%)",
+      n_dropped, n_before, 100 * n_dropped / n_before
+    ), log_file)
+  }
+  if (nrow(task_data) == 0L) {
+    log_msg("  SKIP: 0 rows remain after NA removal", log_file)
+    return(list(status = "skipped_all_na", predictor_names = predictor_names))
+  }
+
   # 3. mlr3 Task creation (stratified on response for balanced CV folds)
   task <- mlr3::as_task_classif(task_data, target = "response", positive = "1")
   task$col_roles$stratum <- "response"  # stratified resampling (see RESEARCH §2)
