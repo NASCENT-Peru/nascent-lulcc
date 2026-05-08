@@ -379,7 +379,7 @@ train_mlr3_transition <- function(
     ), log_file)
     stop(sprintf("Sanity check failed: probabilities not in [0,1] or contain NA: %s", output_path))
   }
-  log_msg(sprintf("  Sanity check passed (5-row predict OK)", ), log_file)
+  log_msg("  Sanity check passed (5-row predict OK)", log_file)
 
   # 10. Return result compatible with perform_transition_modelling() aggregation
   list(
