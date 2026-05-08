@@ -360,8 +360,10 @@ train_mlr3_transition <- function(
   }
 
   # 9. Predict sanity check (D-13): 5-row predict, assert [0,1] non-NA
+  # Use task$data() for fixture rows — guaranteed NA-free and correctly typed
+  # from training, avoiding NA failures when transition_data rows have missing predictors.
   model_check <- qs::qread(output_path)
-  fixture_rows <- utils::head(transition_data[, predictor_names, drop = FALSE], 5L)
+  fixture_rows <- task$data(rows = seq_len(min(5L, task$nrow)), cols = task$feature_names)
   pred_check <- tryCatch(
     model_check$learner$predict_newdata(newdata = fixture_rows),
     error = function(e) {
