@@ -1113,8 +1113,8 @@ perform_transition_modelling <- function(
         fs_status == "failed" ~ "not_attempted_fs_failed",
         fs_status == "missing" ~ "not_attempted_fs_missing",
         fs_status == "success" &
-          (is.na(selected_predictors) ||
-            selected_predictors == "" ||
+          (is.na(selected_predictors) |
+            selected_predictors == "" |
             nchar(trimws(selected_predictors)) == 0) ~ "skipped_no_predictors",
         fs_status == "success" & model_file_exists ~ "success",
         fs_status == "success" &
