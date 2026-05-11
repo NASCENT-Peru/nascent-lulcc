@@ -189,6 +189,78 @@ prof_mem_summary <- function(tag, log_file = NULL) {
   invisible(m)
 }
 
+pin_native_threads_to_one <- function(verbose = FALSE) {
+  Sys.setenv(
+    OMP_NUM_THREADS = "1",
+    OPENBLAS_NUM_THREADS = "1",
+    MKL_NUM_THREADS = "1",
+    GOTO_NUM_THREADS = "1",
+    GDAL_NUM_THREADS = "1",
+    R_DATATABLE_NUM_THREADS = "1"
+  )
+  if (requireNamespace("RhpcBLASctl", quietly = TRUE)) {
+    try(RhpcBLASctl::blas_set_num_threads(1L), silent = !verbose)
+    try(RhpcBLASctl::omp_set_num_threads(1L), silent = !verbose)
+  }
+  if (requireNamespace("data.table", quietly = TRUE)) {
+    data.table::setDTthreads(1L)
+  }
+  if (requireNamespace("arrow", quietly = TRUE)) {
+    try(arrow::set_cpu_count(1L), silent = !verbose)
+    try(arrow::set_io_thread_count(1L), silent = !verbose)
+  }
+  invisible(NULL)
+}
+
+prof_cgroup_snapshot <- function(tag, log_file = NULL) {
+  paths_v2 <- list(
+    current = "/sys/fs/cgroup/memory.current",
+    max = "/sys/fs/cgroup/memory.max"
+  )
+  paths_v1 <- list(
+    current = "/sys/fs/cgroup/memory/memory.usage_in_bytes",
+    max = "/sys/fs/cgroup/memory/memory.limit_in_bytes"
+  )
+  paths <- if (file.exists(paths_v2$current)) {
+    paths_v2
+  } else if (file.exists(paths_v1$current)) {
+    paths_v1
+  } else {
+    return(invisible(NULL))
+  }
+
+  read_counter_mb <- function(path) {
+    if (!file.exists(path)) {
+      return(NA_real_)
+    }
+    raw <- tryCatch(readLines(path, warn = FALSE), error = function(e) character(0))
+    if (!length(raw) || identical(raw[[1]], "max")) {
+      return(NA_real_)
+    }
+    suppressWarnings(as.numeric(raw[[1]]) / 1024^2)
+  }
+
+  current_mb <- read_counter_mb(paths$current)
+  max_raw <- tryCatch(readLines(paths$max, warn = FALSE), error = function(e) character(0))
+  max_mb <- if (!length(max_raw) || identical(max_raw[[1]], "max")) {
+    NA_real_
+  } else {
+    suppressWarnings(as.numeric(max_raw[[1]]) / 1024^2)
+  }
+
+  log_msg(
+    sprintf(
+      "CGROUP %s memory.current=%sMB memory.max=%sMB",
+      tag,
+      if (is.na(current_mb)) "unknown" else sprintf("%.1f", current_mb),
+      if (is.na(max_mb)) "unlimited" else sprintf("%.1f", max_mb)
+    ),
+    log_file
+  )
+
+  invisible(list(current_mb = current_mb, max_mb = max_mb))
+}
+
 # ---------------------------------------------------------------------------
 # Stage 7 pre-flight gate (Plan 01-03, locked decisions D-01..D-04).
 #
@@ -242,6 +314,7 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
                       "DINAMICA_EGO_8_HOME")
     packages_expected <- c(
       "ps", "terra", "arrow", "data.table", "future", "furrr",
+      "parallelly",
       "processx", "base64enc", "dplyr", "stringr", "yaml", "jsonlite",
       "workflows", "parsnip", "recipes", "ranger", "xgboost",
       "tidypredict", "butcher", "bundle", "qs", "lobstr", "RhpcBLASctl"
@@ -330,6 +403,342 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
 # Small null-coalesce operator local to this file; avoids importing rlang
 # just for its `%||%`.
 `%||%` <- function(x, y) if (is.null(x) || (is.atomic(x) && length(x) == 0L)) y else x
+
+parse_allocation_filter_values <- function(env_key) {
+  raw <- Sys.getenv(env_key, unset = "")
+  if (!nzchar(raw)) {
+    return(character(0))
+  }
+  vals <- trimws(strsplit(raw, ",", fixed = TRUE)[[1]])
+  vals[nzchar(vals)]
+}
+
+select_allocation_plan <- function() {
+  override <- suppressWarnings(as.integer(
+    Sys.getenv("ALLOCATION_NUM_WORKERS", unset = NA_character_)
+  ))
+  workers <- if (!is.na(override) && override > 0L) {
+    override
+  } else if (requireNamespace("parallelly", quietly = TRUE)) {
+    parallelly::availableCores()
+  } else {
+    max(1L, parallel::detectCores() - 1L)
+  }
+
+  forced <- tolower(Sys.getenv("ALLOCATION_PARALLEL_STRATEGY", unset = ""))
+  if (identical(forced, "sequential")) {
+    return(list(strategy = "sequential", workers = 1L))
+  }
+  if (forced %in% c("multicore", "multisession")) {
+    return(list(strategy = forced, workers = workers))
+  }
+  if (requireNamespace("parallelly", quietly = TRUE) &&
+      parallelly::supportsMulticore()) {
+    list(strategy = "multicore", workers = workers)
+  } else {
+    list(strategy = "multisession", workers = workers)
+  }
+}
+
+filter_allocation_regions <- function(regions) {
+  requested <- parse_allocation_filter_values("ALLOCATION_REGION_FILTER")
+  if (!length(requested)) {
+    return(regions)
+  }
+  missing <- setdiff(requested, regions$label)
+  if (length(missing)) {
+    stop(sprintf(
+      "ALLOCATION_REGION_FILTER requested unknown region(s): %s",
+      paste(missing, collapse = ", ")
+    ))
+  }
+  filtered <- regions[match(requested, regions$label), , drop = FALSE]
+  message(sprintf(
+    "Smoke filter: restricting regions to %s",
+    paste(filtered$label, collapse = ", ")
+  ))
+  filtered
+}
+
+filter_allocation_timesteps <- function(year_starts, year_ends, scenario) {
+  year_post_filter <- Sys.getenv("ALLOCATION_YEAR_POST_FILTER", unset = "")
+  if (!nzchar(year_post_filter)) {
+    return(list(year_starts = year_starts, year_ends = year_ends))
+  }
+
+  year_post <- suppressWarnings(as.integer(year_post_filter))
+  if (is.na(year_post)) {
+    stop("ALLOCATION_YEAR_POST_FILTER must be an integer posterior year")
+  }
+  idx <- which(year_ends == year_post)
+  if (!length(idx)) {
+    stop(sprintf(
+      "ALLOCATION_YEAR_POST_FILTER=%d is not a valid posterior year for scenario '%s'",
+      year_post,
+      scenario
+    ))
+  }
+  message(sprintf(
+    "Smoke filter: restricting scenario '%s' to posterior year %d",
+    scenario,
+    year_post
+  ))
+  list(
+    year_starts = year_starts[idx],
+    year_ends = year_ends[idx]
+  )
+}
+
+get_allocation_worker_rss_budget_mb <- function() {
+  raw <- Sys.getenv("ALLOCATION_WORKER_RSS_BUDGET_MB", unset = "")
+  if (!nzchar(raw)) {
+    return(NA_real_)
+  }
+  suppressWarnings(as.numeric(raw))
+}
+
+load_allocation_class_map <- function(config) {
+  lulc_schema <- jsonlite::fromJSON(
+    config[["lulc_aggregation_path"]],
+    simplifyVector = FALSE
+  )
+  setNames(
+    sapply(lulc_schema, function(x) x$value),
+    sapply(lulc_schema, function(x) x$class_name)
+  )
+}
+
+load_allocation_focal_matrices <- function(config) {
+  fm <- readRDS(file.path(
+    config[["preds_tools_dir"]],
+    "neighbourhood_matrices",
+    "all_matrices.rds"
+  ))
+  fm <- unlist(fm, recursive = FALSE)
+  names(fm) <- vapply(
+    names(fm),
+    function(x) stringr::str_split(x, "[.]")[[1]][2],
+    character(1)
+  )
+  fm
+}
+
+load_transition_model_file <- function(file_path) {
+  if (grepl("\\.qs$", file_path, perl = TRUE)) {
+    qs::qread(file_path)
+  } else {
+    readRDS(file_path)
+  }
+}
+
+load_allocation_models <- function(region_labels, calibration_period, config) {
+  class_name_to_value <- load_allocation_class_map(config)
+  model_dir <- file.path(config[["transition_model_dir"]], calibration_period)
+  models_by_region <- vector("list", length(region_labels))
+  names(models_by_region) <- gsub(" ", "_", tolower(region_labels))
+
+  for (region_label in region_labels) {
+    region_suffix <- gsub(" ", "_", tolower(region_label))
+    model_files <- list.files(
+      model_dir,
+      pattern = sprintf(".*_%s\\.(qs|rds)$", region_suffix),
+      full.names = TRUE
+    )
+    if (length(model_files) == 0L) {
+      stop(sprintf(
+        "No fitted model files found for region '%s' in %s",
+        region_suffix,
+        model_dir
+      ))
+    }
+
+    model_info <- data.table::data.table(
+      file_path = model_files,
+      trans_name = sub(
+        sprintf("_%s\\.(qs|rds)$", region_suffix),
+        "",
+        basename(model_files)
+      )
+    )
+    model_info[,
+      c("anterior_class", "posterior_class") := data.table::tstrsplit(
+        trans_name,
+        "-",
+        fixed = TRUE
+      )
+    ]
+    model_info[,
+      `:=`(
+        from_val = as.integer(class_name_to_value[anterior_class]),
+        to_val = as.integer(class_name_to_value[posterior_class])
+      )
+    ]
+    model_info[, model_obj := lapply(file_path, load_transition_model_file)]
+    model_info[, predictor_names := lapply(model_obj, get_saved_transition_predictors)]
+    models_by_region[[region_suffix]] <- model_info
+  }
+
+  models_by_region
+}
+
+write_nhood_tif <- function(anterior_path, pred_name, focal_matrices,
+                            class_name_to_value, out_path) {
+  anterior <- terra::rast(anterior_path)
+  rast <- compute_single_nhood_raster(
+    anterior = anterior,
+    pred_name = pred_name,
+    focal_matrices = focal_matrices,
+    class_name_to_value = class_name_to_value
+  )
+  dir.create(dirname(out_path), recursive = TRUE, showWarnings = FALSE)
+  terra::writeRaster(
+    rast,
+    out_path,
+    overwrite = TRUE,
+    datatype = "FLT4S",
+    gdal = c(
+      "COMPRESS=LZW",
+      "TILED=YES",
+      "BLOCKXSIZE=256",
+      "BLOCKYSIZE=256",
+      "BIGTIFF=IF_SAFER",
+      "NUM_THREADS=1"
+    )
+  )
+  rm(rast, anterior)
+  gc(verbose = FALSE)
+  out_path
+}
+
+prepare_region_nhood_paths <- function(anterior_path, region_models, scenario,
+                                       year_post, region_suffix, config,
+                                       focal_matrices, class_name_to_value) {
+  predictor_names <- unlist(
+    region_models[["predictor_names"]],
+    recursive = FALSE,
+    use.names = FALSE
+  )
+  nhood_needed <- sort(unique(grep("_nhood_", predictor_names, value = TRUE)))
+  if (!length(nhood_needed)) {
+    return(setNames(character(0), character(0)))
+  }
+
+  cache_dir <- file.path(
+    Sys.getenv("TERRA_TEMP", unset = tempdir()),
+    "nhood_cache",
+    paste0(scenario, "_", year_post, "_", region_suffix)
+  )
+  out_paths <- setNames(
+    file.path(cache_dir, paste0(nhood_needed, ".tif")),
+    nhood_needed
+  )
+  for (pred_name in nhood_needed) {
+    write_nhood_tif(
+      anterior_path = anterior_path,
+      pred_name = pred_name,
+      focal_matrices = focal_matrices,
+      class_name_to_value = class_name_to_value,
+      out_path = out_paths[[pred_name]]
+    )
+  }
+  out_paths
+}
+
+prepare_region_worker_inputs <- function(scenario, year_post, current_lulc_path,
+                                         regions, region_rast_path,
+                                         calibration_period, timestep_dir,
+                                         config) {
+  class_name_to_value <- load_allocation_class_map(config)
+  t_preload_models <- prof_tic()
+  models_list <- load_allocation_models(
+    region_labels = regions$label,
+    calibration_period = calibration_period,
+    config = config
+  )
+  prof_toc(
+    t_preload_models,
+    sprintf(
+      "scenario=%s year_post=%d stage=preload_models models=%d",
+      scenario,
+      year_post,
+      sum(vapply(models_list, nrow, integer(1)))
+    )
+  )
+
+  focal_matrices <- load_allocation_focal_matrices(config)
+  current_lulc <- terra::rast(current_lulc_path)
+  region_rast <- terra::rast(region_rast_path)
+  region_inputs <- vector("list", nrow(regions))
+
+  t_nhood_precompute <- prof_tic()
+  for (idx in seq_len(nrow(regions))) {
+    region_label <- regions$label[[idx]]
+    region_val <- as.integer(regions$value[[idx]])
+    region_suffix <- gsub(" ", "_", tolower(region_label))
+    region_work_dir <- file.path(timestep_dir, paste0("region_", region_suffix))
+    ensure_dir(region_work_dir)
+
+    lulc_region <- terra::mask(
+      current_lulc,
+      region_rast,
+      maskvalues = region_val,
+      inverse = TRUE
+    )
+    lulc_region <- terra::trim(lulc_region, padding = 0)
+    anterior_path <- file.path(region_work_dir, "anterior.tif")
+    terra::writeRaster(
+      lulc_region,
+      anterior_path,
+      overwrite = TRUE,
+      wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
+    )
+    rm(lulc_region)
+    gc(verbose = FALSE)
+
+    region_models <- models_list[[region_suffix]]
+    nhood_paths <- prepare_region_nhood_paths(
+      anterior_path = anterior_path,
+      region_models = region_models,
+      scenario = scenario,
+      year_post = year_post,
+      region_suffix = region_suffix,
+      config = config,
+      focal_matrices = focal_matrices,
+      class_name_to_value = class_name_to_value
+    )
+
+    region_inputs[[idx]] <- list(
+      region_label = region_label,
+      region_val = region_val,
+      region_suffix = region_suffix,
+      region_work_dir = region_work_dir,
+      anterior_path = anterior_path,
+      models_list = region_models,
+      nhood_paths = nhood_paths
+    )
+  }
+  prof_toc(
+    t_nhood_precompute,
+    sprintf(
+      "scenario=%s year_post=%d stage=nhood_precompute regions=%d",
+      scenario,
+      year_post,
+      nrow(regions)
+    )
+  )
+
+  prof_cgroup_snapshot(
+    sprintf("scenario=%s year_post=%d stage=parent_baseline", scenario, year_post)
+  )
+  prof_toc(
+    prof_tic(),
+    sprintf("scenario=%s year_post=%d stage=parent_baseline", scenario, year_post)
+  )
+
+  rm(current_lulc, region_rast, focal_matrices, class_name_to_value)
+  gc(verbose = FALSE)
+  region_inputs
+}
 
 #' Detect if a loaded model object is in the "minimal saved transition model" format
 #' (contains only a recipe and a fitted model, without the full workflow structure).
@@ -739,6 +1148,7 @@ run_allocation <- function(config = get_config()) {
 
   # Load regions
   regions <- jsonlite::fromJSON(file.path(config[["reg_dir"]], "regions.json"))
+  regions <- filter_allocation_regions(regions)
   region_rast_path <- list.files(
     config[["reg_dir"]],
     pattern = "regions.tif$",
@@ -811,6 +1221,9 @@ run_allocation_for_scenario <- function(
   # Build timestep pairs
   year_starts <- seq(start_year, end_year - step_length, by = step_length)
   year_ends <- year_starts + step_length
+  year_filters <- filter_allocation_timesteps(year_starts, year_ends, scenario)
+  year_starts <- year_filters$year_starts
+  year_ends <- year_filters$year_ends
 
   profile_timestep_index <- config[["profile_timestep_index"]]
   if (!is.null(profile_timestep_index)) {
@@ -898,24 +1311,25 @@ run_allocation_one_timestep <- function(
 ) {
   timestep_dir <- file.path(sim_dir, as.character(year_post))
   ensure_dir(timestep_dir)
-
-  # Extract region names and values for iteration
-  region_names <- regions$label
-  region_vals <- as.integer(regions$value)
+  region_inputs <- prepare_region_worker_inputs(
+    scenario = scenario,
+    year_post = year_post,
+    current_lulc_path = current_lulc_path,
+    regions = regions,
+    region_rast_path = region_rast_path,
+    calibration_period = calibration_period,
+    timestep_dir = timestep_dir,
+    config = config
+  )
 
   # Process each region (parallel via furrr if available)
   posterior_paths <- furrr::future_map(
-    seq_along(region_names),
-    function(idx) {
-      region_label <- region_names[idx]
-      region_val <- region_vals[idx]
-      region_suffix <- gsub(" ", "_", tolower(region_label))
-
-      region_work_dir <- file.path(
-        timestep_dir,
-        paste0("region_", region_suffix)
-      )
-      ensure_dir(region_work_dir)
+    region_inputs,
+    function(region_input) {
+      region_label <- region_input$region_label
+      region_val <- region_input$region_val
+      region_suffix <- region_input$region_suffix
+      region_work_dir <- region_input$region_work_dir
       log_file <- initialize_worker_log(
         file.path(region_work_dir, "worker_logs"),
         region_suffix
@@ -947,29 +1361,76 @@ run_allocation_one_timestep <- function(
       worker_state_set(stage = "region_setup", log_file = log_file)
       t_region_total <- prof_tic()
       t_region_setup <- prof_tic()
-
-      # load region raster
-      region_rast <- terra::rast(region_rast_path)
-
-      # Load current LULC raster
-      current_lulc <- terra::rast(current_lulc_path)
-
-      # Mask and trim current LULC to region
-      lulc_region <- terra::mask(
-        current_lulc,
-        region_rast,
-        maskvalues = region_val,
-        inverse = TRUE
+      log_msg(
+        sprintf(
+          paste0(
+            "PROFILE region=%s stage=pin_native_threads_to_one ",
+            "OMP_NUM_THREADS=%s data.table_threads=%s"
+          ),
+          region_suffix,
+          Sys.getenv("OMP_NUM_THREADS", unset = "unset"),
+          if (requireNamespace("data.table", quietly = TRUE)) {
+            as.character(data.table::getDTthreads())
+          } else {
+            "unset"
+          }
+        ),
+        log_file
       )
-      lulc_region <- terra::trim(lulc_region, padding = 0)
-
-      anterior_path <- file.path(region_work_dir, "anterior.tif")
-      #todo consider using the project write_raster function from utils.r here to ensure consistent datatype and compression settings across all rasters. We should also consider using it for all subsequent raster writes in this script, including the probability maps and the final posterior rasters.
-      terra::writeRaster(
-        lulc_region,
-        anterior_path,
-        overwrite = TRUE,
-        wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
+      worker_budget_mb <- get_allocation_worker_rss_budget_mb()
+      if (!is.na(worker_budget_mb)) {
+        log_msg(
+          sprintf(
+            paste0(
+              "RSS_BUDGET region=%s budget_mb=%.1f source=",
+              "ALLOCATION_WORKER_RSS_BUDGET_MB"
+            ),
+            region_suffix,
+            worker_budget_mb
+          ),
+          log_file
+        )
+      }
+      log_msg(
+        sprintf(
+          "PROFILE region=%s stage=preload_models models=%d",
+          region_suffix,
+          nrow(region_input$models_list)
+        ),
+        log_file
+      )
+      log_msg(
+        sprintf(
+          "PROFILE region=%s stage=nhood_precompute paths=%d",
+          region_suffix,
+          length(region_input$nhood_paths)
+        ),
+        log_file
+      )
+      log_msg(
+        sprintf("PROFILE region=%s stage=parent_baseline", region_suffix),
+        log_file
+      )
+      prof_cgroup_snapshot(
+        sprintf("region=%s stage=worker_entry", region_suffix),
+        log_file
+      )
+      if (!file.exists(region_input$anterior_path)) {
+        stop(log_msg(
+          sprintf(
+            "Precomputed anterior raster missing for region '%s': %s",
+            region_label,
+            region_input$anterior_path
+          ),
+          log_file
+        ))
+      }
+      log_msg(
+        sprintf(
+          "    Using precomputed anterior raster: %s",
+          region_input$anterior_path
+        ),
+        log_file
       )
 
       prof_toc(
@@ -990,10 +1451,12 @@ run_allocation_one_timestep <- function(
         scenario = scenario,
         year_ant = year_ant,
         year_post = year_post,
-        anterior_path = anterior_path,
+        anterior_path = region_input$anterior_path,
         calibration_period = calibration_period,
         config = config,
-        log_file = log_file
+        log_file = log_file,
+        models_list = region_input$models_list,
+        nhood_paths = region_input$nhood_paths
       )
       prof_toc(
         t_setup_inputs,
@@ -1018,7 +1481,7 @@ run_allocation_one_timestep <- function(
         log_file
       )
 
-      rm(lulc_region, current_lulc, region_rast)
+      rm(region_input)
       gc(verbose = FALSE)
 
       prof_toc(
@@ -1093,7 +1556,9 @@ setup_allocation_inputs <- function(
   anterior_path,
   calibration_period,
   config,
-  log_file
+  log_file,
+  models_list,
+  nhood_paths
 ) {
   # 1. Copy transition rates CSV
   scalar_str <- sprintf("%.1f", config[["selected_scalar"]])
@@ -1216,7 +1681,9 @@ setup_allocation_inputs <- function(
     anterior_path = anterior_path,
     trans_rates_df = trans_rates_df,
     config = config,
-    log_file = log_file
+    log_file = log_file,
+    models_list = models_list,
+    nhood_paths = nhood_paths
   )
 }
 
@@ -1259,7 +1726,9 @@ generate_probability_maps <- function(
   anterior_path,
   trans_rates_df,
   config,
-  log_file
+  log_file,
+  models_list,
+  nhood_paths
 ) {
   prob_map_dir <- file.path(work_dir, "probability_map_dir")
   ensure_dir(prob_map_dir)
@@ -1282,65 +1751,22 @@ generate_probability_maps <- function(
     ssp_name <- "baseline"
   }
 
-  # Load LULC schema for class ID <-> name mapping
-  lulc_schema <- jsonlite::fromJSON(
-    config[["lulc_aggregation_path"]],
-    simplifyVector = FALSE
-  )
-  class_name_to_value <- setNames(
-    sapply(lulc_schema, function(x) x$value),
-    sapply(lulc_schema, function(x) x$class_name)
-  )
-
-  # Discover fitted model files for this region
-  model_dir <- file.path(config[["transition_model_dir"]], calibration_period)
-  model_files <- list.files(
-    model_dir,
-    pattern = sprintf(".*_%s\\.rds$", region_suffix),
-    full.names = TRUE
-  )
-  if (length(model_files) == 0) {
+  if (missing(models_list) || !nrow(models_list)) {
     stop(log_msg(
       sprintf(
-        "No fitted model RDS files found for region '%s' in %s",
-        region_suffix,
-        model_dir
+        "No preloaded transition models available for region '%s'",
+        region_suffix
       ),
       log_file
     ))
   }
 
-  # Build per-transition metadata (no RDS reads here — models are loaded
-  # on-demand inside the prediction loop, one at a time, to keep peak memory
-  # bounded by a single model's size).
-  model_info <- data.table::data.table(
-    file_path = model_files,
-    trans_name = sub(
-      sprintf("_%s\\.rds$", region_suffix),
-      "",
-      basename(model_files)
-    )
-  )
-  model_info[,
-    c("anterior_class", "posterior_class") := data.table::tstrsplit(
-      trans_name,
-      "-",
-      fixed = TRUE
-    )
-  ]
-  model_info[,
-    `:=`(
-      from_val = as.integer(class_name_to_value[anterior_class]),
-      to_val = as.integer(class_name_to_value[posterior_class])
-    )
-  ]
-  # id_trans is not strictly needed for the prediction step, but it's helpful metadata
   model_info <- merge(
-    model_info,
+    data.table::copy(models_list),
     trans_rates_df[, c("From*", "To*", "id_trans")],
     by.x = c("from_val", "to_val"),
     by.y = c("From*", "To*"),
-    all.x = FALSE, # to avoid keeping models that don't have a corresponding transition rate (e.g. zero-rate or not in this scenario)
+    all.x = FALSE,
     sort = FALSE
   )
 
@@ -1420,40 +1846,8 @@ generate_probability_maps <- function(
     )
   )
 
-  # Neighbourhood SpatRasters computed on first use and cached for the
-  # remainder of the region run. Values depend only on the anterior LULC,
-  # not on which transition references them. Focal matrices are read once
-  # here, not on every cache miss.
-  nhood_raster_cache <- new.env(parent = emptyenv())
-  focal_matrices <- NULL
-  get_nhood_raster <- function(pred_name) {
-    if (!exists(pred_name, envir = nhood_raster_cache, inherits = FALSE)) {
-      if (is.null(focal_matrices)) {
-        fm <- readRDS(file.path(
-          config[["preds_tools_dir"]],
-          "neighbourhood_matrices",
-          "all_matrices.rds"
-        ))
-        fm <- unlist(fm, recursive = FALSE)
-        names(fm) <- vapply(
-          names(fm),
-          function(x) stringr::str_split(x, "[.]")[[1]][2],
-          character(1)
-        )
-        focal_matrices <<- fm
-      }
-      rast <- compute_single_nhood_raster(
-        anterior = anterior,
-        pred_name = pred_name,
-        focal_matrices = focal_matrices,
-        class_name_to_value = class_name_to_value
-      )
-      assign(pred_name, rast, envir = nhood_raster_cache)
-    }
-    get(pred_name, envir = nhood_raster_cache)
-  }
   log_msg(
-    "    Prepared for probability map generation: model metadata, anterior cell index, neighood raster cache and Parquet datasets ready.",
+    "    Prepared for probability map generation: preloaded models, anterior cell index, TIF-backed neighbourhood paths and Parquet datasets ready.",
     log_file
   )
 
@@ -1525,14 +1919,8 @@ generate_probability_maps <- function(
       next
     }
 
-    # Load model (we need its predictor names anyway, so load once + use
-    # immediately + release at end of iteration).
     t_model_load <- prof_tic()
-    fitted_wf <- if (grepl("\\.qs$", mi$file_path, perl = TRUE)) {
-      qs::qread(mi$file_path)
-    } else {
-      readRDS(mi$file_path)
-    }
+    fitted_wf <- mi$model_obj[[1L]]
     prof_toc(
       t_model_load,
       sprintf(
@@ -1543,7 +1931,7 @@ generate_probability_maps <- function(
       ),
       log_file
     )
-    preds_needed <- get_saved_transition_predictors(fitted_wf)
+    preds_needed <- mi$predictor_names[[1L]]
     nhood_needed <- grep("_nhood_", preds_needed, value = TRUE)
     parquet_needed <- setdiff(preds_needed, nhood_needed)
 
@@ -1587,15 +1975,26 @@ generate_probability_maps <- function(
     }
 
     if (length(nhood_needed) > 0L) {
+      missing_nhood <- setdiff(nhood_needed, names(nhood_paths))
+      if (length(missing_nhood) > 0L) {
+        stop(log_msg(
+          sprintf(
+            "Missing precomputed neighbourhood path(s) for region '%s': %s",
+            region_label,
+            paste(missing_nhood, collapse = ", ")
+          ),
+          log_file
+        ))
+      }
       log_msg(
         sprintf(
-          "        Computing/loading neighbourhood rasters for predictors: %s",
+          "        Reopening neighbourhood rasters from TIF paths for predictors: %s",
           paste(nhood_needed, collapse = ", ")
         ),
         log_file
       )
       t_nhood_extract <- prof_tic()
-      nhood_stack <- terra::rast(lapply(nhood_needed, get_nhood_raster))
+      nhood_stack <- terra::rast(nhood_paths[nhood_needed])
       nhood_vals <- terra::extract(
         nhood_stack,
         as.matrix(from_data[, .(x, y)])

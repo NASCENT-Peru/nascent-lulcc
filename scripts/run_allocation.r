@@ -169,25 +169,34 @@ config <- tryCatch(
 
 cat("Configuration loaded successfully.\n\n")
 
+profile_scenario <- Sys.getenv("ALLOCATION_PROFILE_SCENARIO", unset = "")
+if (nzchar(profile_scenario)) {
+  if (!(profile_scenario %in% config[["scenario_names"]])) {
+    stop(sprintf(
+      "ALLOCATION_PROFILE_SCENARIO='%s' is not in config$scenario_names",
+      profile_scenario
+    ))
+  }
+  config[["scenario_names"]] <- profile_scenario
+  cat(sprintf(
+    "Smoke filter: restricting to scenario '%s'\n",
+    profile_scenario
+  ))
+}
+
+region_filter <- Sys.getenv("ALLOCATION_REGION_FILTER", unset = "")
+if (nzchar(region_filter)) {
+  cat(sprintf("Smoke filter: ALLOCATION_REGION_FILTER=%s\n", region_filter))
+}
+year_post_filter <- Sys.getenv("ALLOCATION_YEAR_POST_FILTER", unset = "")
+if (nzchar(year_post_filter)) {
+  cat(sprintf("Smoke filter: ALLOCATION_YEAR_POST_FILTER=%s\n", year_post_filter))
+}
+
 profile_enabled <- isTRUE(as.logical(
   Sys.getenv("ALLOCATION_PROFILE", unset = "FALSE")
 ))
 if (profile_enabled) {
-  profile_scenario <- Sys.getenv("ALLOCATION_PROFILE_SCENARIO", unset = "")
-  if (nzchar(profile_scenario)) {
-    if (!(profile_scenario %in% config[["scenario_names"]])) {
-      stop(sprintf(
-        "ALLOCATION_PROFILE_SCENARIO='%s' is not in config$scenario_names",
-        profile_scenario
-      ))
-    }
-    config[["scenario_names"]] <- profile_scenario
-    cat(sprintf(
-      "Profile mode: restricting to scenario '%s'\n",
-      profile_scenario
-    ))
-  }
-
   profile_timestep_index <- Sys.getenv(
     "ALLOCATION_PROFILE_TIMESTEP_INDEX",
     unset = ""
@@ -215,9 +224,29 @@ if (preflight_exit != 0L) {
   quit(status = preflight_exit)
 }
 
-num_workers <- as.integer(Sys.getenv("ALLOCATION_NUM_WORKERS", unset = "4"))
-cat(sprintf("Setting up parallel processing with %d workers\n", num_workers))
-future::plan(future::multisession, workers = num_workers)
+t_pin_threads <- prof_tic()
+pin_native_threads_to_one(verbose = TRUE)
+prof_toc(t_pin_threads, "stage=pin_native_threads_to_one")
+
+if (isTRUE(as.logical(Sys.getenv("ALLOCATION_DEV_STRICT_GLOBALS", "FALSE")))) {
+  options(future.globals.onReference = "error")
+  cat("DEV MODE: future.globals.onReference = 'error' enabled\n")
+}
+
+plan_choice <- select_allocation_plan()
+if (identical(plan_choice$strategy, "multicore")) {
+  options(parallelly.fork.enable = TRUE)
+  future::plan(future::multicore, workers = plan_choice$workers)
+} else if (identical(plan_choice$strategy, "multisession")) {
+  future::plan(future::multisession, workers = plan_choice$workers)
+} else {
+  future::plan(future::sequential)
+}
+cat(sprintf(
+  "Parallel: strategy=%s workers=%d\n",
+  plan_choice$strategy,
+  plan_choice$workers
+))
 
 # Run allocation simulations
 cat("\n========================================\n")
