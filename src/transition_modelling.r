@@ -260,7 +260,9 @@ train_mlr3_transition <- function(
     response_tbl <- table(transition_data$response)
     minority_cls <- names(which.min(response_tbl))
     majority_cls <- names(which.max(response_tbl))
-    n_minority   <- response_tbl[[minority_cls]]
+    # Cap minority at max_rows/2 so n_majority is always non-negative
+    # (handles rare cases where transitions alone exceed max_training_rows)
+    n_minority   <- min(response_tbl[[minority_cls]], max_rows %/% 2L)
     n_majority   <- min(max_rows - n_minority, response_tbl[[majority_cls]])
     set.seed(config[["random_seed"]] %||% 123L)  # D-10: seed from config
     min_rows <- transition_data[transition_data$response == minority_cls, ]
