@@ -76,7 +76,18 @@ Plans:
   3. RSS profiling (Phase 1) shows per-worker private memory bounded — no worker exceeds a documented per-worker budget — and `models_list` is loaded exactly once in the parent.
   4. Neighbourhood rasters exist as TIF files on scratch before any worker starts; workers receive character paths and call `terra::rast()` themselves; `options(future.globals.onReference = "error")` passes during a dev run.
   5. BLAS, data.table, arrow, and xgboost native thread counts are all pinned to 1 before `future::plan()` is invoked.
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+
+**Wave 1**
+- [ ] 03-01-PLAN.md - Establish the runtime control plane: automatic plan selection, native thread pinning, strict-globals dev mode, cgroup logging, and smoke-run filters.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 03-02-PLAN.md - Refactor allocation workers to use parent-preloaded models and path-based neighbourhood rasters with parent baseline logging.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 03-03-PLAN.md - Add the reproducible HPC smoke-run wrapper and automated verifier proving no OOM, bounded worker RSS, and readable output.
 
 ### Phase 4: End-to-End Correctness & Performance
 **Goal**: All four scenarios run to completion across all regions and timesteps, with `predict` no longer dominating wall time, restarts skipping completed work atomically, and the latent correctness gaps (raster/terra split, missing CVXR loop, drifted intervention paths) closed.

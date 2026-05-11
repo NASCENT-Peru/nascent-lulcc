@@ -16,8 +16,10 @@ cat("model_type:     ", m$model_type, "\n")
 cat("predictor_names:", paste(m$predictor_names, collapse = ", "), "\n")
 cat("learner class:  ", class(m$learner)[[1L]], "\n")
 
-# Synthetic fixture — same structure as training data, no NAs
-fixture <- as.data.frame(matrix(0.5, nrow = 5L, ncol = length(m$predictor_names)))
+# Synthetic fixture — integer columns to match training data types
+fixture <- as.data.frame(
+  lapply(seq_along(m$predictor_names), function(i) rep(1L, 5L))
+)
 names(fixture) <- m$predictor_names
 
 cat("\n=== predict_newdata on qs-loaded learner ===\n")
