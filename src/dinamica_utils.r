@@ -90,8 +90,14 @@ detect_dinamica_backend <- function() {
 #' deriving their own launch contract.
 #'
 #' On HPC, `DINAMICA_EGO_8_HOME` is treated as the absolute path to the
-#' external `.sif` image (INFRA-01); the resolved args take the shape
-#' `c("exec", <sif_path>, "DinamicaConsole", <ego model passthrough args>)`.
+#' external `.sif` image (INFRA-01); the resolved args take the apptainer
+#' launch shape (D-104):
+#' `c("exec", "--home", <staged-home>, "--env", "DINAMICA_EGO_8_TEMP_DIR=<staged-tmp>",`
+#' ` <sif_path>, "bash", "-c", "cd /opt/dinamica/usr && bin/DinamicaEGO.sh <abs-model> [flags]")`.
+#' The staged home + tmp directories live under `$HPC_SCRATCH_ROOT/dinamica-home`
+#' and `$HPC_SCRATCH_ROOT/dinamica-tmp` and are seeded idempotently (D-105).
+#' The model path interpolated into the bash -c payload is always absolute
+#' via `normalizePath()` (D-106).
 #'
 #' On local, `DINAMICA_EGO_8_HOME` is the Dinamica install directory; the
 #' resolved args are simply the DinamicaConsole flags + model path.
@@ -111,6 +117,8 @@ detect_dinamica_backend <- function() {
 #' @return Named list with elements `backend`, `runtime`, `artifact_path`,
 #'   `command`, `args`, `log_file`, `env`. `command` is the executable name
 #'   to pass to `processx::run()`; `args` is the corresponding argv vector.
+#' @note Phase 1.1 — D-104/D-105/D-106. MUST stay in sync with the
+#'   `scripts/smoke_test_dinamica.sh` LAUNCH_CMD array.
 #' @export
 resolve_dinamica_launch <- function(
   model_path,
@@ -162,6 +170,18 @@ resolve_dinamica_launch <- function(
   log_file <- resolve_dinamica_log_path(base_dir)
 
   if (identical(backend, "hpc")) {
+    # ---- Phase 1.1 — D-104, D-105, D-106 ----
+    # Apptainer launch shape:
+    #   apptainer exec --home <staged-home> \
+    #                  --env DINAMICA_EGO_8_TEMP_DIR=<staged-tmp> \
+    #                  <sif> bash -c \
+    #                  'cd /opt/dinamica/usr && bin/DinamicaEGO.sh <abs-model> [flags]'
+    # Direct `apptainer exec <sif> DinamicaConsole <model>` is unsupported by
+    # the upstream image and produces silent std::exception failures; the
+    # `bin/DinamicaEGO.sh` launcher is the only entrypoint that sets the
+    # env vars and relative paths the binary needs.
+    # MUST stay in sync with scripts/smoke_test_dinamica.sh LAUNCH_CMD array.
+
     # On HPC the env var is the .sif image path, consumed directly as the
     # container image argument to apptainer/singularity exec (INFRA-01).
     artifact_path <- dinamica_home
@@ -186,8 +206,69 @@ resolve_dinamica_launch <- function(
       )
     }
 
-    # apptainer exec <sif> DinamicaConsole [-disable-parallel-steps] [-log-level N] <model>
-    container_args <- c("exec", artifact_path, "DinamicaConsole", console_args)
+    # D-105 — staged-home + staged-tmp under HPC_SCRATCH_ROOT.
+    # Fail fast if unset so we never silently fall back to $HOME (out-of-quota).
+    hpc_scratch_root <- Sys.getenv("HPC_SCRATCH_ROOT", unset = "")
+    if (!nzchar(hpc_scratch_root)) {
+      stop(
+        "HPC_SCRATCH_ROOT is not set. Phase 1.1 D-105 requires HPC_SCRATCH_ROOT ",
+        "for the apptainer --home and --env DINAMICA_EGO_8_TEMP_DIR staging. ",
+        "Source the project .env or export HPC_SCRATCH_ROOT=/cluster/scratch/$USER/nascent-lulcc.",
+        call. = FALSE
+      )
+    }
+    staged_home <- file.path(hpc_scratch_root, "dinamica-home")
+    staged_tmp  <- file.path(hpc_scratch_root, "dinamica-tmp")
+    dir.create(staged_home, recursive = TRUE, showWarnings = FALSE)
+    dir.create(staged_tmp,  recursive = TRUE, showWarnings = FALSE)
+
+    # Seed .dinamica_ego_8.conf only if missing (idempotent — see Pitfall 3
+    # in 01.1-RESEARCH.md). Atomic write via tempfile + file.rename() so
+    # concurrent workers see either the full file or no file at all.
+    conf <- file.path(staged_home, ".dinamica_ego_8.conf")
+    if (!file.exists(conf)) {
+      tmp_conf <- tempfile(tmpdir = staged_home, fileext = ".conf.tmp")
+      writeLines(
+        c(
+          'AlternativePathForR = "/usr/local/bin/Rscript"',
+          'ClConfig = "0"',
+          'MemoryAllocationPolicy = "1"',
+          'RCranMirror = "https://cloud.r-project.org/"'
+        ),
+        tmp_conf
+      )
+      file.rename(tmp_conf, conf)
+    }
+
+    # D-106 — model path interpolated into the bash -c payload must be
+    # absolute (the launcher's relative-path branch is fragile under `cd`).
+    abs_model <- normalizePath(model_path, winslash = "/", mustWork = FALSE)
+
+    # D-104 — bash -c payload. `bin/DinamicaEGO.sh` is a thin wrapper around
+    # DinamicaConsole and DOES forward DinamicaConsole flags; preserve
+    # `console_args` (without the trailing relative model_path), substitute
+    # in the absolute model path, and shQuote() it to neutralise shell
+    # metacharacters in user-supplied paths (T-01.1-03).
+    flags <- character()
+    if (isTRUE(disable_parallel)) {
+      flags <- c(flags, "-disable-parallel-steps")
+    }
+    if (!is.null(log_level)) {
+      flags <- c(flags, "-log-level", as.character(log_level))
+    }
+    launcher_argline <- paste(c(flags, shQuote(abs_model)), collapse = " ")
+    bash_payload <- sprintf(
+      "cd /opt/dinamica/usr && bin/DinamicaEGO.sh %s",
+      launcher_argline
+    )
+
+    container_args <- c(
+      "exec",
+      "--home", staged_home,
+      "--env", paste0("DINAMICA_EGO_8_TEMP_DIR=", staged_tmp),
+      artifact_path,
+      "bash", "-c", bash_payload
+    )
     env_vec <- c("current")  # apptainer/singularity inherit env by default
     return(list(
       backend       = "hpc",
@@ -217,6 +298,66 @@ resolve_dinamica_launch <- function(
     log_file      = log_file,
     env           = env_vec
   )
+}
+
+# ---- Phase 1.1 — D-107, D-108 ----
+# Post-hoc error-string detection: `DinamicaConsole` / `bin/DinamicaEGO.sh`
+# return exit 0 on `std::exception` and on hard parse failures
+# (`"terminate called after throwing an instance of 'DFF::Exception'"`).
+# Grep the captured log (the SAME artifact `resolve_dinamica_log_path()`
+# returns; D-108) for the three canonical error strings and `stop()` on
+# any match, regardless of subprocess exit code. This is the only way the
+# OBS-02 / Phase 1 SC2 contract ("operator can diagnose any allocation
+# failure within minutes") can hold.
+# MUST stay in sync with `scripts/smoke_test_dinamica.sh` grep pattern set.
+DINAMICA_ERROR_PATTERNS <- c(
+  "Dinamica EGO exited with an error",
+  "terminate called after throwing",
+  "std::exception"
+)
+
+#' Inspect a Dinamica subprocess result for post-hoc error strings
+#'
+#' Internal helper. Reads the captured log (D-108: the SAME teed log file
+#' `exec_dinamica()` writes when `write_logfile = TRUE`; falls back to
+#' `res$stdout + res$stderr` when `write_logfile = FALSE`) and stops with
+#' a clear message if any of the three D-107 patterns match OR if the
+#' subprocess exit code is non-zero.
+#'
+#' @param res A processx::run() result list with `status`, `stdout`, `stderr`.
+#' @param write_logfile Logical; whether `exec_dinamica()` was called with
+#'   `write_logfile = TRUE` (in which case `logfile_path` is read).
+#' @param logfile_path Path to the teed Dinamica log file (or `NULL` when
+#'   `write_logfile = FALSE`).
+#' @return `invisible(res)` on success; raises `stop()` on any error signal.
+#' @keywords internal
+.check_dinamica_post_run <- function(res, write_logfile, logfile_path) {
+  log_contents <- if (isTRUE(write_logfile) &&
+                      !is.null(logfile_path) &&
+                      file.exists(logfile_path)) {
+    paste(readLines(logfile_path, warn = FALSE), collapse = "\n")
+  } else {
+    paste(c(res[["stdout"]], res[["stderr"]]), collapse = "\n")
+  }
+
+  error_hits <- vapply(
+    DINAMICA_ERROR_PATTERNS,
+    function(p) grepl(p, log_contents, fixed = TRUE),
+    logical(1)
+  )
+
+  if (res[["status"]] != 0L || any(error_hits)) {
+    matched <- DINAMICA_ERROR_PATTERNS[error_hits]
+    stop(
+      "Dinamica registered an error",
+      if (length(matched)) sprintf(" (matched: %s)", paste(matched, collapse = "; ")) else "",
+      if (res[["status"]] != 0L) sprintf(" [exit %d]", res[["status"]]) else "",
+      ".\nRerun with echo = TRUE or check logfile: ",
+      if (!is.null(logfile_path)) logfile_path else "(no logfile — write_logfile=FALSE)",
+      call. = FALSE
+    )
+  }
+  invisible(res)
 }
 
 #' Execute a Dinamica .ego file using DinamicaConsole
@@ -310,15 +451,14 @@ exec_dinamica <- function(
     )
   }
 
-  if (
-    res[["status"]] != 0L ||
-      grepl("Dinamica EGO exited with an error", res[["stdout"]])
-  ) {
-    stop(
-      "Dinamica registered an error. \n",
-      "Rerun with echo = TRUE or check logfile to see what went wrong."
-    )
-  }
+  # D-107, D-108 — three-pattern grep on the teed log artifact (or on
+  # res$stdout+res$stderr when write_logfile=FALSE). The helper raises
+  # stop() on any pattern match OR on non-zero exit status.
+  .check_dinamica_post_run(
+    res            = res,
+    write_logfile  = write_logfile,
+    logfile_path   = if (isTRUE(write_logfile)) logfile_path else NULL
+  )
 
   invisible(res)
 }

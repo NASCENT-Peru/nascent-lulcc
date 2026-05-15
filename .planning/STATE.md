@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 02-04-PLAN.md — Phase 2 fully complete; scripts/retrain_all_models.r created; all 4 Phase 2 plans executed
-last_updated: "2026-05-15T12:52:15.669Z"
-last_activity: 2026-05-15 -- Phase 01.1 planning complete
+last_updated: "2026-05-15T18:52:10.011Z"
+last_activity: 2026-05-15 -- Phase 01.1 execution started
 progress:
   total_phases: 5
   completed_phases: 3
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** allocation.r completes reliably for all scenarios × regions × timesteps, producing simulated LULC maps without crashing.
-**Current focus:** Phase 2 — Model Size Reduction
+**Current focus:** Phase 01.1 — fix-dinamica-launch-contract
 
 ## Current Position
 
-Phase: 2 of 4 (Model Size Reduction)
-Plan: 4 of 4 in current phase (all complete: 02-01, 02-02, 02-03, 02-04)
-Status: Ready to execute
-Last activity: 2026-05-15 -- Phase 01.1 planning complete
+Phase: 01.1 (fix-dinamica-launch-contract) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 01.1
+Last activity: 2026-05-15 -- Phase 01.1 execution started
 
 Progress: [█████░░░░░] 50%
 
