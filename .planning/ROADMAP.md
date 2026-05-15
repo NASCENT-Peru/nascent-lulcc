@@ -12,7 +12,8 @@ Hardening the 7-stage Peruvian LULCC pipeline so that `src/allocation.r` runs re
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [x] **Phase 1: Repair & Visibility** - Fix broken profiling, structured logs, env/path repairs, pre-flight validation, post-mortem tooling, Singularity container for Dinamica EGO 8 *(completed 2026-05-05)*
+- [x] **Phase 1: Repair & Visibility** - Fix broken profiling, structured logs, env/path repairs, pre-flight validation, post-mortem tooling, Singularity container for Dinamica EGO 8 *(completed 2026-05-05; INFRA-01 / SC6 reopened by 2026-05-15 live verification — see Phase 1.1)*
+- [ ] **Phase 1.1: Fix Dinamica Launch Contract** *(INSERTED 2026-05-15)* - Repair the seven structural defects in the Dinamica-on-HPC launch path that 2026-05-15 live verification surfaced (broken `.def` bootstrap, wrong launch command, smoke test reports SUCCESS on Dinamica errors, wrong-format smoke fixture, env script silently fills home quota). Closes INFRA-01 / SC6 properly.
 - [x] **Phase 2: Model Size Reduction** - Replace tidymodels with mlr3 in transition_modelling.r; save models as .qs via qs::qsave() with ranger save.memory=TRUE; all artefacts <200 MB *(completed 2026-05-07)*
 - [ ] **Phase 3: Parallelism & Memory Architecture** - Switch to fork-based multicore on Linux, share nhood rasters, eliminate OOM
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port
@@ -37,6 +38,20 @@ Plans:
 - [x] 01-02-PLAN.md - Canonicalize `allocation_env` and align HPC shell/bootstrap scripts to the shared contract.
 - [x] 01-03-PLAN.md - Add consolidated Stage 7 pre-flight, portable RSS profiling, crash sentinels, and one-command diagnosis.
 - [x] 01-04-PLAN.md - Unify Dinamica local/HPC backends, centralize Dinamica logs, and add the Euler smoke-test contract.
+
+### Phase 1.1: Fix Dinamica Launch Contract *(INSERTED 2026-05-15)*
+**Goal**: A fresh operator on Euler can run `bash scripts/setup_environments.sh --env allocation_env --non-interactive` and `bash scripts/smoke_test_dinamica.sh --live ...` to a green light, against a `.sif` rebuildable from this repo with no manual workstation transfer; production allocation workers invoke Dinamica via the supported `bin/DinamicaEGO.sh` launcher and any Dinamica error (including silent `std::exception`) returns a non-zero exit so operators see failures within minutes.
+**Depends on**: Phase 1
+**Requirements**: INFRA-01 (reopened), OBS-02 (fix detection contract), PIPE-04 (env install root), MEM-06 (smoke-test fixture sanity)
+**Success Criteria** (what must be TRUE):
+  1. `apptainer build dinamica-ego-8.sif dinamica/container/rocker-geospatial-dinamica.def` succeeds on Euler with no GHCR auth, no workstation transfer step, and no manual edits — bootstraps from a publicly-pullable upstream image.
+  2. `scripts/smoke_test_dinamica.sh --live --runtime auto --artifact "$DINAMICA_EGO_8_HOME" --ego dinamica/dinamica_model/<minimal>.ego --require-log-under logs` exits 0 with a non-empty `logs/dinamica-smoke-<ts>.log` containing actual Dinamica model output (not `std::exception`).
+  3. When Dinamica prints `Dinamica EGO exited with an error`, `terminate called after throwing`, or `std::exception` to stdout, both `scripts/smoke_test_dinamica.sh` and `src/dinamica_utils.r:exec_dinamica()` return non-zero — regardless of the subprocess exit code.
+  4. `src/dinamica_utils.r:resolve_dinamica_launch()` builds the HPC launch command as `apptainer exec --home <staged-home> --env DINAMICA_EGO_8_TEMP_DIR=<staged-tmp> <sif> bash -c 'cd /opt/dinamica/usr && bin/DinamicaEGO.sh <abs-model-path>'` and creates the staged-home + staged-tmp directories with `.dinamica_ego_8.conf` seeded.
+  5. The committed smoke-test model in `dinamica/dinamica_model/` is a true minimal `.ego` (binary) that DinamicaConsole accepts; the production allocation flow's encode-then-execute path is unchanged.
+  6. `scripts/setup_environments.sh` refuses to fall back to `$PROJECT_ROOT/.envs` when running on HPC and `HPC_SCRATCH_ROOT` is unset; exits non-zero with a single actionable message.
+  7. `dinamica/container/README.md` and `docs/README_HPC.md` document the new build flow + launch command shape; the workstation `docker save` workaround is demoted to a fallback note.
+**Plans**: TBD (created by `/gsd:plan-phase 1.1`)
 
 ### Phase 2: Model Size Reduction
 **Goal**: A freshly trained or re-saved transition model loads in well under a second and consumes a small fraction of worker RAM, so the parent process stays small enough that fork-based parallelism becomes viable.
