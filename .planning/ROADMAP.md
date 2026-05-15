@@ -51,7 +51,17 @@ Plans:
   5. The committed smoke-test model in `dinamica/dinamica_model/` is a true minimal `.ego` (binary) that DinamicaConsole accepts; the production allocation flow's encode-then-execute path is unchanged.
   6. `scripts/setup_environments.sh` refuses to fall back to `$PROJECT_ROOT/.envs` when running on HPC and `HPC_SCRATCH_ROOT` is unset; exits non-zero with a single actionable message.
   7. `dinamica/container/README.md` and `docs/README_HPC.md` document the new build flow + launch command shape; the workstation `docker save` workaround is demoted to a fallback note.
-**Plans**: TBD (created by `/gsd:plan-phase 1.1`)
+**Plans:** 4 plans
+
+Plans:
+
+**Wave 1** *(parallel — no files_modified overlap)*
+- [ ] 01.1-01-PLAN.md — R-side launch contract (D-104/D-105/D-106) + exec_dinamica() three-pattern error grep (D-107/D-108) + unit tests.
+- [ ] 01.1-02-PLAN.md — Shell-side smoke test mirror (LAUNCH_CMD + exit code 5 grep) + setup_environments.sh three-signal HPC-detection refusal (D-112/D-113) + pure-bash test.
+- [ ] 01.1-03-PLAN.md — Rewrite rocker-geospatial-dinamica.def (D-101/D-102) + add smoketest.ego{-decoded} sibling fixtures (D-109/D-110/DD-2); includes operator gate for live Euler build + smoke verification.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 01.1-04-PLAN.md — Cross-language mirror assertion test (RESEARCH Target 7) + dinamica/container/README.md and docs/README_HPC.md updates (D-114).
 
 ### Phase 2: Model Size Reduction
 **Goal**: A freshly trained or re-saved transition model loads in well under a second and consumes a small fraction of worker RAM, so the parent process stays small enough that fork-based parallelism becomes viable.
