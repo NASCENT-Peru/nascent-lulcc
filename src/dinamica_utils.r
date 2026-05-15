@@ -300,6 +300,66 @@ resolve_dinamica_launch <- function(
   )
 }
 
+# ---- Phase 1.1 — D-107, D-108 ----
+# Post-hoc error-string detection: `DinamicaConsole` / `bin/DinamicaEGO.sh`
+# return exit 0 on `std::exception` and on hard parse failures
+# (`"terminate called after throwing an instance of 'DFF::Exception'"`).
+# Grep the captured log (the SAME artifact `resolve_dinamica_log_path()`
+# returns; D-108) for the three canonical error strings and `stop()` on
+# any match, regardless of subprocess exit code. This is the only way the
+# OBS-02 / Phase 1 SC2 contract ("operator can diagnose any allocation
+# failure within minutes") can hold.
+# MUST stay in sync with `scripts/smoke_test_dinamica.sh` grep pattern set.
+DINAMICA_ERROR_PATTERNS <- c(
+  "Dinamica EGO exited with an error",
+  "terminate called after throwing",
+  "std::exception"
+)
+
+#' Inspect a Dinamica subprocess result for post-hoc error strings
+#'
+#' Internal helper. Reads the captured log (D-108: the SAME teed log file
+#' `exec_dinamica()` writes when `write_logfile = TRUE`; falls back to
+#' `res$stdout + res$stderr` when `write_logfile = FALSE`) and stops with
+#' a clear message if any of the three D-107 patterns match OR if the
+#' subprocess exit code is non-zero.
+#'
+#' @param res A processx::run() result list with `status`, `stdout`, `stderr`.
+#' @param write_logfile Logical; whether `exec_dinamica()` was called with
+#'   `write_logfile = TRUE` (in which case `logfile_path` is read).
+#' @param logfile_path Path to the teed Dinamica log file (or `NULL` when
+#'   `write_logfile = FALSE`).
+#' @return `invisible(res)` on success; raises `stop()` on any error signal.
+#' @keywords internal
+.check_dinamica_post_run <- function(res, write_logfile, logfile_path) {
+  log_contents <- if (isTRUE(write_logfile) &&
+                      !is.null(logfile_path) &&
+                      file.exists(logfile_path)) {
+    paste(readLines(logfile_path, warn = FALSE), collapse = "\n")
+  } else {
+    paste(c(res[["stdout"]], res[["stderr"]]), collapse = "\n")
+  }
+
+  error_hits <- vapply(
+    DINAMICA_ERROR_PATTERNS,
+    function(p) grepl(p, log_contents, fixed = TRUE),
+    logical(1)
+  )
+
+  if (res[["status"]] != 0L || any(error_hits)) {
+    matched <- DINAMICA_ERROR_PATTERNS[error_hits]
+    stop(
+      "Dinamica registered an error",
+      if (length(matched)) sprintf(" (matched: %s)", paste(matched, collapse = "; ")) else "",
+      if (res[["status"]] != 0L) sprintf(" [exit %d]", res[["status"]]) else "",
+      ".\nRerun with echo = TRUE or check logfile: ",
+      if (!is.null(logfile_path)) logfile_path else "(no logfile — write_logfile=FALSE)",
+      call. = FALSE
+    )
+  }
+  invisible(res)
+}
+
 #' Execute a Dinamica .ego file using DinamicaConsole
 #'
 #' Single caller-facing entrypoint for both local and HPC Dinamica launches.
@@ -391,15 +451,14 @@ exec_dinamica <- function(
     )
   }
 
-  if (
-    res[["status"]] != 0L ||
-      grepl("Dinamica EGO exited with an error", res[["stdout"]])
-  ) {
-    stop(
-      "Dinamica registered an error. \n",
-      "Rerun with echo = TRUE or check logfile to see what went wrong."
-    )
-  }
+  # D-107, D-108 — three-pattern grep on the teed log artifact (or on
+  # res$stdout+res$stderr when write_logfile=FALSE). The helper raises
+  # stop() on any pattern match OR on non-zero exit status.
+  .check_dinamica_post_run(
+    res            = res,
+    write_logfile  = write_logfile,
+    logfile_path   = if (isTRUE(write_logfile)) logfile_path else NULL
+  )
 
   invisible(res)
 }
