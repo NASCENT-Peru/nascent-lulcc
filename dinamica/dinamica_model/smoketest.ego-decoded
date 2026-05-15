@@ -1,0 +1,12 @@
+@charset = UTF-8
+@date = 2026-05-15 00:00:00
+@version = 8.7.0.20250814
+
+Script {{
+    // Phase 1.1 smoke fixture — exercises the launch contract only.
+    // No R/Python chunks; no data I/O; intentional no-op.
+    // See dinamica/dinamica_model/smoketest.ego (encoded binary) and
+    // .planning/phases/01.1-fix-dinamica-launch-contract/01.1-RESEARCH.md
+    // Target 1 + Target 8 for the format rationale (D-109, DD-2).
+    smoketestConstant := NumberValue 1;
+}}
