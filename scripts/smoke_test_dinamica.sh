@@ -42,6 +42,16 @@
 #   3   live Dinamica subprocess returned a non-zero exit code
 #   4   live Dinamica subprocess succeeded but no `dinamica-smoke-*.log` was
 #       written under the requested log root (D-11 contract violation)
+#   5   live Dinamica subprocess returned 0 BUT printed an error string under
+#       grep -E 'Dinamica EGO exited with an error|terminate called after throwing|std::exception'
+#       (D-107 — Dinamica exits 0 even on std::exception; do not trust the
+#       subprocess exit code as the success signal).
+
+# ----------------------------------------------------------------------------
+# Dinamica launch contract (Phase 1.1 — D-104) — keep in sync with
+#   src/dinamica_utils.r:resolve_dinamica_launch()
+# See .planning/phases/01.1-fix-dinamica-launch-contract/01.1-PATTERNS.md
+# ----------------------------------------------------------------------------
 
 set -euo pipefail
 
@@ -174,6 +184,16 @@ if [[ -z "$EGO_MODEL" ]]; then
 fi
 
 # ----------------------------------------------------------------------------
+# D-105 — In --live mode, fail fast if HPC_SCRATCH_ROOT is unset so the
+# operator gets the named-signal message BEFORE the runtime probe (which
+# would otherwise mask this with a generic "runtime not found" exit 2).
+# ----------------------------------------------------------------------------
+if [[ "$MODE" == "live" && -z "${HPC_SCRATCH_ROOT:-}" ]]; then
+    echo "ERROR: --live requires HPC_SCRATCH_ROOT (D-105). Source the project .env first." >&2
+    exit 1
+fi
+
+# ----------------------------------------------------------------------------
 # Probe the runtime
 # Dry-run: never call Sys.which / command -v ; just trust the operator-supplied
 #          name so the smoke test can validate the launch plan on a workstation
@@ -228,6 +248,42 @@ if [[ "$MODE" == "live" ]]; then
     fi
 fi
 
+# ----------------------------------------------------------------------------
+# D-105 — Resolve staged-home and staged-tmp paths under HPC_SCRATCH_ROOT.
+# --live mode already exited above if HPC_SCRATCH_ROOT was unset; here we
+# tolerate a missing HPC_SCRATCH_ROOT in --dry-run by using a tempdir so
+# workstation operators can still print the launch plan.
+# ----------------------------------------------------------------------------
+if [[ -n "${HPC_SCRATCH_ROOT:-}" ]]; then
+    STAGED_HOME="$HPC_SCRATCH_ROOT/dinamica-home"
+    STAGED_TMP="$HPC_SCRATCH_ROOT/dinamica-tmp"
+else
+    # Dry-run only — --live with unset HPC_SCRATCH_ROOT already exited 1 above.
+    STAGED_HOME="${TMPDIR:-/tmp}/nascent-dinamica-home-dryrun"
+    STAGED_TMP="${TMPDIR:-/tmp}/nascent-dinamica-tmp-dryrun"
+fi
+
+# In --live mode, create staged-home and staged-tmp; seed conf if missing.
+if [[ "$MODE" == "live" ]]; then
+    mkdir -p "$STAGED_HOME" "$STAGED_TMP"
+    if [[ ! -f "$STAGED_HOME/.dinamica_ego_8.conf" ]]; then
+        cat > "$STAGED_HOME/.dinamica_ego_8.conf" <<'CONF'
+AlternativePathForR = "/usr/local/bin/Rscript"
+ClConfig = "0"
+MemoryAllocationPolicy = "1"
+RCranMirror = "https://cloud.r-project.org/"
+CONF
+    fi
+fi
+
+# D-106 — absolute model path
+ABS_EGO_MODEL="$(readlink -f "$EGO_MODEL" 2>/dev/null || python3 -c "import os,sys; print(os.path.abspath(sys.argv[1]))" "$EGO_MODEL" 2>/dev/null || true)"
+if [[ -z "$ABS_EGO_MODEL" ]]; then
+    # Final fallback: leave as-is and warn.
+    echo "WARN: could not resolve absolute path for $EGO_MODEL; passing literal." >&2
+    ABS_EGO_MODEL="$EGO_MODEL"
+fi
+
 # Build the timestamp + log file path used for both modes.
 TIMESTAMP="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"
 mkdir -p "$LOG_ROOT" 2>/dev/null || true
@@ -246,11 +302,22 @@ artifact (.sif)    : $ARTIFACT
 ego model          : $EGO_MODEL
 log root           : $LOG_ROOT
 log file           : $LOG_FILE
+staged home        : $STAGED_HOME
+staged tmp         : $STAGED_TMP
+abs ego model      : $ABS_EGO_MODEL
 PLAN
 
 # Resolved launch command line — printed verbatim and used by --live below.
-# This is the same shape exec_dinamica() builds: <runtime> exec <sif> DinamicaConsole <model>
-LAUNCH_CMD=("$RESOLVED_RUNTIME" "exec" "$ARTIFACT" "DinamicaConsole" "$EGO_MODEL")
+# Dinamica launch contract (Phase 1.1 — D-104) — keep in sync with
+#   src/dinamica_utils.r:resolve_dinamica_launch()
+LAUNCH_CMD=(
+    "$RESOLVED_RUNTIME" "exec"
+    "--home" "$STAGED_HOME"
+    "--env" "DINAMICA_EGO_8_TEMP_DIR=$STAGED_TMP"
+    "$ARTIFACT"
+    "bash" "-c"
+    "cd /opt/dinamica/usr && bin/DinamicaEGO.sh $(printf '%q' "$ABS_EGO_MODEL")"
+)
 
 echo "resolved command   : ${LAUNCH_CMD[*]}"
 
@@ -288,6 +355,16 @@ if [[ "$EXIT_CODE" -ne 0 ]]; then
     echo "[live] FAIL: Dinamica subprocess exited with status $EXIT_CODE" >&2
     echo "[live] See $LOG_FILE for output." >&2
     exit 3
+fi
+
+# D-107 — Dinamica exits 0 even on std::exception. Grep the log for error
+# strings; non-zero exit if any match. Keep in sync with
+#   src/dinamica_utils.r:DINAMICA_ERROR_PATTERNS
+if grep -qE 'Dinamica EGO exited with an error|terminate called after throwing|std::exception' "$LOG_FILE"; then
+    echo "[live] FAIL: Dinamica printed an error string despite exit 0" >&2
+    echo "[live] Matching lines:" >&2
+    grep -nE 'Dinamica EGO exited with an error|terminate called after throwing|std::exception' "$LOG_FILE" >&2
+    exit 5
 fi
 
 # Contract: a timestamped dinamica-smoke-*.log MUST exist under $LOG_ROOT.
