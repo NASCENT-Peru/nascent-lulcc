@@ -34,6 +34,7 @@ source "$SCRIPT_DIR/hpc_common.sh"
 # ---------------------------------------------------------------------------
 ENV_FILTER=""
 NON_INTERACTIVE="false"
+FORCE_HPC="${FORCE_HPC:-false}"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -45,15 +46,23 @@ while [ $# -gt 0 ]; do
             NON_INTERACTIVE="true"
             shift
             ;;
+        --hpc)
+            FORCE_HPC="true"
+            shift
+            ;;
         --help|-h)
             cat <<EOF
-Usage: bash scripts/setup_environments.sh [--env NAME] [--non-interactive]
+Usage: bash scripts/setup_environments.sh [--env NAME] [--non-interactive] [--hpc]
 
   --env NAME          Provision only the named environment (e.g.
                       allocation_env). When omitted, all environments listed
                       in environments/ are provisioned.
   --non-interactive   Do not prompt for confirmation. If a target env already
                       exists it is removed and recreated.
+  --hpc               Force HPC-detection on (overrides automatic signals).
+                      Use when running setup on a node that does not have
+                      /cluster/scratch and is not under SLURM, but you want
+                      HPC-style installation.
 EOF
             exit 0
             ;;
@@ -79,18 +88,39 @@ MAMBA_EXE=$(find_micromamba) || exit 1
 eval "$($MAMBA_EXE shell hook -s bash)"
 
 # ---------------------------------------------------------------------------
-# Resolve env install root
+# Resolve env install root (Phase 1.1 — D-112 / PIPE-04)
 # ---------------------------------------------------------------------------
-# Prefer the Stage 7 contract var when present (HPC). On a local checkout
-# with no HPC contract, fall back to a repo-local prefix so the same script
-# bootstraps a runnable allocation_env without requiring scratch paths.
-if [ -n "${HPC_SCRATCH_ROOT:-}" ]; then
+# Three-signal HPC detection mirrors scripts/hpc_common.sh:check_stage7_contract():
+#   1. SLURM_JOB_ID or SLURM_CLUSTER_NAME set
+#   2. /cluster/scratch directory exists
+#   3. --hpc flag or FORCE_HPC=true environment variable
+# On HPC detection without HPC_SCRATCH_ROOT, REFUSE to fall back to
+# $PROJECT_ROOT/.envs (which fills $HOME quota); exit non-zero with a clear,
+# named-signal message.
+on_hpc=false
+hpc_signal=""
+if [ -n "${SLURM_JOB_ID:-}" ] || [ -n "${SLURM_CLUSTER_NAME:-}" ]; then
+    on_hpc=true; hpc_signal="SLURM env var"
+elif [ -d /cluster/scratch ]; then
+    on_hpc=true; hpc_signal="/cluster/scratch present"
+elif [ "${FORCE_HPC:-false}" = "true" ]; then
+    on_hpc=true; hpc_signal="--hpc flag"
+fi
+
+if [ "$on_hpc" = "true" ]; then
+    if [ -z "${HPC_SCRATCH_ROOT:-}" ]; then
+        echo "ERROR: HPC context detected ($hpc_signal) but HPC_SCRATCH_ROOT is unset." >&2
+        echo "       Refusing to install conda envs under \$HOME (home filesystem quota)." >&2
+        echo "       Source the project .env or run: export HPC_SCRATCH_ROOT=/cluster/scratch/\$USER/nascent-lulcc" >&2
+        exit 1
+    fi
     ENV_BASE_PATH="$HPC_SCRATCH_ROOT/micromamba/envs"
+    echo "Env install root (HPC): $ENV_BASE_PATH"
 else
     ENV_BASE_PATH="$PROJECT_ROOT/.envs"
+    echo "Env install root (local fallback, no HPC signals): $ENV_BASE_PATH"
 fi
 mkdir -p "$ENV_BASE_PATH"
-echo "Env install root: $ENV_BASE_PATH"
 echo
 
 # ---------------------------------------------------------------------------
