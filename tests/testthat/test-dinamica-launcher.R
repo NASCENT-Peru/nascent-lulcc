@@ -138,8 +138,14 @@ test_that("resolve_dinamica_launch() HPC uses absolute model path even when give
   # that means starting with `/`; on Windows normalizePath() returns `C:/...`.
   # Both shapes are "absolute" per R's normalizePath contract; the test
   # accepts either so it works on workstation and HPC.
+  # Optional `-disable-parallel-steps` / `-log-level <n>` flags may be spliced
+  # between `bin/DinamicaEGO.sh` and the absolute model path (D-104). The
+  # `(?:-\S+\s+)*` allows zero or more leading flag tokens before the path.
   expect_true(
-    grepl("bin/DinamicaEGO\\.sh\\s+['\"]?(?:/|[A-Za-z]:/)", payload, perl = TRUE),
+    grepl(
+      "bin/DinamicaEGO\\.sh\\s+(?:-\\S+\\s+)*['\"]?(?:/|[A-Za-z]:/)",
+      payload, perl = TRUE
+    ),
     info = sprintf(
       "Model path in bash -c payload must be absolute (D-106). payload=%s",
       payload
