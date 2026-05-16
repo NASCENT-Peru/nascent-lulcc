@@ -57,7 +57,12 @@ From: rocker/r-ver:4.5.3
     nascent-lulcc.upstream                 "ethzplus/rocker-geospatial-dinamica"
     nascent-lulcc.phase                    "1.1"
 
-%post
+%post -c /bin/bash
+    # `-c /bin/bash` selects bash as the script interpreter. Apptainer defaults
+    # to /bin/sh (dash on Debian-derived images), which does not support
+    # `set -o pipefail`. The build aborts at line 1 otherwise. The body
+    # contains no pipelines today, but `pipefail` stays for defence-in-depth
+    # against future edits that introduce them.
     set -euo pipefail
     export DEBIAN_FRONTEND=noninteractive
     export DINAMICA_TARGET_DIR=/opt/dinamica
@@ -112,7 +117,8 @@ CONF
     # NOTE: DINAMICA_EGO_8_TEMP_DIR is NOT exported here - apptainer --env
     # overrides it at runtime per D-105.
 
-%test
+%test -c /bin/bash
+    # `-c /bin/bash` — see %post header for rationale (dash lacks pipefail).
     set -euo pipefail
     # Lightweight build-time verification: the entrypoint binaries exist.
     # The real end-to-end smoke runs from outside the container via
