@@ -4,9 +4,11 @@
 
 Script {{
     // Phase 1.1 smoke fixture — exercises the launch contract only.
-    // No R/Python chunks; no data I/O; intentional no-op.
-    // See dinamica/dinamica_model/smoketest.ego (encoded binary) and
+    // One CalculateRExpression block so process_dinamica_script(mode='encode')
+    // has something to base64-encode → the resulting `.ego` carries an
+    // operation DinamicaConsole accepts (D-109, DD-2; A1 / Pitfall 5 fix).
+    // See dinamica/dinamica_model/smoketest.ego (encoded sibling) and
     // .planning/phases/01.1-fix-dinamica-launch-contract/01.1-RESEARCH.md
-    // Target 1 + Target 8 for the format rationale (D-109, DD-2).
-    smoketestConstant := NumberValue 1;
+    // Target 1 + Target 8 for the format rationale.
+    noop := CalculateRExpression "CiAgICAgICAgbWVzc2FnZShTeXMudGltZSgpLCAnIC0gcGhhc2UgMS4xIHNtb2tlIGZpeHR1cmU6IGxhdW5jaCBjb250cmFjdCBvaycpCiAgICA=" .no {{ }};
 }}
