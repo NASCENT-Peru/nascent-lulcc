@@ -3,9 +3,9 @@
 @version = 8.7.0.20250814
 
 Script {{
-    // Phase 1.1 smoke fixture — exercises the launch contract only.
+    // Phase 1.1 smoke fixture -- exercises the launch contract only.
     // One CalculateRExpression block so process_dinamica_script(mode='encode')
-    // has something to base64-encode → the resulting `.ego` carries an
+    // has something to base64-encode -> the resulting .ego carries an
     // operation DinamicaConsole accepts (D-109, DD-2; A1 / Pitfall 5 fix).
     // See dinamica/dinamica_model/smoketest.ego (encoded sibling) and
     // .planning/phases/01.1-fix-dinamica-launch-contract/01.1-RESEARCH.md
@@ -13,4 +13,4 @@ Script {{
     noop := CalculateRExpression "
         message(Sys.time(), ' - phase 1.1 smoke fixture: launch contract ok')
     " .no {{ }};
-}}
+}};
