@@ -117,9 +117,13 @@ CONF
     # NOTE: DINAMICA_EGO_8_TEMP_DIR is NOT exported here - apptainer --env
     # overrides it at runtime per D-105.
 
-%test -c /bin/bash
-    # `-c /bin/bash` — see %post header for rationale (dash lacks pipefail).
-    set -euo pipefail
+%test
+    # Apptainer runs %test under /bin/sh (dash on rocker/r-ver:4.5.3) and
+    # does NOT honor the `-c /bin/bash` section flag the way %post does
+    # (verified against Euler Apptainer 1.x). Stick to POSIX-sh constructs
+    # only — no `set -o pipefail`, no `[[ ]]`, no arrays. Body has no
+    # pipelines so `set -eu` is functionally equivalent here.
+    set -eu
     # Lightweight build-time verification: the entrypoint binaries exist.
     # The real end-to-end smoke runs from outside the container via
     # scripts/smoke_test_dinamica.sh --live against this .sif.
