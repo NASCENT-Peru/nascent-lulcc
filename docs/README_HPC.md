@@ -2,6 +2,30 @@
 
 This directory contains scripts and environments for running the Land Use Land Cover Change (LULCC) modelling pipeline on HPC systems using Slurm.
 
+## Recent Changes (Phase 1.1)
+
+The Dinamica-on-Euler launch contract was rewritten in Phase 1.1 to the
+apptainer-`exec`-`--home`-`--env`-`bash -c`-`bin/DinamicaEGO.sh` shape
+(**D-104**). The previous `apptainer exec <sif> DinamicaConsole <model>` form
+is **DEPRECATED** because it produced silent `std::exception` failures on the
+upstream image. The `setup_environments.sh` silent fallback to
+`$PROJECT_ROOT/.envs` on HPC was also replaced with a three-signal HPC
+detector that refuses to install conda envs under `$HOME` when
+`HPC_SCRATCH_ROOT` is unset (**D-112**). The workstation `docker save` →
+`docker-archive://` workaround is no longer canonical; see
+`dinamica/container/README.md` for the build-flow contract.
+
+> **Phase 1.1 runtime caveat.** The launch shape and detection contract
+> below are mechanically validated and the D-107 error grep correctly
+> surfaces the current failure (exit 5). However, the `--live` smoke test
+> does **not** yet exit 0 against the rebuilt `.sif` because
+> `DinamicaConsole` crashes with `std::exception` on bare invocation
+> inside the container — an AppImage/base-library compatibility issue
+> tracked in
+> `.planning/phases/01.1-fix-dinamica-launch-contract/01.1-03-SUMMARY.md`
+> Open Issue 1. The fix is deferred to phase 01.1 gap-closure / phase
+> 01.2.
+
 ## Stage 7 Dinamica-on-Euler contract (INFRA-01)
 
 Stage 7 (allocation) calls Dinamica EGO 8 through a single R entrypoint
@@ -25,10 +49,26 @@ On Euler, set it to wherever the built `.sif` lives, e.g.:
 export DINAMICA_EGO_8_HOME=/cluster/project/<project>/containers/dinamica-ego-8.sif
 ```
 
-`exec_dinamica()` consumes that exact path as the image argument to
-`apptainer exec "$DINAMICA_EGO_8_HOME" DinamicaConsole <model>`, with
-`singularity exec` as the only fallback runtime spelling. The runtime is
+`exec_dinamica()` consumes that exact path as the image argument and builds
+the **D-104** launch shape:
+
+```bash
+apptainer exec \
+    --home   "$HPC_SCRATCH_ROOT/dinamica-home" \
+    --env    DINAMICA_EGO_8_TEMP_DIR="$HPC_SCRATCH_ROOT/dinamica-tmp" \
+    "$DINAMICA_EGO_8_HOME" \
+    bash -c 'cd /opt/dinamica/usr && bin/DinamicaEGO.sh /abs/path/to/model.ego'
+```
+
+`singularity exec` is the only fallback runtime spelling. The runtime is
 probed in the order `apptainer` first, `singularity` second.
+
+The `--home`/`--env` flags stage Dinamica's mutable state under
+`$HPC_SCRATCH_ROOT/dinamica-{home,tmp}` (**D-105**) so the binary does not
+touch Euler `$HOME` (home quota) and so its temp files are isolated per job.
+The model path passed to `bin/DinamicaEGO.sh` must be absolute (**D-106**).
+`resolve_dinamica_launch()` seeds the minimal `.dinamica_ego_8.conf` under
+the staged home idempotently.
 
 ### Required env vars (Stage 7)
 
@@ -84,41 +124,109 @@ bash scripts/smoke_test_dinamica.sh \
     --dry-run \
     --runtime apptainer \
     --artifact /tmp/dinamica.sif \
-    --ego dinamica/dinamica_model/allocation.ego-decoded
+    --ego dinamica/dinamica_model/smoketest.ego
 ```
 
 This prints the resolved launch plan (runtime, `DINAMICA_EGO_8_HOME` artifact
-path, ego model, log file destination) and exits 0 without spawning Dinamica.
-The dry-run uses the operator-supplied runtime name verbatim so the contract
-can be validated on a host that has neither `apptainer` nor `singularity`
-installed.
+path, ego model, log file destination, staged home/tmp, absolute model path,
+and the full resolved `apptainer exec --home … --env … bash -c 'cd … && bin/DinamicaEGO.sh …'`
+command) and exits 0 without spawning Dinamica. The dry-run uses the
+operator-supplied runtime name verbatim so the contract can be validated on
+a host that has neither `apptainer` nor `singularity` installed.
+
+The smoke fixture is `dinamica/dinamica_model/smoketest.ego` — a no-op `.ego`
+(D-109 / DD-2). The production `allocation.ego-decoded` is unchanged and
+continues to be loaded by `run_allocation_dinamica()` for real Stage 7 runs.
 
 #### Live Euler smoke-test command
 
 ```bash
 # Source the .env file first so DINAMICA_EGO_8_HOME and the Stage 7 path
-# contract are populated.
+# contract are populated (HPC_SCRATCH_ROOT must be set; --live exits 1
+# otherwise per D-105).
 source .env
 
 bash scripts/smoke_test_dinamica.sh \
     --live \
     --runtime auto \
     --artifact "$DINAMICA_EGO_8_HOME" \
-    --ego dinamica/dinamica_model/allocation.ego-decoded \
+    --ego dinamica/dinamica_model/smoketest.ego \
     --require-log-under logs
 ```
 
 The live mode:
 
-1. Probes `apptainer` first, then `singularity`, on `PATH`.
-2. Checks that `$DINAMICA_EGO_8_HOME` actually points to a readable `.sif`.
-3. Runs `apptainer exec "$DINAMICA_EGO_8_HOME" DinamicaConsole <ego>` (or the
-   `singularity exec` equivalent) and tees combined stdout/stderr into
-   `logs/dinamica-smoke-<timestamp>.log`.
-4. Exits **non-zero** unless Dinamica completes successfully **and** the
-   timestamped logfile lands under `logs/`.
+1. Fails fast (exit 1) if `HPC_SCRATCH_ROOT` is unset (D-105).
+2. Probes `apptainer` first, then `singularity`, on `PATH`.
+3. Checks that `$DINAMICA_EGO_8_HOME` actually points to a readable `.sif`.
+4. Creates `$HPC_SCRATCH_ROOT/dinamica-{home,tmp}` if missing and seeds
+   `.dinamica_ego_8.conf` idempotently.
+5. Runs the D-104 launch command
+   (`apptainer exec --home … --env DINAMICA_EGO_8_TEMP_DIR=… <sif> bash -c 'cd /opt/dinamica/usr && bin/DinamicaEGO.sh <abs-model>'`)
+   and tees combined stdout/stderr into `logs/dinamica-smoke-<timestamp>.log`.
+6. After the subprocess returns, greps the log for the **D-107** error
+   patterns (`Dinamica EGO exited with an error`,
+   `terminate called after throwing`, `std::exception`) and exits **5** on
+   any match — regardless of the subprocess exit code (Dinamica returns 0
+   even on `std::exception`).
+7. Exits **non-zero** unless Dinamica completes successfully **and** the
+   timestamped logfile lands under `logs/` **and** no D-107 error pattern
+   matched.
 
-The exit-code contract is documented at the top of the script.
+Exit-code contract (documented at the top of the script):
+
+| Exit | Meaning                                                                                  |
+| ---- | ---------------------------------------------------------------------------------------- |
+| 0    | success                                                                                  |
+| 1    | usage / argument validation error (incl. `--live` without `HPC_SCRATCH_ROOT`)            |
+| 2    | dry-run resolution failed (artifact missing, runtime not on PATH, etc.)                  |
+| 3    | live Dinamica subprocess returned a non-zero exit code                                   |
+| 4    | live Dinamica succeeded but no `dinamica-smoke-*.log` was written                        |
+| 5    | live Dinamica returned 0 BUT printed a D-107 error string in the log                     |
+
+> Per the Phase 1.1 runtime caveat at the top of this doc, the `--live`
+> command currently exits **5** against the rebuilt `.sif`: `DinamicaConsole`
+> crashes with `std::exception`, the D-107 grep catches it correctly, and
+> the underlying AppImage/base-library fix is tracked in 01.1-03-SUMMARY.md
+> Open Issue 1. End-to-end exit-0 closure is gated on resolving that issue.
+
+### Phase 1.1 — HPC env install root contract (D-112)
+
+`scripts/setup_environments.sh` detects HPC context via three OR'd signals:
+
+1. `SLURM_JOB_ID` or `SLURM_CLUSTER_NAME` environment variable is set
+2. `/cluster/scratch` directory exists on the host
+3. `--hpc` CLI flag or `FORCE_HPC=true` environment variable
+
+When HPC is detected AND `HPC_SCRATCH_ROOT` is unset, the script **refuses**
+to fall back to `$PROJECT_ROOT/.envs` and exits non-zero with a named-signal
+message:
+
+```text
+ERROR: HPC context detected (<signal>) but HPC_SCRATCH_ROOT is unset.
+       Refusing to install conda envs under $HOME (home filesystem quota).
+       Source the project .env or run: export HPC_SCRATCH_ROOT=/cluster/scratch/$USER/nascent-lulcc
+```
+
+Source `.env` (which sets `HPC_SCRATCH_ROOT`) before running:
+
+```bash
+bash scripts/setup_environments.sh --env allocation_env --non-interactive
+```
+
+If you need to force HPC behaviour from a workstation (e.g. for a smoke run
+that does not have `/cluster/scratch` or SLURM env vars), pass the `--hpc`
+flag explicitly — the script will still refuse to proceed without
+`HPC_SCRATCH_ROOT`. On a true workstation with no HPC signals and no `--hpc`
+flag, the script keeps the `$PROJECT_ROOT/.envs` path and emits a one-line
+confirmation:
+
+```text
+Env install root (local fallback, no HPC signals): /path/to/repo/.envs
+```
+
+The detection signal that fired is named in the message so operators can
+disambiguate stale env-var pollution from real HPC context.
 
 ## Files Overview
 
