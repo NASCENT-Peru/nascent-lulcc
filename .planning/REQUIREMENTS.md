@@ -8,7 +8,7 @@
 ### Observability
 
 - [ ] **OBS-01**: RAM profiling reports real values — `rss_before/after/peak` are valid numbers, not "NAMB", on both local and HPC
-- [ ] **OBS-02**: When an allocation worker crashes (including SIGKILL), the region log contains a sentinel trace and `diagnose_alloc_crash.sh` surfaces the OOM evidence from `sacct`/`seff`
+- [x] **OBS-02**: When an allocation worker crashes (including SIGKILL), the region log contains a sentinel trace and `diagnose_alloc_crash.sh` surfaces the OOM evidence from `sacct`/`seff` *(closed Phase 1.1: D-107 three-pattern grep in `src/dinamica_utils.r:.check_dinamica_post_run()` + `scripts/smoke_test_dinamica.sh` exit-5 block; validated live on Euler 2026-05-17 — the grep correctly caught the Open Issue 1 `std::exception` with exit 5)*
 - [ ] **OBS-03**: `setup_allocation_inputs` and `run_allocation_dinamica` emit structured messages to the per-region log file (not only to stdout)
 - [ ] **OBS-04**: Allocation entry runs pre-flight validation — asserts env vars, all packages loadable, model files present, Dinamica binary executable — and fails fast with a single actionable list of all gaps
 
@@ -36,7 +36,7 @@
 - [ ] **PIPE-01**: `simulation_trans_rates_prep.r` reads LULC demand from the config-driven CSV path (`config[["lulc_demand_path"]]`) — the hardcoded Windows xlsx path is removed
 - [ ] **PIPE-02**: The CVXR convex optimisation loop is ported from `src/old/simulation_transition_rates_estimation.R` into `simulation_trans_rates_prep.r` section G and produces valid transition rate tables
 - [ ] **PIPE-03**: `calibration_predictor_prep.r` reads terra temp directory from `Sys.getenv("TERRA_TEMP", unset = tempdir())` — not hardcoded `E:/terra_temp`
-- [ ] **PIPE-04**: HPC shell scripts use `$USER` in all paths — no hardcoded `bblack` references in `hpc_common.sh`, `setup_environments.sh`, or `.env.template`
+- [x] **PIPE-04**: HPC shell scripts use `$USER` in all paths — no hardcoded `bblack` references in `hpc_common.sh`, `setup_environments.sh`, or `.env.template` *(closed Phase 1.1 / Plan 01.1-02: `setup_environments.sh` rewrite + three-signal HPC-detection refusal D-112; `tests/shell/test-setup-environments-hpc-refusal.sh` PASS:5/FAIL:0)*
 - [ ] **PIPE-05**: All active source files (outside `src/old/`) use `terra` only — 73 `raster::` call sites in `lulcc.spatprobmanipulation.r`, `spatial_interventions_prep.r`, and `landscape_pattern_analysis.r` are migrated or removed
 - [ ] **PIPE-06**: Intervention YAML files (`config/SSP*_interventions.yml`) reference `inputs/spat_prob_perturb/` paths matching the config schema — not legacy `Data/Spat_prob_perturb_layers/` paths
 - [ ] **PIPE-07**: Dinamica EGO log files are written to the central `logs/` directory — not scattered across region work directories
@@ -70,7 +70,7 @@ Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | OBS-01 | Phase 1 | Pending |
-| OBS-02 | Phase 1 | Pending |
+| OBS-02 | Phase 1 + Phase 1.1 | Complete (closed Plan 01.1-04 via 01.1-01 D-107 grep + 01.1-02 exit-5 shell mirror) |
 | OBS-03 | Phase 1 | Pending |
 | OBS-04 | Phase 1 | Pending |
 | MEM-01 | Phase 3 | Pending |
@@ -78,15 +78,15 @@ Updated during roadmap creation.
 | MEM-03 | Phase 3 | Pending |
 | MEM-04 | Phase 2 | Pending |
 | MEM-05 | Phase 3 | Pending |
-| MEM-06 | Phase 1 | Pending |
+| MEM-06 | Phase 1 + Phase 1.1 | Partial (`allocation_env.yml` package set closed by Phase 1; SC5 smoke fixture round-trip closed by 01.1-03 Task 3; DinamicaConsole-accepts-the-fixture gate deferred to gap-closure on 01.1-03 Open Issue 1) |
 | PERF-01 | Phase 4 | Pending |
 | PERF-02 | Phase 4 | Pending |
 | PERF-03 | Phase 4 | Pending |
-| INFRA-01 | Phase 1 | Pending |
+| INFRA-01 | Phase 1 + Phase 1.1 | Partial (SC1/SC3/SC4/SC6/SC7 closed; SC2 live `--live` exit 0 deferred to gap-closure on 01.1-03 Open Issue 1 — DinamicaConsole std::exception under rocker/r-ver:4.5.3 Noble base) |
 | PIPE-01 | Phase 1 | Pending |
 | PIPE-02 | Phase 4 | Pending |
 | PIPE-03 | Phase 1 | Pending |
-| PIPE-04 | Phase 1 | Pending |
+| PIPE-04 | Phase 1 + Phase 1.1 | Complete (closed Plan 01.1-02 via setup_environments.sh rewrite + D-112 refusal; test-setup-environments-hpc-refusal.sh PASS:5/FAIL:0) |
 | PIPE-05 | Phase 4 | Pending |
 | PIPE-06 | Phase 4 | Pending |
 | PIPE-07 | Phase 1 | Pending |
@@ -104,4 +104,4 @@ Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-05-05*
-*Last updated: 2026-05-05 — phase mappings added during roadmap creation*
+*Last updated: 2026-05-17 — Phase 1.1 closed PIPE-04 + OBS-02; INFRA-01 + MEM-06 partial (deferred to gap-closure on 01.1-03 Open Issue 1)*

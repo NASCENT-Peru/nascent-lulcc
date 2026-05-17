@@ -13,7 +13,7 @@ Hardening the 7-stage Peruvian LULCC pipeline so that `src/allocation.r` runs re
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Repair & Visibility** - Fix broken profiling, structured logs, env/path repairs, pre-flight validation, post-mortem tooling, Singularity container for Dinamica EGO 8 *(completed 2026-05-05; INFRA-01 / SC6 reopened by 2026-05-15 live verification — see Phase 1.1)*
-- [ ] **Phase 1.1: Fix Dinamica Launch Contract** *(INSERTED 2026-05-15)* - Repair the seven structural defects in the Dinamica-on-HPC launch path that 2026-05-15 live verification surfaced (broken `.def` bootstrap, wrong launch command, smoke test reports SUCCESS on Dinamica errors, wrong-format smoke fixture, env script silently fills home quota). Closes INFRA-01 / SC6 properly.
+- [ ] **Phase 1.1: Fix Dinamica Launch Contract** *(INSERTED 2026-05-15; 4/4 plans landed 2026-05-17; INFRA-01 SC2 + MEM-06 SC5 deferred to gap-closure on 01.1-03 Open Issue 1)* - Repaired the seven structural defects in the Dinamica-on-HPC launch path. Launch-contract mechanics (D-101–D-108, D-112, D-114) all landed and the cross-language drift safety net is in place. Live `--live` smoke does not yet exit 0 against the rebuilt `.sif` — DinamicaConsole crashes with `std::exception` under `rocker/r-ver:4.5.3` (Ubuntu Noble) regardless of `.ego` content. The D-107 grep correctly catches it (exit 5). Resolution of the AppImage/base-library compat gap is tracked as Open Issue 1 in `01.1-03-SUMMARY.md`.
 - [x] **Phase 2: Model Size Reduction** - Replace tidymodels with mlr3 in transition_modelling.r; save models as .qs via qs::qsave() with ranger save.memory=TRUE; all artefacts <200 MB *(completed 2026-05-07)*
 - [ ] **Phase 3: Parallelism & Memory Architecture** - Switch to fork-based multicore on Linux, share nhood rasters, eliminate OOM
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port
@@ -61,7 +61,7 @@ Plans:
 - [x] 01.1-03-PLAN.md — Rewrite rocker-geospatial-dinamica.def (D-101/D-102) + add smoketest.ego{-decoded} sibling fixtures (D-109/D-110/DD-2); includes operator gate for live Euler build + smoke verification.
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 01.1-04-PLAN.md — Cross-language mirror assertion test (RESEARCH Target 7) + dinamica/container/README.md and docs/README_HPC.md updates (D-114).
+- [x] 01.1-04-PLAN.md — Cross-language mirror assertion test (RESEARCH Target 7) + dinamica/container/README.md and docs/README_HPC.md updates (D-114).
 
 ### Phase 2: Model Size Reduction
 **Goal**: A freshly trained or re-saved transition model loads in well under a second and consumes a small fraction of worker RAM, so the parent process stays small enough that fork-based parallelism becomes viable.
@@ -135,6 +135,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Repair & Visibility | 4/4 | Complete | 2026-05-05 |
+| 1.1. Fix Dinamica Launch Contract | 4/4 | Contract landed; INFRA-01 SC2 / MEM-06 SC5 deferred to gap-closure (01.1-03 Open Issue 1) | 2026-05-17 |
 | 2. Model Size Reduction | 4/4 | Complete | 2026-05-07 |
 | 3. Parallelism & Memory Architecture | 0/TBD | Not started | - |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
