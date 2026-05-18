@@ -1,0 +1,316 @@
+/opt/dinamica/usr/bin/Data/:
+GDAL
+R
+
+/opt/dinamica/usr/bin/Data/GDAL:
+3.20
+bag_template.xml
+CH
+copyright
+cubewerx_extra.wkt
+default.rsc
+DefineFindPackage2.cmake
+deformation_model.schema.json
+ecw_cs.wkt
+eedaconf.json
+epsg.wkt
+esri
+esri_epsg.wkt
+esri_extra.wkt
+esri_StatePlane_extra.wkt
+gdal_algorithm.schema.json
+GDALConfig.cmake
+GDALConfigVersion.cmake
+GdalFindModulePath.cmake
+gdalg.schema.json
+gdalicon.png
+gdalinfo_output.schema.json
+GDALLogoBW.svg
+GDALLogoColor.svg
+GDALLogoGS.svg
+gdalmdiminfo_output.schema.json
+GDAL-targets.cmake
+GDAL-targets-release.cmake
+gdaltileindex.xsd
+gdalvrt.xsd
+gfs.xsd
+GL27
+gml_registry.xml
+gml_registry.xsd
+grib2_center.csv
+grib2_process.csv
+grib2_subcenter.csv
+grib2_table_4_2_0_0.csv
+grib2_table_4_2_0_13.csv
+grib2_table_4_2_0_14.csv
+grib2_table_4_2_0_15.csv
+grib2_table_4_2_0_16.csv
+grib2_table_4_2_0_17.csv
+grib2_table_4_2_0_18.csv
+grib2_table_4_2_0_190.csv
+grib2_table_4_2_0_191.csv
+grib2_table_4_2_0_19.csv
+grib2_table_4_2_0_1.csv
+grib2_table_4_2_0_20.csv
+grib2_table_4_2_0_21.csv
+grib2_table_4_2_0_22.csv
+grib2_table_4_2_0_2.csv
+grib2_table_4_2_0_3.csv
+grib2_table_4_2_0_4.csv
+grib2_table_4_2_0_5.csv
+grib2_table_4_2_0_6.csv
+grib2_table_4_2_0_7.csv
+grib2_table_4_2_10_0.csv
+grib2_table_4_2_10_191.csv
+grib2_table_4_2_10_1.csv
+grib2_table_4_2_10_2.csv
+grib2_table_4_2_10_3.csv
+grib2_table_4_2_10_4.csv
+grib2_table_4_2_1_0.csv
+grib2_table_4_2_1_1.csv
+grib2_table_4_2_1_2.csv
+grib2_table_4_2_20_0.csv
+grib2_table_4_2_20_1.csv
+grib2_table_4_2_20_2.csv
+grib2_table_4_2_20_3.csv
+grib2_table_4_2_2_0.csv
+grib2_table_4_2_2_3.csv
+grib2_table_4_2_2_4.csv
+grib2_table_4_2_2_5.csv
+grib2_table_4_2_2_6.csv
+grib2_table_4_2_2_7.csv
+grib2_table_4_2_3_0.csv
+grib2_table_4_2_3_1.csv
+grib2_table_4_2_3_2.csv
+grib2_table_4_2_3_3.csv
+grib2_table_4_2_3_4.csv
+grib2_table_4_2_3_5.csv
+grib2_table_4_2_3_6.csv
+grib2_table_4_2_4_0.csv
+grib2_table_4_2_4_10.csv
+grib2_table_4_2_4_1.csv
+grib2_table_4_2_4_2.csv
+grib2_table_4_2_4_3.csv
+grib2_table_4_2_4_4.csv
+grib2_table_4_2_4_5.csv
+grib2_table_4_2_4_6.csv
+grib2_table_4_2_4_7.csv
+grib2_table_4_2_4_8.csv
+grib2_table_4_2_4_9.csv
+grib2_table_4_2_local_Canada.csv
+grib2_table_4_2_local_HPC.csv
+grib2_table_4_2_local_index.csv
+grib2_table_4_2_local_MRMS.csv
+grib2_table_4_2_local_NCEP.csv
+grib2_table_4_2_local_NDFD.csv
+grib2_table_4_5.csv
+grib2_table_versions.csv
+gt_datum.csv
+gt_ellips.csv
+header.dxf
+inspire_cp_BasicPropertyUnit.gfs
+inspire_cp_CadastralBoundary.gfs
+inspire_cp_CadastralParcel.gfs
+inspire_cp_CadastralZoning.gfs
+ITRF2000
+ITRF2008
+ITRF2014
+ITRF2020
+jpfgdgml_AdmArea.gfs
+jpfgdgml_AdmBdry.gfs
+jpfgdgml_AdmPt.gfs
+jpfgdgml_BldA.gfs
+jpfgdgml_BldL.gfs
+jpfgdgml_Cntr.gfs
+jpfgdgml_CommBdry.gfs
+jpfgdgml_CommPt.gfs
+jpfgdgml_Cstline.gfs
+jpfgdgml_ElevPt.gfs
+jpfgdgml_GCP.gfs
+jpfgdgml_LeveeEdge.gfs
+jpfgdgml_RailCL.gfs
+jpfgdgml_RdArea.gfs
+jpfgdgml_RdASL.gfs
+jpfgdgml_RdCompt.gfs
+jpfgdgml_RdEdg.gfs
+jpfgdgml_RdMgtBdry.gfs
+jpfgdgml_RdSgmtA.gfs
+jpfgdgml_RvrMgtBdry.gfs
+jpfgdgml_SBAPt.gfs
+jpfgdgml_SBArea.gfs
+jpfgdgml_SBBdry.gfs
+jpfgdgml_WA.gfs
+jpfgdgml_WL.gfs
+jpfgdgml_WStrA.gfs
+jpfgdgml_WStrL.gfs
+leaflet_template.html
+LICENSE.TXT
+MM_m_idofic.csv
+nad27
+nad83
+nad.lst
+netcdf_config.xsd
+nitf_spec.xml
+nitf_spec.xsd
+ogr_fields_override.schema.json
+ogrinfo_output.schema.json
+ogrvrt.xsd
+osmconf.ini
+other.extra
+ozi_datum.csv
+ozi_ellips.csv
+packages
+pci_datum.txt
+pci_ellips.txt
+pdfcomposition.xsd
+pds4_template.xml
+plscenesconf.json
+proj4-targets.cmake
+proj4-targets-release.cmake
+proj-config.cmake
+proj-config-version.cmake
+proj.db
+proj.ini
+projjson.schema.json
+proj-targets.cmake
+proj-targets-release.cmake
+ruian_vf_ob_v1.gfs
+ruian_vf_st_uvoh_v1.gfs
+ruian_vf_st_v1.gfs
+ruian_vf_v1.gfs
+s57agencies.csv
+s57attributes.csv
+s57expectedinput.csv
+s57objectclasses.csv
+seed_2d.dgn
+seed_3d.dgn
+stateplane.csv
+template_tiles.mapml
+thirdparty
+tms_LINZAntarticaMapTileGrid.json
+tms_MapML_APSTILE.json
+tms_MapML_CBMTILE.json
+tms_NZTM2000.json
+trailer.dxf
+triangulation.schema.json
+usage
+vcpkg_abi_info.txt
+vcpkg-cmake-wrapper.cmake
+vcpkg.spdx.json
+vdv452.xml
+vdv452.xsd
+vicar.json
+world
+
+/opt/dinamica/usr/bin/Data/GDAL/3.20:
+FindLibLZMA.cmake
+FindPostgreSQL.cmake
+
+/opt/dinamica/usr/bin/Data/GDAL/packages:
+FindBlosc.cmake
+FindBRUNSLI.cmake
+FindCryptoPP.cmake
+FindCURL.cmake
+FindDeflate.cmake
+FindECW.cmake
+FindEXPAT.cmake
+FindExprTk.cmake
+FindFileGDB.cmake
+FindFreeXL.cmake
+FindFYBA.cmake
+FindGEOS.cmake
+FindGeoTIFF.cmake
+FindGIF.cmake
+FindHDF4.cmake
+FindHDFS.cmake
+FindIconv.cmake
+FindIDB.cmake
+FindJSONC.cmake
+FindKDU.cmake
+FindLERC.cmake
+FindLibKML.cmake
+FindLZ4.cmake
+FindMONGOCXX.cmake
+FindMRSID.cmake
+FindMSSQL_NCLI.cmake
+FindMSSQL_ODBC.cmake
+Findmuparser.cmake
+FindMySQL.cmake
+FindNetCDF.cmake
+FindODBC.cmake
+FindODBCCPP.cmake
+FindOpenCAD.cmake
+FindOpenEXR.cmake
+FindOpenJPEG.cmake
+FindOracle.cmake
+FindPCRE2.cmake
+FindPCRE.cmake
+FindPodofo.cmake
+FindPoppler.cmake
+FindPROJ.cmake
+FindQHULL.cmake
+FindRASTERLITE2.cmake
+FindSFCGAL.cmake
+FindShapelib.cmake
+FindSpatialindex.cmake
+FindSPATIALITE.cmake
+FindSQLite3.cmake
+FindTEIGHA.cmake
+FindWebP.cmake
+FindZSTD.cmake
+
+/opt/dinamica/usr/bin/Data/GDAL/thirdparty:
+DotnetImports.props.in
+FindCSharp.cmake
+FindDotnet.cmake
+FindInt128.cmake
+FindMono.cmake
+GetGitHeadDate.cmake
+GetGitRevisionDescription.cmake
+GetGitRevisionDescription.cmake.in
+OSXInstallDirs.cmake
+SystemSummary.cmake
+
+/opt/dinamica/usr/bin/Data/R:
+Dinamica_1.0.8.tar.gz
+---
+total 641661
+drwxr-xr-x 9 bblack bblack-group         0 May 17 08:00 .
+drwxr-xr-x 4 bblack bblack-group         0 May 17 08:00 ..
+drwxr-xr-x 4 bblack bblack-group         0 May 17 07:59 cl
+drwxr-xr-x 4 bblack bblack-group         0 May 17 07:59 Data
+-rwxr-xr-x 1 bblack bblack-group   3914824 May 17 07:59 DinamicaAgent
+-rwxr-xr-x 1 bblack bblack-group   1128872 May 17 07:59 DinamicaConsole
+-rwxr-xr-x 1 bblack bblack-group   7353176 May 17 07:59 DinamicaCoordinator
+-rwxr-xr-x 1 bblack bblack-group      4633 May 17 07:59 DinamicaEGO.sh
+-rw-r--r-- 1 bblack bblack-group     14454 May 17 07:59 dinamica.h
+-rw-r--r-- 1 bblack bblack-group   3967288 May 17 07:59 DinamicaNUI.jar
+drwxr-xr-x 2 bblack bblack-group         0 May 17 07:59 Dmps
+-rwxr-xr-x 1 bblack bblack-group  88988600 May 17 07:59 gdalbuildvrt
+-rwxr-xr-x 1 bblack bblack-group  88988600 May 17 07:59 gdalinfo
+-rwxr-xr-x 1 bblack bblack-group  88988600 May 17 07:59 gdal_rasterize
+-rwxr-xr-x 1 bblack bblack-group  88992696 May 17 07:59 gdaltransform
+-rwxr-xr-x 1 bblack bblack-group  88992696 May 17 07:59 gdal_translate
+-rwxr-xr-x 1 bblack bblack-group  88992696 May 17 07:59 gdalwarp
+drwxr-xr-x 8 bblack bblack-group         0 May 17 07:59 jre
+drwxr-xr-x 2 bblack bblack-group         0 May 17 08:00 lib
+-rw-r--r-- 1 bblack bblack-group     51568 May 17 08:00 libavplugin-54.so
+-rw-r--r-- 1 bblack bblack-group     51592 May 17 08:00 libavplugin-56.so
+-rw-r--r-- 1 bblack bblack-group     51592 May 17 08:00 libavplugin-57.so
+-rw-r--r-- 1 bblack bblack-group     51720 May 17 08:00 libavplugin-ffmpeg-56.so
+-rw-r--r-- 1 bblack bblack-group     51592 May 17 08:00 libavplugin-ffmpeg-57.so
+-rw-r--r-- 1 bblack bblack-group     51592 May 17 08:00 libavplugin-ffmpeg-58.so
+-rw-r--r-- 1 bblack bblack-group     70624 May 17 08:00 libdecora_sse.so
+-rw-r--r-- 1 bblack bblack-group     51016 May 17 08:00 libfxplugins.so
+-rw-r--r-- 1 bblack bblack-group    523336 May 17 08:00 libglassgtk3.so
+-rw-r--r-- 1 bblack bblack-group     12928 May 17 08:00 libglass.so
+-rw-r--r-- 1 bblack bblack-group   2320720 May 17 08:00 libgstreamer-lite.so
+-rw-r--r-- 1 bblack bblack-group     27368 May 17 08:00 libjavafx_font_freetype.so
+-rw-r--r-- 1 bblack bblack-group     25496 May 17 08:00 libjavafx_font_pango.so
+-rw-r--r-- 1 bblack bblack-group     16928 May 17 08:00 libjavafx_font.so
+-rw-r--r-- 1 bblack bblack-group    151504 May 17 08:00 libjavafx_iio.so
+-rw-r--r-- 1 bblack bblack-group    520504 May 17 08:00 libjfxmedia.so
+-rw-r--r-- 1 bblack bblack-group 102641224 May 17 08:00 libjfxwebkit.so
+-rw-r--r-- 1 bblack bblack-group     71432 May 17 08:00 libprism_sw.so
+drwxr-xr-x 4 bblack bblack-group         0 May 17 07:59 PyEnvironment
+drwxr-xr-x 2 bblack bblack-group         0 May 17 07:59 Submodels

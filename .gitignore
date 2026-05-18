@@ -29,6 +29,9 @@ inst/doc
 *.log
 *.tif
 
+# allow diagnostic evidence logs under .planning/ (committed as part of debug records)
+!.planning/**/*.log
+
 renv*
 .claude/settings.local.json
 Agent-tool-input-(l9orum).txt
