@@ -96,11 +96,14 @@ From: rocker/r-ver:4.5.3
 
     # Stage 5 - seed /root/.dinamica_ego_8.conf (D-105 - replicated at runtime
     # via apptainer --home <staged-home>)
+    # Phase 1.1 gap-closure (Plan 06): add data-path conf keys — see diagnostics/FINDINGS.md.
     cat > /root/.dinamica_ego_8.conf <<'CONF'
 AlternativePathForR = "/usr/local/bin/Rscript"
 ClConfig = "0"
 MemoryAllocationPolicy = "1"
 RCranMirror = "https://cloud.r-project.org/"
+PathForGDALData = "/opt/dinamica/usr/bin/Data/GDAL"
+PathForRData = "/opt/dinamica/usr/bin/Data/R"
 CONF
 
     # Ensure the in-image staging dir for DINAMICA_EGO_8_TEMP_DIR exists; the
@@ -114,6 +117,11 @@ CONF
     export PATH=$PATH:/opt/dinamica/usr/bin
     export DINAMICA_EGO_8_INSTALLATION_DIRECTORY=/opt/dinamica/usr/bin
     export DINAMICA_EGO_8_HOME_DIR=/opt/dinamica
+    # Phase 1.1 gap-closure (Plan 06): export GDAL_DATA + LOG_PATH at container
+    # level so bare DinamicaConsole invocations (including %test) have them set
+    # even before DinamicaEGO.sh runs — see diagnostics/FINDINGS.md.
+    export DINAMICA_EGO_8_GDAL_DATA=/opt/dinamica/usr/bin/Data/GDAL
+    export DINAMICA_EGO_8_LOG_PATH=/tmp/dinamica
     # NOTE: DINAMICA_EGO_8_TEMP_DIR is NOT exported here - apptainer --env
     # overrides it at runtime per D-105.
 
