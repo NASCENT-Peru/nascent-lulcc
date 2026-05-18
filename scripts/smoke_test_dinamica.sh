@@ -274,6 +274,8 @@ MemoryAllocationPolicy = "1"
 RCranMirror = "https://cloud.r-project.org/"
 CONF
     fi
+    # Dinamica requires the system conf to exist even if empty (Plan 07 finding).
+    touch "$STAGED_HOME/.dinamica_ego_8_system.conf"
 fi
 
 # D-106 — absolute model path

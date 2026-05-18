@@ -121,6 +121,11 @@ MemoryAllocationPolicy = "1"
 RCranMirror = "https://cloud.r-project.org/"
 GdalToolsData = "/opt/dinamica/usr/bin/Data/GDAL"
 CONF
+    # Dinamica requires a system-level conf file to exist at startup even if
+    # it is empty (surfaced during %test with Plan 07 LD_PRELOAD fix active).
+    # Also replicated at runtime via the staged-home seeding in smoke_test_dinamica.sh
+    # and resolve_dinamica_launch().
+    touch /root/.dinamica_ego_8_system.conf
 
     # Ensure the in-image staging dir for DINAMICA_EGO_8_TEMP_DIR exists; the
     # runtime override via apptainer --env may point elsewhere, but the

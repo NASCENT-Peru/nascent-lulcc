@@ -240,6 +240,9 @@ resolve_dinamica_launch <- function(
       )
       file.rename(tmp_conf, conf)
     }
+    # Dinamica requires the system conf to exist even if empty (Plan 07 finding).
+    system_conf <- file.path(staged_home, ".dinamica_ego_8_system.conf")
+    if (!file.exists(system_conf)) file.create(system_conf)
 
     # D-106 — model path interpolated into the bash -c payload must be
     # absolute (the launcher's relative-path branch is fragile under `cd`).
