@@ -1,22 +1,28 @@
 Bootstrap: docker
-From: rocker/r-ver:4.5.3
+From: rocker/r-ver:4.4.3
 
 # -----------------------------------------------------------------------------
 # Apptainer / Singularity definition file for the external Dinamica EGO 8
 # image used by Stage 7 on Euler.
 #
 # Phase 1.1 - Rewrite per D-101, D-102, D-103.
+# Phase 1.1 gap-closure (Plan 06 iteration 3): rolled back from rocker/r-ver:4.5.3
+# (Ubuntu Noble 24.04) to rocker/r-ver:4.4.3 (Ubuntu Jammy 22.04). All env-var
+# and conf-key hypotheses were FALSIFIED across three builds; LD_DEBUG=files
+# showed clean library loading. The crash is a C++ ABI runtime incompatibility
+# between the Dinamica AppImage (compiled on Jammy) and Noble's libstdc++14.
+# See diagnostics/FINDINGS.md H5 for the full diagnostic chain.
 #
 # Provenance
 # ----------
 # This definition inlines the upstream `ethzplus/rocker-geospatial-dinamica`
 # Dockerfile's install steps verbatim in %post, bootstrapping from the
-# publicly-pullable rocker/r-ver:4.5.3 base image instead of a GHCR-published
+# publicly-pullable rocker/r-ver:4.4.3 base image instead of a GHCR-published
 # composite image (D-101 - the upstream repo is Dockerfile-only because
 # Dinamica's license forbids redistribution).
 #
 # Pinned versions (D-102 - rebuild trigger conditions documented below):
-#   - rocker/r-ver:4.5.3
+#   - rocker/r-ver:4.4.3 (Ubuntu Jammy 22.04 — rolled back from 4.5.3/Noble per FINDINGS.md H5)
 #   - Dinamica EGO 8.7.0.20250814 via https://dinamicaego.com/nui_download/1960/
 #
 # When to rebuild:

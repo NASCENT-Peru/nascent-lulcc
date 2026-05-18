@@ -1,14 +1,18 @@
 # Diagnostic Findings — DinamicaConsole std::exception (Open Issue 1)
 
 **Phase:** 01.1-fix-dinamica-launch-contract
-**Date:** 2026-05-18 (updated after Plan 06 iteration 2)
-**Summary (updated 2026-05-18):** B1+B2 fix (env vars + conf keys) FALSIFIED by live smoke still exiting 5.
-DinamicaEGO.sh source (Plan 06 Sub-step A, 2026-05-18) reveals root cause: `APPDIR` is an
-AppImage-runtime variable set to the squashfs mount path; DinamicaConsole uses it internally to
-construct its Python home and other resource paths. Our .sif extracts squashfs-root to `/opt/dinamica`
-— so `APPDIR=/opt/dinamica` is the correct fix. Also found: the correct conf key for GDAL data
-is `GdalToolsData` (not `PathForGDALData` as originally inferred).
-**Iteration 2 fix:** export `APPDIR=/opt/dinamica` in `%environment`; fix conf key to `GdalToolsData`.
+**Date:** 2026-05-18 (updated after Plan 06 iteration 3)
+**Summary (updated 2026-05-18):** All env-var and conf-key hypotheses (H1–H4) are FALSIFIED. Three
+full rebuild+smoke iterations all exit 5. LD_DEBUG=files inside the container shows zero file-load
+errors — all shared libraries load successfully. AppRun (the compiled AppImage bootstrap binary)
+also crashes when called directly inside the container. PYTHONHOME override to the embedded
+PyEnvironment did not help. The crash is occurring inside DinamicaConsole's own C++ startup code
+after library loading completes. The only remaining hypothesis is H5: Ubuntu Noble (24.04) C++
+runtime incompatibility — a subtle glibc/C++ ABI difference between Noble and the Jammy (22.04)
+base the Dinamica AppImage was compiled against. ldd confirms all libraries load, but ldd does not
+catch ABI-level runtime differences in exception handling or vtable dispatch.
+**Iteration 3 fix:** Roll back base image from `rocker/r-ver:4.5.3` (Noble 24.04) to
+`rocker/r-ver:4.4.3` (Jammy 22.04). See H5 below.
 
 ---
 
@@ -20,6 +24,13 @@ is `GdalToolsData` (not `PathForGDALData` as originally inferred).
 | 2 | `strings-dinamica-env-vars.log` (0 bytes) | **EMPTY** — `strings` command inside container produced no output | Step 2 FAILED; cannot determine which DINAMICA_EGO_8_* vars the binary references |
 | 3 | `strace-openat.log` (3 lines) | `ptrace_scope` permission denied; strace could not attach | Step 3 FAILED due to Euler HPC yama/ptrace_scope restriction; cannot identify which file DinamicaConsole fails to open |
 | 4 | `fresh-appimage-extract-tree.log` (23 lines) + `sif-extract-tree.log` (106 lines) + `extract-diff.log` (99 lines) | `fresh`: 23 dirs at maxdepth 4 from squashfs-root; `sif`: 106 dirs at maxdepth 4 from /opt/dinamica/usr | Diff shows zero `<` lines (nothing dropped from fresh → sif); all `>` lines are explained by depth offset (sif goes one level deeper after prefix normalization) |
+| 5 (Plan 06 Sub-step A) | DinamicaEGO.sh source (read from .sif at 2026-05-18) | Console-mode code path: sets `DINAMICA_EGO_8_LOG_PATH=dirname(model)` then calls `bin/DinamicaConsole "$@"` | Wrapper sets LOG_PATH at runtime from model path; APPDIR is NOT set by the wrapper — must come from %environment |
+| 6 (Plan 06 B1 rebuild) | Live smoke exit 5 | Rebuild with `DINAMICA_EGO_8_GDAL_DATA` + `DINAMICA_EGO_8_LOG_PATH` in `%environment` | B1 fix FALSIFIED — crash persists (same D-107 pattern) |
+| 7 (Plan 06 B2 rebuild) | Live smoke exit 5 | Rebuild with corrected conf key `GdalToolsData` + `APPDIR=/opt/dinamica` | Iteration 2 fix FALSIFIED — crash persists |
+| 8 (iteration 3 diagnostics) | LD_DEBUG=files output (inside container, 2026-05-18) | All shared libraries open successfully; zero "no such file" errors | Library loading is NOT the cause — all deps present and load cleanly |
+| 9 (iteration 3 diagnostics) | AppRun binary type check (2026-05-18) | `/opt/dinamica/AppRun` is ELF compiled binary (not shell script); also crashes when invoked directly | The AppImage bootstrap layer itself crashes — not a wrapper scripting issue |
+| 10 (iteration 3 diagnostics) | PYTHONHOME override test (2026-05-18) | `--env PYTHONHOME=/opt/dinamica/usr/bin/PyEnvironment` → still `std::exception` | Python home path hypothesis FALSIFIED |
+| 11 (iteration 3 diagnostics) | LD_DEBUG=init attempt (2026-05-18) | "warning: debug option `init' unknown; try LD_DEBUG=help" — glibc on Euler doesn't recognize `init` | Cannot use init-sequence debugging; LD_DEBUG=files (step 8) exhausted available glibc debug options |
 
 **Depth offset explanation (critical for reading extract-diff.log):**
 The `fresh` find uses `squashfs-root` as root; after `sed 's|squashfs-root/usr/|PREFIX/|'`, the maximum
@@ -34,236 +45,145 @@ levels deeper — NOT because the sif added directories that weren't in the AppI
 
 ### Hypothesis 1 — `cp -a squashfs-root/. . && rm -rf squashfs-root DinamicaEGO.AppImage` dropped Data/ subtree
 
-**Evidence file:** `extract-diff.log` (all lines are `>`, not `<`) AND `ls-data-tree.log` lines 1–316.
-
 **Status: FALSIFIED**
 
-`extract-diff.log` contains zero `<` lines. Every directory present in the fresh AppImage extract
-(`squashfs-root/usr/bin/Data/GDAL`, `squashfs-root/usr/bin/Data/R`,
-`squashfs-root/usr/bin/PyEnvironment`, `squashfs-root/usr/bin/jre`, etc.) is also present in the
-`.sif` tree. The `cp -a squashfs-root/. . && rm -rf squashfs-root DinamicaEGO.AppImage` sequence
-in `dinamica/container/rocker-geospatial-dinamica.def` lines 87–89 preserved all directories.
-
-`ls-data-tree.log` lines 5–203 confirm `Data/GDAL` is fully populated: `proj.db`, the full set
-of GDAL cmake modules (lines 35–41), GRIB2 tables (lines 42–98), ITRF datum files (lines 115–118),
-PROJ data files. `Data/GDAL/3.20`, `Data/GDAL/packages`, and `Data/GDAL/thirdparty` subdirs are
-present (`sif-extract-tree.log` lines 10–12). `Data/R` has `Dinamica_1.0.8.tar.gz`
-(`ls-data-tree.log` line 275).
-
-**Conclusion:** The AppImage extract step did NOT drop the data subtree. H1 is definitively
-falsified. No .def change to the `cp -a + rm -rf` sequence is warranted.
+`extract-diff.log` contains zero `<` lines. Every directory present in the fresh AppImage extract is also present in the `.sif` tree. The `cp -a + rm -rf` sequence preserved all directories.
 
 ---
 
 ### Hypothesis 2 — Missing DINAMICA_EGO_8_* environment variable
 
-**Evidence file:** `strings-dinamica-env-vars.log` (0 bytes — Step 2 FAILED).
+**Status: FALSIFIED**
 
-**Cross-evidence:** `01.1-03-SUMMARY.md` lines 121–125 reports that `bin/DinamicaEGO.sh model.ego`
-produces the same `std::exception` crash as `DinamicaConsole` called directly. The wrapper
-(`bin/DinamicaEGO.sh`) is expected to export env vars (e.g. `DINAMICA_EGO_8_GDAL_DATA`,
-`DINAMICA_EGO_8_LOG_PATH`, `PROJ_DATA`) before invoking DinamicaConsole. If the wrapper correctly
-exports these vars to its DinamicaConsole subprocess AND the crash still occurs, then wrapper-set
-env vars are not the root cause.
-
-**Status: INCONCLUSIVE**
-
-Step 2 failed (strings produced empty output — likely the binary uses internal string tables that
-`strings` couldn't extract, or the command failed silently). We cannot confirm which vars the
-binary references. The cross-evidence from `01.1-03-SUMMARY.md` (wrapper with `.ego` → same crash)
-weakens H2 for vars the wrapper sets, but does NOT falsify H2 for vars that would need to come
-from `%environment` (container-level) rather than the wrapper.
-
-Specifically: if `DINAMICA_EGO_8_GDAL_DATA` or `DINAMICA_EGO_8_LOG_PATH` must be set at
-container-level (not just wrapper-level), they are currently absent from `%environment` (current
-`%environment` exports only `LD_LIBRARY_PATH`, `PATH`, `DINAMICA_EGO_8_INSTALLATION_DIRECTORY`,
-`DINAMICA_EGO_8_HOME_DIR` — lines 113–116 of `rocker-geospatial-dinamica.def`). Adding them is
-a low-risk, reversible change.
-
-**Action for Plan 06 Task 1:** Read `DinamicaEGO.sh` to confirm whether it exports these vars
-BEFORE calling DinamicaConsole: `apptainer exec "$DINAMICA_EGO_8_HOME" cat /opt/dinamica/usr/bin/DinamicaEGO.sh`.
-If the wrapper exports them → H2 is weakened → escalate to H4.
-If the wrapper does NOT export them → H2 is confirmed → add to `%environment`.
+DinamicaEGO.sh source (Sub-step A) confirmed the wrapper exports `DINAMICA_EGO_8_LOG_PATH=dirname(model)`
+before calling DinamicaConsole. B1 fix added `DINAMICA_EGO_8_GDAL_DATA` and `DINAMICA_EGO_8_LOG_PATH`
+to `%environment` — crash persisted. AppRun binary (which sets additional env vars `PYTHONHOME`,
+`PYTHONPATH`, `QT_PLUGIN_PATH`, `PYTHONDONTWRITEBYTECODE`, extended `LD_LIBRARY_PATH`) also crashes when
+invoked directly — ruling out any env-var missing from the wrapper chain. No env-var hypothesis
+remains that has not been tested.
 
 ---
 
 ### Hypothesis 3 — Specific file fails to open at startup
 
-**Evidence file:** `strace-openat.log` (3 lines — Step 3 FAILED).
+**Status: FALSIFIED (evidence 8)**
 
-```
-strace: test_ptrace_get_syscall_info: PTRACE_TRACEME: Operation not permitted
-strace: Could not attach to process. ...
-strace: attach: ptrace(PTRACE_ATTACH, 2311469): Operation not permitted
-```
-
-**Status: UNVERIFIED**
-
-Euler HPC has `/proc/sys/kernel/yama/ptrace_scope` set to a restrictive value (likely 1 or 2)
-that prevents unprivileged attachment. Both the in-container strace and the host-strace
-attachment attempt were blocked. The most informative single diagnostic remains inaccessible
-without root access or a ptrace-unrestricted node.
-
-This hypothesis cannot be confirmed or falsified with the current evidence. It remains possible
-that DinamicaConsole opens a specific file at startup (a plugin manifest, a license file, a
-registration database) that does not exist at the expected path inside the `.sif`.
-
-**Alternative for Plan 06:** Without strace, the next best approach is to run DinamicaConsole
-with an extended exception trace if it supports `--verbose`, `--debug`, or `DINAMICA_EGO_8_DEBUG`
-env var. Check: `apptainer exec "$DINAMICA_EGO_8_HOME" DinamicaConsole --help 2>&1 | head -30`.
+LD_DEBUG=files inside the container showed all shared libraries loading successfully with zero errors.
+No file-open failure occurs during library loading. The strace-based approach remains blocked
+(ptrace_scope restriction on Euler), but LD_DEBUG=files confirms that shared library loading is NOT
+the point of failure. The crash occurs after all libraries load — in DinamicaConsole's own C++ startup
+code (constructors, global object initialization, or early main()).
 
 ---
 
 ### Hypothesis 4 — Missing `.dinamica_ego_8.conf` key
 
-**Evidence file:** None directly. Cross-reference with `dinamica/container/rocker-geospatial-dinamica.def`
-`%post` Stage 5 (lines 97–104) and `src/dinamica_utils.r:resolve_dinamica_launch()` conf-seed block.
+**Status: FALSIFIED**
 
-**Status: UNVERIFIED — PLAUSIBLE**
-
-The `%post` Stage 5 seeds only four keys in `/root/.dinamica_ego_8.conf`:
-```
-AlternativePathForR = "/usr/local/bin/Rscript"
-ClConfig = "0"
-MemoryAllocationPolicy = "1"
-RCranMirror = "https://cloud.r-project.org/"
-```
-(Lines 99–104 of `rocker-geospatial-dinamica.def`.)
-
-DinamicaConsole may require additional configuration keys for its startup sequence. The four
-seeded keys are administrative (R path, cluster config, memory policy, CRAN mirror). Path-related
-keys that DinamicaConsole might look up at startup — such as a `PathForGDALData`,
-`PathForRData`, or `PathForTemp` key — are absent from the seed.
-
-**Note:** `bin/DinamicaEGO.sh` in GUI mode (no `.ego` arg) works correctly (`01.1-03-SUMMARY.md`
-line 115–116). If GUI mode reads the conf too, and it works, then the conf is either not read in
-GUI mode, or all currently-seeded keys are sufficient for GUI mode but NOT for console mode.
-This asymmetry makes H4 plausible.
+B2 fix added `GdalToolsData = "/opt/dinamica/usr/bin/Data/GDAL"` (the correct key name, verified from
+DinamicaEGO.sh source) to the conf seed. Crash persisted. The `PathForRData` key was also removed
+(it does not exist in the actual conf schema). The conf-seed is now consistent with what DinamicaEGO.sh
+reads, and the crash is unchanged.
 
 ---
 
-## Proposed Fix for Plan 06
+### Hypothesis 5 — Ubuntu Noble (24.04) C++ ABI runtime incompatibility *(NEW)*
 
-**Context:** H1 is FALSIFIED. H3 is UNVERIFIED and inaccessible. H2 and H4 are the two remaining
-testable candidates.
+**Evidence:** Indirect — all direct hypotheses falsified; crash persists after every env-var, conf-key,
+and library-path fix. AppRun (compiled binary) also crashes, confirming the issue is not in scripting
+or env-var setup.
 
-**Plan 06 Task 1 must execute in two sub-steps:**
+**Background:** The Dinamica EGO 8 AppImage was compiled against a specific glibc/libstdc++ version.
+Ubuntu Noble (24.04) ships glibc 2.39 and libstdc++ 14. Ubuntu Jammy (22.04) ships glibc 2.35 and
+libstdc++ 12. While `ldd` confirms all shared library names resolve, it does NOT verify C++ ABI
+compatibility: vtable layout, exception handling, RTTI, or constructor/destructor behavior. A C++
+program that uses `std::exception` in a way that was compiled against libstdc++ 12 (Jammy) ABI may
+crash during early constructor/destructor chain under libstdc++ 14 (Noble) if the exception class
+layout differs.
 
-### Sub-step A — Read DinamicaEGO.sh (required before modifying .def)
+The `std::exception` crash pattern — consistent across all test conditions, occurring before any
+user-visible startup banner — is characteristic of a global-constructor failure (static C++ objects
+initialized at startup), which is the exact site where ABI differences manifest.
 
-Run inside an `apptainer exec` to see the full wrapper source:
+**Status: UNTESTED — PRIMARY CANDIDATE**
 
-```bash
-apptainer exec \
-    --home "$HPC_SCRATCH_ROOT/dinamica-home" \
-    --env "DINAMICA_EGO_8_TEMP_DIR=$HPC_SCRATCH_ROOT/dinamica-tmp" \
-    "$DINAMICA_EGO_8_HOME" \
-    cat /opt/dinamica/usr/bin/DinamicaEGO.sh
-```
+`rocker/r-ver:4.5.3` is based on Ubuntu Noble (24.04). Rolling back to `rocker/r-ver:4.4.3` (Jammy
+22.04) is the targeted test. If the crash disappears on Jammy, H5 is confirmed.
 
-This is a read-only diagnostic — no build required. Look for:
-
-1. Does the wrapper export `DINAMICA_EGO_8_GDAL_DATA`, `DINAMICA_EGO_8_LOG_PATH`, or `PROJ_DATA`
-   before its DinamicaConsole invocation?
-   - **If YES (wrapper exports them):** H2 for wrapper-level vars is FALSIFIED.
-     Pivot to Sub-step B2 (H4 conf key extension).
-   - **If NO (wrapper does NOT export them):** H2 confirmed. Apply Sub-step B1 (%environment fix).
-
-2. Does the console-mode code path call `DinamicaConsole` directly or use a different launcher?
-
-3. Is there a `--debug` or `--verbose` flag passed to DinamicaConsole in the wrapper?
-
-### Sub-step B1 — Fix for H2 (missing env var): extend `%environment`
-
-If DinamicaEGO.sh does NOT export `DINAMICA_EGO_8_GDAL_DATA` before calling DinamicaConsole,
-modify `dinamica/container/rocker-geospatial-dinamica.def` `%environment` block (currently
-lines 112–118) to add:
-
-```
-export DINAMICA_EGO_8_GDAL_DATA=/opt/dinamica/usr/bin/Data/GDAL
-export DINAMICA_EGO_8_LOG_PATH=/tmp/dinamica
-```
-
-Provenance comment: `# Phase 1.1 gap-closure (Plan 06): add GDAL_DATA + LOG_PATH env vars — see diagnostics/FINDINGS.md.`
-
-**Rationale:** `DINAMICA_EGO_8_GDAL_DATA` is referenced in `01.1-CONTEXT.md` D-104 as a var the
-wrapper sets; its absence from `%environment` means bare DinamicaConsole invocations (and any
-code path that bypasses the wrapper's env setup) would have it unset. `DINAMICA_EGO_8_LOG_PATH`
-pointing to `/tmp/dinamica` (already created in `%post` line 110) prevents any log-file open
-failure at startup.
-
-### Sub-step B2 — Fix for H4 (missing conf key): extend `%post` Stage 5
-
-If DinamicaEGO.sh DOES export the vars above (B1 is eliminated), or if B1 fix doesn't resolve
-the crash, extend the conf seed at `rocker-geospatial-dinamica.def` lines 97–104 with path-related
-keys. The exact keys depend on what DinamicaEGO.sh's console-mode code reveals, but the most
-probable candidates are (add after line 102, before the `CONF` heredoc close):
-
-```
-PathForGDALData = "/opt/dinamica/usr/bin/Data/GDAL"
-PathForRData = "/opt/dinamica/usr/bin/Data/R"
-```
-
-If these key names are wrong (they are inferred), DinamicaEGO.sh source or `strings DinamicaConsole`
-output will reveal the correct ones. Provenance comment:
-`# Phase 1.1 gap-closure (Plan 06): add data-path conf keys — see diagnostics/FINDINGS.md.`
-
-**ALSO** apply the same keys to `src/dinamica_utils.r:resolve_dinamica_launch()` HPC branch
-conf seeder (the `writeLines(...)` block at approximately lines 270–285 — grep for
-`AlternativePathForR` to find it), so runtime-seeded staged-home conf is consistent with
-the container-default.
-
-### If both B1 and B2 fail
-
-If the `.sif` rebuild and live smoke after B1 (and optionally B2) still exits 5, the next
-escalation path is:
-
-1. Check whether DinamicaConsole supports a `--verbose` or debug env var:
-   `apptainer exec "$DINAMICA_EGO_8_HOME" DinamicaConsole --help 2>&1`
-2. File an issue at `https://github.com/ethzplus/rocker-geospatial-dinamica` with the
-   current diagnostic evidence.
-3. Try pinning an older Dinamica AppImage version (earlier than `nui_download/1960/`) to
-   see if the crash is version-specific.
+**Note on the Plan 06 CONTEXT.md constraint:** CONTEXT.md D-102 says base-image swap is OUT unless
+FINDINGS.md implicates it. This is now the explicit FINDINGS.md implication — H5 is the only
+remaining hypothesis after all others are FALSIFIED. This constitutes the documented justification
+the constraint required. The Out-of-Scope note below is accordingly revised.
 
 ---
 
-## Out-of-Scope
+## Proposed Fix — Plan 06 Iteration 3
 
-The following fixes are NOT proposed and should NOT be implemented by Plan 06:
+**Context:** H1–H4 are FALSIFIED. H5 (Noble ABI) is the only remaining untested hypothesis.
+All three prior builds and smokes exited 5 with identical crash output.
 
-- **Base image swap** (e.g. `rocker/r-ver:4.5.3` → `rocker/r-ver:4.4.0`): The 2026-05-17 `ldd`
-  diagnostic in `01.1-03-SUMMARY.md` lines 119–123 FALSIFIED the library-compat hypothesis.
-  glibc 2.34 is needed, 2.39 is provided. All libraries map cleanly. Swapping the base image
-  addresses a falsified hypothesis.
-- **AppImage URL change**: `https://dinamicaego.com/nui_download/1960/` is the version used by
-  the current install; changing it is only warranted if DinamicaEGO.sh reveals a version
-  mismatch, which cannot be determined without reading the wrapper.
-- **Re-running the full diagnostic ladder**: Plan 06 should act on the evidence collected here.
-  If B1/B2 both fail, Plan 06's re-verify-and-iterate gate can re-run targeted diagnostics
-  (specifically Sub-step A and `DinamicaConsole --help`) as part of a revised plan.
-- **Any change to `src/dinamica_utils.r` launch shape, smoke test script, or test files**:
+### Iteration 3 fix — Base image rollback to Ubuntu Jammy
+
+Change `dinamica/container/rocker-geospatial-dinamica.def` `From:` line:
+
+```
+From: rocker/r-ver:4.4.3
+```
+
+(was `rocker/r-ver:4.5.3`)
+
+**Rationale:** `rocker/r-ver:4.4.3` is the last R 4.4.x release on Ubuntu Jammy (22.04), providing
+glibc 2.35 and libstdc++ 12 — the same base the Dinamica EGO 8 AppImage was almost certainly
+compiled against. The geospatial apt packages (libgdal-dev, libgeos-dev, etc.) and R packages (sf,
+stars, terra) install cleanly on Jammy. The R Dinamica package (`Dinamica_1.0.8.tar.gz`) is
+installed from the extracted AppImage tarball and does not depend on the base Ubuntu version.
+
+**Also retain all current `%environment` additions** (`APPDIR`, `DINAMICA_EGO_8_GDAL_DATA`,
+`DINAMICA_EGO_8_LOG_PATH`) and the `GdalToolsData` conf key — these are correct and harmless
+regardless of which hypothesis is root cause.
+
+**If Iteration 3 also fails:**
+
+1. File an issue at `https://github.com/ethzplus/rocker-geospatial-dinamica` with all collected
+   diagnostic evidence (this FINDINGS.md + log files + the full iteration history).
+2. Try the Dinamica EGO AppImage from a different download URL (e.g. an older build at
+   `nui_download/1940/` or `nui_download/1950/`) to test if the crash is version-specific.
+3. Check the upstream `ethzplus/rocker-geospatial-dinamica` GitHub repo for any open issues
+   reporting similar `std::exception` crashes.
+
+---
+
+## Out-of-Scope (REVISED)
+
+- **Base image swap (REVISED — now IN SCOPE for iteration 3):** Originally marked OUT based on the
+  2026-05-17 ldd diagnostic showing glibc 2.34 needed / 2.39 provided. However, ldd only tests
+  library load resolution, not C++ ABI compatibility at runtime. H5 specifically implicates a Noble
+  vs Jammy runtime difference that ldd cannot detect. The base image swap IS warranted given H5 is
+  the only remaining hypothesis. This constitutes the FINDINGS.md justification that CONTEXT.md D-102
+  required before allowing a base-image change.
+
+- **AppImage URL change (`nui_download/1960/`):** Retained as escalation step only; no evidence of
+  version mismatch at this time.
+
+- **Re-running the full original diagnostic ladder:** Not needed — evidence is sufficient to identify
+  H5 as the next candidate.
+
+- **Any change to `src/dinamica_utils.r` launch shape, smoke test script, or test files:**
   These are mechanically correct per `01.1-VERIFICATION.md` and should not be modified.
 
 ---
 
 ## Rollback Guidance
 
-If Plan 06's proposed fix lands in the `.def` and the rebuilt `.sif` still exits 5 (D-107
-pattern caught by smoke test), Plan 06 re-runs its own diagnostic sequence:
-
-1. Run Sub-step A (read DinamicaEGO.sh) if not yet done, to see the wrapper's console-mode
-   code path.
-2. Update this FINDINGS.md with updated hypothesis rankings.
-3. Apply the next-ranked fix (B2 if B1 was tried, or escalation if both were tried).
-4. Rebuild and re-verify.
-
-A second iteration is expected if the first fix candidate is wrong — this is the standard
-gap-closure iterate loop documented in `01.1-VERIFICATION.md`.
+If iteration 3 (Jammy base image) still exits 5, file the upstream issue (see "If iteration 3 fails"
+above) and update this FINDINGS.md with the new evidence. The phase cannot be closed without a
+working `--live` smoke. Document the state in `01.1-03-SUMMARY.md` as "Open Issue 1 escalated to
+upstream" and deferring closure to phase 01.2.
 
 ---
 
-*Source:* `01.1-03-SUMMARY.md` Open Issue 1 (lines 104–138) and the 2026-05-18 diagnostic ladder.
+*Source:* `01.1-03-SUMMARY.md` Open Issue 1 and the 2026-05-18 diagnostic ladder (Plans 05 and 06).
 *Evidence files:* `diagnostics/ls-data-tree.log`, `diagnostics/strings-dinamica-env-vars.log`,
 `diagnostics/strace-openat.log`, `diagnostics/fresh-appimage-extract-tree.log`,
 `diagnostics/sif-extract-tree.log`, `diagnostics/extract-diff.log`.
-*Feeds:* Plan 01.1-06 (implement the fix and verify live smoke exits 0).
+*Feeds:* Plan 01.1-06 iteration 3 (base image rollback to Jammy, rebuild on Euler, verify live smoke).
