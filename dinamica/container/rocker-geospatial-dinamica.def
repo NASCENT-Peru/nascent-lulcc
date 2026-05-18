@@ -108,8 +108,7 @@ AlternativePathForR = "/usr/local/bin/Rscript"
 ClConfig = "0"
 MemoryAllocationPolicy = "1"
 RCranMirror = "https://cloud.r-project.org/"
-PathForGDALData = "/opt/dinamica/usr/bin/Data/GDAL"
-PathForRData = "/opt/dinamica/usr/bin/Data/R"
+GdalToolsData = "/opt/dinamica/usr/bin/Data/GDAL"
 CONF
 
     # Ensure the in-image staging dir for DINAMICA_EGO_8_TEMP_DIR exists; the
@@ -123,9 +122,12 @@ CONF
     export PATH=$PATH:/opt/dinamica/usr/bin
     export DINAMICA_EGO_8_INSTALLATION_DIRECTORY=/opt/dinamica/usr/bin
     export DINAMICA_EGO_8_HOME_DIR=/opt/dinamica
-    # Phase 1.1 gap-closure (Plan 06): export GDAL_DATA + LOG_PATH at container
-    # level so bare DinamicaConsole invocations (including %test) have them set
-    # even before DinamicaEGO.sh runs — see diagnostics/FINDINGS.md.
+    # Phase 1.1 gap-closure (Plan 06 iteration 2): APPDIR is the AppImage
+    # squashfs mount path; DinamicaConsole uses it internally to construct
+    # Python home and resource paths. Without it, startup throws std::exception.
+    # Our extracted layout puts squashfs-root at /opt/dinamica — see
+    # diagnostics/FINDINGS.md for the full diagnostic chain.
+    export APPDIR=/opt/dinamica
     export DINAMICA_EGO_8_GDAL_DATA=/opt/dinamica/usr/bin/Data/GDAL
     export DINAMICA_EGO_8_LOG_PATH=/tmp/dinamica
     # NOTE: DINAMICA_EGO_8_TEMP_DIR is NOT exported here - apptainer --env

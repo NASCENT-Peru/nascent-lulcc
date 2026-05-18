@@ -234,8 +234,7 @@ resolve_dinamica_launch <- function(
           'ClConfig = "0"',
           'MemoryAllocationPolicy = "1"',
           'RCranMirror = "https://cloud.r-project.org/"',
-          'PathForGDALData = "/opt/dinamica/usr/bin/Data/GDAL"',
-          'PathForRData = "/opt/dinamica/usr/bin/Data/R"'
+          'GdalToolsData = "/opt/dinamica/usr/bin/Data/GDAL"'
         ),
         tmp_conf
       )

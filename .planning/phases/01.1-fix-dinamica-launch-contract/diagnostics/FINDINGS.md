@@ -1,13 +1,14 @@
 # Diagnostic Findings — DinamicaConsole std::exception (Open Issue 1)
 
 **Phase:** 01.1-fix-dinamica-launch-contract
-**Date:** 2026-05-18
-**Summary:** Hypothesis 1 (dropped directory tree) FALSIFIED by extract-diff.log and ls-data-tree.log.
-Hypotheses 2 and 3 could not be verified due to tool failures on Euler (strings empty output,
-strace ptrace_scope restriction). Hypothesis 4 (conf key missing) is UNVERIFIED but remains the
-most testable remaining candidate. Proposed fix: read `DinamicaEGO.sh` to determine whether it
-exports `DINAMICA_EGO_8_GDAL_DATA` / `DINAMICA_EGO_8_LOG_PATH` to its DinamicaConsole subprocess,
-then extend the `%environment` block or `%post` Stage 5 conf seed with any missing items.
+**Date:** 2026-05-18 (updated after Plan 06 iteration 2)
+**Summary (updated 2026-05-18):** B1+B2 fix (env vars + conf keys) FALSIFIED by live smoke still exiting 5.
+DinamicaEGO.sh source (Plan 06 Sub-step A, 2026-05-18) reveals root cause: `APPDIR` is an
+AppImage-runtime variable set to the squashfs mount path; DinamicaConsole uses it internally to
+construct its Python home and other resource paths. Our .sif extracts squashfs-root to `/opt/dinamica`
+— so `APPDIR=/opt/dinamica` is the correct fix. Also found: the correct conf key for GDAL data
+is `GdalToolsData` (not `PathForGDALData` as originally inferred).
+**Iteration 2 fix:** export `APPDIR=/opt/dinamica` in `%environment`; fix conf key to `GdalToolsData`.
 
 ---
 
