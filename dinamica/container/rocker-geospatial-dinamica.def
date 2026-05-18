@@ -27,17 +27,23 @@ From: rocker/r-ver:4.5.3
 #
 # Build flow (operators only)
 # ---------------------------
+# IMPORTANT: Build directly to $DINAMICA_EGO_8_HOME (project or scratch
+# filesystem). Do NOT use a relative path — the output .sif is ~1 GB and
+# a relative path resolves to $REPO_ROOT which lives under $HOME on Euler.
+# Euler home quotas (~15-50 GB) cannot accommodate the SIF file.
+#
 # Apptainer (preferred on Euler):
-#   apptainer build dinamica-ego-8.sif \
+#   apptainer build "$DINAMICA_EGO_8_HOME" \
 #       dinamica/container/rocker-geospatial-dinamica.def
 #
 # Singularity (fallback spelling):
-#   singularity build dinamica-ego-8.sif \
+#   singularity build "$DINAMICA_EGO_8_HOME" \
 #       dinamica/container/rocker-geospatial-dinamica.def
 #
-# After building, place the `.sif` outside the repository (typically under
-# `/cluster/project/<project>/containers/dinamica-ego-8.sif` per D-10) and
-# export DINAMICA_EGO_8_HOME to that absolute path.
+# $DINAMICA_EGO_8_HOME should point to the external artifact path, e.g.:
+#   /cluster/project/<project>/containers/dinamica-ego-8.sif
+# or, if project filesystem is unavailable:
+#   $HPC_SCRATCH_ROOT/containers/dinamica-ego-8.sif
 #
 # The fallback `docker save -> docker-archive://` workstation transfer (D-114)
 # is documented in dinamica/container/README.md as a fallback note ONLY,

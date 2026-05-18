@@ -62,31 +62,37 @@ runtime spellings are supported and produce the same artifact.
 
 ### Apptainer (preferred on Euler)
 
-```bash
-apptainer build dinamica-ego-8.sif \
-    dinamica/container/rocker-geospatial-dinamica.def
-```
+> **Quota warning:** The built `.sif` is ~1 GB. **Always build directly to
+> `$DINAMICA_EGO_8_HOME`** (project or scratch filesystem) — never use a
+> relative path like `dinamica-ego-8.sif` from inside `$REPO_ROOT`. A relative
+> path resolves to `$REPO_ROOT` which is under `$HOME` on Euler, and Euler
+> home quotas (~15–50 GB) will be exhausted during the `Creating SIF file…`
+> step, causing a fatal `disk quota exceeded` error after an otherwise
+> successful build.
 
-On Euler, route the build temp/cache to scratch so the home-filesystem quota
-isn't exhausted by intermediate layers:
+Route the build temp/cache to scratch to avoid intermediate-layer quota
+exhaustion, and build directly to `$DINAMICA_EGO_8_HOME`:
 
 ```bash
 export APPTAINER_TMPDIR="$HPC_SCRATCH_ROOT/apptainer-tmp"
 export APPTAINER_CACHEDIR="$HPC_SCRATCH_ROOT/apptainer-cache"
 mkdir -p "$APPTAINER_TMPDIR" "$APPTAINER_CACHEDIR"
+
+apptainer build "$DINAMICA_EGO_8_HOME" \
+    dinamica/container/rocker-geospatial-dinamica.def
 ```
 
 ### Singularity (fallback spelling)
 
 ```bash
-singularity build dinamica-ego-8.sif \
+singularity build "$DINAMICA_EGO_8_HOME" \
     dinamica/container/rocker-geospatial-dinamica.def
 ```
 
 If `--fakeroot` is required by the cluster build node, pass it through:
 
 ```bash
-apptainer build --fakeroot dinamica-ego-8.sif \
+apptainer build --fakeroot "$DINAMICA_EGO_8_HOME" \
     dinamica/container/rocker-geospatial-dinamica.def
 ```
 

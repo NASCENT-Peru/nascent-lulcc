@@ -96,18 +96,29 @@ The committed container definition lives at:
 
 To (re)build the image on a node that supports container builds:
 
+> **Quota warning:** The built `.sif` is ~1 GB. Build **directly to
+> `$DINAMICA_EGO_8_HOME`** (project or scratch filesystem), not to a relative
+> path inside `$REPO_ROOT`. A relative path resolves under `$HOME` and Euler
+> home quotas will be exhausted at the final `Creating SIF file…` step,
+> producing `disk quota exceeded` after an otherwise successful build.
+
 ```bash
-# Preferred:
-apptainer build dinamica-ego-8.sif \
+# Route build temp/cache to scratch (avoid intermediate-layer home quota):
+export APPTAINER_TMPDIR="$HPC_SCRATCH_ROOT/apptainer-tmp"
+export APPTAINER_CACHEDIR="$HPC_SCRATCH_ROOT/apptainer-cache"
+mkdir -p "$APPTAINER_TMPDIR" "$APPTAINER_CACHEDIR"
+
+# Build directly to the external artifact path:
+apptainer build "$DINAMICA_EGO_8_HOME" \
     dinamica/container/rocker-geospatial-dinamica.def
 
 # Fallback spelling:
-singularity build dinamica-ego-8.sif \
+singularity build "$DINAMICA_EGO_8_HOME" \
     dinamica/container/rocker-geospatial-dinamica.def
 ```
 
-Then publish the resulting `.sif` to a stable path **outside** the repo (the
-external artifact pattern, D-10) and export `DINAMICA_EGO_8_HOME` to that path.
+`$DINAMICA_EGO_8_HOME` is already the stable external-artifact path (D-10) —
+no separate publish step needed when building directly to it.
 
 ### Smoke-test commands (D-11)
 
