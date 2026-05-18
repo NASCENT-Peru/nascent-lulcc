@@ -6,13 +6,11 @@ From: rocker/r-ver:4.5.3
 # image used by Stage 7 on Euler.
 #
 # Phase 1.1 - Rewrite per D-101, D-102, D-103.
-# Phase 1.1 gap-closure (Plan 06 iteration 5): H6 (Qt) FALSIFIED — ldd shows
-# no Qt in DinamicaConsole at all. Active hypothesis H7: PROJ_DATA not set.
-# DinamicaEGO.sh sets `export PROJ_DATA=${BIN_PATH}/Data/GDAL` before calling
-# DinamicaConsole; our %environment never had PROJ_DATA. PROJ_DATA fix is
-# tested on current .sif before rebuild; %environment updated on confirmation.
-# QT_PLUGIN_PATH / QT_QPA_PLATFORM left from H6 — harmless, not the fix.
-# See diagnostics/FINDINGS.md H7 for the full diagnostic chain.
+# Phase 1.1 gap-closure (Plan 07): H8 CONFIRMED — circular singleton init bug in
+# DFF::LogManager::Instance() (libBase.so). Fix: LD_PRELOAD interceptor compiled
+# in Stage 6 and exported in %environment. All prior hypotheses H1–H7 FALSIFIED.
+# QT_PLUGIN_PATH / QT_QPA_PLATFORM retained from H6 investigation — harmless.
+# See diagnostics/FINDINGS.md H8 for full diagnostic chain and fix rationale.
 #
 # Provenance
 # ----------
@@ -24,11 +22,13 @@ From: rocker/r-ver:4.5.3
 #
 # Pinned versions (D-102 - rebuild trigger conditions documented below):
 #   - rocker/r-ver:4.5.3
-#   - Dinamica EGO 8.7.0.20250814 via https://dinamicaego.com/nui_download/1960/
+#   - Dinamica EGO 8.11.2.20260408 via https://dinamicaego.com/nui_download/1960/
+#     (URL serves the current release, not a pinned version — version as of 2026-05-18)
 #
 # When to rebuild:
-#   - Upstream Dinamica EGO bumps to 8.8 -> update the download URL number
-#     AND the @version line in dinamica/dinamica_model/smoketest.ego-decoded.
+#   - Upstream Dinamica EGO version bumps -> update the download URL number if
+#     the URL changes, AND update @version in both smoketest.ego + smoketest.ego-decoded,
+#     AND update the Pinned versions comment above.
 #   - rocker/r-ver bumps to 4.6+ -> update the `From` tag here.
 #   - Otherwise, the .sif is byte-reproducible from this .def.
 #
@@ -70,6 +70,10 @@ From: rocker/r-ver:4.5.3
     nascent-lulcc.upstream                 "ethzplus/rocker-geospatial-dinamica"
     nascent-lulcc.phase                    "1.1"
 
+%files
+    # LD_PRELOAD fix source for H8 circular init bug (compiled in Stage 6 below)
+    dinamica/container/dinamica_init_fix.cpp /tmp/dinamica_init_fix.cpp
+
 %post -c /bin/bash
     # `-c /bin/bash` selects bash as the script interpreter. Apptainer defaults
     # to /bin/sh (dash on Debian-derived images), which does not support
@@ -83,7 +87,7 @@ From: rocker/r-ver:4.5.3
 
     # Stage 1 - apt geospatial deps (verbatim from upstream install_geospatial.sh)
     apt-get update && apt-get install -y --no-install-recommends \
-        cmake gdal-bin lbzip2 libabsl-dev libfftw3-dev libgdal-dev libgeos-dev \
+        cmake gdal-bin g++ lbzip2 libabsl-dev libfftw3-dev libgdal-dev libgeos-dev \
         libgsl0-dev libhdf4-alt-dev libhdf5-dev libnetcdf-dev libproj-dev \
         libprotobuf-dev libsqlite3-dev libssl-dev libudunits2-dev netcdf-bin \
         pkg-config protobuf-compiler sqlite3 curl ca-certificates \
@@ -124,6 +128,15 @@ CONF
     # does not abort when no --env is passed (used by %test below).
     mkdir -p /tmp/dinamica
 
+    # Stage 6 - compile circular-init LD_PRELOAD fix (H8 — diagnostics/FINDINGS.md)
+    # Intercepts DFF::LogManager::Instance() + DFF::getContextualLog() to break the
+    # recursive init cycle in libBase.so that causes __gnu_cxx::recursive_init_error
+    # at DinamicaConsole startup. Fix confirmed live on Euler (step 30, FINDINGS.md).
+    g++ -shared -fPIC -std=c++17 -O2 \
+        -o /usr/local/lib/dinamica_init_fix.so \
+        /tmp/dinamica_init_fix.cpp -ldl
+    rm /tmp/dinamica_init_fix.cpp
+
 %environment
     export LD_LIBRARY_PATH=/opt/dinamica/usr/lib:$LD_LIBRARY_PATH
     export PATH=$PATH:/opt/dinamica/usr/bin
@@ -132,14 +145,15 @@ CONF
     export APPDIR=/opt/dinamica
     export DINAMICA_EGO_8_GDAL_DATA=/opt/dinamica/usr/bin/Data/GDAL
     export DINAMICA_EGO_8_LOG_PATH=/tmp/dinamica
-    # Phase 1.1 gap-closure (Plan 06 iteration 4): AppRun (the AppImage bootstrap
-    # binary we bypass when calling DinamicaConsole directly) sets QT_PLUGIN_PATH
-    # to $APPDIR/usr/plugins before launching the application. Without it, Qt
-    # cannot find its platform plugins and throws std::exception during startup.
-    # QT_QPA_PLATFORM=offscreen is required on headless HPC nodes (no DISPLAY).
-    # See diagnostics/FINDINGS.md H6 for the full diagnostic chain.
+    # AppRun sets QT_PLUGIN_PATH / QT_QPA_PLATFORM before launching the binary.
+    # H6 hypothesis (Qt plugin crash) was FALSIFIED (ldd shows no Qt in DinamicaConsole);
+    # these vars are harmless and retained for defence-in-depth on any Qt-linked helper.
     export QT_PLUGIN_PATH=/opt/dinamica/usr/plugins
     export QT_QPA_PLATFORM=offscreen
+    # Phase 1.1 gap-closure (Plan 07): LD_PRELOAD interceptor for H8 circular init
+    # bug in libBase.so. Compiled by Stage 6 above; transparent to all callers
+    # including %test, D-104 apptainer exec launch, and DinamicaEGO.sh wrapper.
+    export LD_PRELOAD=/usr/local/lib/dinamica_init_fix.so
     # NOTE: DINAMICA_EGO_8_TEMP_DIR is NOT exported here - apptainer --env
     # overrides it at runtime per D-105.
 

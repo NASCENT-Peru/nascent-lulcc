@@ -100,11 +100,13 @@ apptainer build --fakeroot "$DINAMICA_EGO_8_HOME" \
 
 Rebuild and re-publish the `.sif` when any of these change:
 
-1. **Dinamica EGO version bump** (e.g. upstream releases 8.8+). Update
-   `DINAMICA_EGO_DOWNLOAD_URL` in `rocker-geospatial-dinamica.def` to the new
-   AppImage URL number (currently `nui_download/1960/`), AND update the
-   `@version` line in `dinamica/dinamica_model/smoketest.ego-decoded` to
-   match the new Dinamica version string.
+1. **Dinamica EGO version bump.** If the download URL changes (a new `nui_download/<N>/`
+   slug is published), update `DINAMICA_EGO_DOWNLOAD_URL` in `rocker-geospatial-dinamica.def`.
+   Also update the `@version` line in **both** `dinamica/dinamica_model/smoketest.ego` and
+   `dinamica/dinamica_model/smoketest.ego-decoded` to match the new Dinamica version string,
+   and update the Pinned versions comment in the `.def` header.
+   Note: `nui_download/1960/` serves the *current release* (not a pinned version) — the
+   installed version as of 2026-05-18 is `8.11.2.20260408`.
 2. **Base-image bump** (e.g. `rocker/r-ver` moves to 4.6+). Update the
    `From:` tag in `rocker-geospatial-dinamica.def`. Verify that the upstream
    `install_geospatial.sh` apt-package list still resolves cleanly on the new

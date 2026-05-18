@@ -1,6 +1,6 @@
 @charset = UTF-8
 @date = 2026-05-15 00:00:00
-@version = 8.7.0.20250814
+@version = 8.11.2.20260408
 
 Script {{
     // Phase 1.1 smoke fixture -- exercises the launch contract only.
