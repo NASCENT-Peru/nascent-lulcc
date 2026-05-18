@@ -6,13 +6,13 @@ From: rocker/r-ver:4.5.3
 # image used by Stage 7 on Euler.
 #
 # Phase 1.1 - Rewrite per D-101, D-102, D-103.
-# Phase 1.1 gap-closure (Plan 06 iteration 4): reverted base image back to
-# rocker/r-ver:4.5.3 (Noble) — iteration 3 Jammy rollback FALSIFIED H5 (crash
-# is OS-independent). Root cause confirmed as H6: Qt platform plugin
-# initialization failure. AppRun sets QT_PLUGIN_PATH before launching
-# DinamicaConsole, but we bypass AppRun. Added QT_PLUGIN_PATH and
-# QT_QPA_PLATFORM=offscreen to %environment.
-# See diagnostics/FINDINGS.md H6 for the full diagnostic chain.
+# Phase 1.1 gap-closure (Plan 06 iteration 5): H6 (Qt) FALSIFIED — ldd shows
+# no Qt in DinamicaConsole at all. Active hypothesis H7: PROJ_DATA not set.
+# DinamicaEGO.sh sets `export PROJ_DATA=${BIN_PATH}/Data/GDAL` before calling
+# DinamicaConsole; our %environment never had PROJ_DATA. PROJ_DATA fix is
+# tested on current .sif before rebuild; %environment updated on confirmation.
+# QT_PLUGIN_PATH / QT_QPA_PLATFORM left from H6 — harmless, not the fix.
+# See diagnostics/FINDINGS.md H7 for the full diagnostic chain.
 #
 # Provenance
 # ----------

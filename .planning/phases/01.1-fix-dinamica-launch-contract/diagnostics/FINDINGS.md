@@ -1,18 +1,17 @@
 # Diagnostic Findings — DinamicaConsole std::exception (Open Issue 1)
 
 **Phase:** 01.1-fix-dinamica-launch-contract
-**Date:** 2026-05-18 (updated after Plan 06 iteration 4)
-**Summary (updated 2026-05-18):** H6 (Qt platform plugin not found) is the active
-hypothesis. All prior hypotheses (H1–H5) are FALSIFIED. The root cause: AppRun (the
-AppImage bootstrap binary we bypass when calling DinamicaConsole directly) sets
-`QT_PLUGIN_PATH` before the application starts. Without it, Qt cannot find its
-platform plugin on a headless HPC node and throws `std::exception` during its own
-initialization — before any argument processing occurs. Our `%environment` replicated
-APPDIR, GDAL_DATA, and LOG_PATH from AppRun but missed `QT_PLUGIN_PATH` (and
-`QT_QPA_PLATFORM=offscreen` for headless operation).
-**Iteration 4 fix (no rebuild needed for diagnosis):** Test `--env QT_QPA_PLATFORM=offscreen
---env QT_PLUGIN_PATH=/opt/dinamica/usr/plugins` on the current .sif. If confirmed,
-add both to `%environment` and rebuild.
+**Date:** 2026-05-18 (updated after Plan 06 iteration 5)
+**Summary (updated 2026-05-18):** H7 (PROJ_DATA not set) is the active hypothesis.
+All prior hypotheses (H1–H6) are FALSIFIED. The root cause: `DinamicaEGO.sh` explicitly
+runs `export PROJ_DATA=${BIN_PATH}/Data/GDAL` before calling `bin/DinamicaConsole`.
+Our `%environment` block has always been missing `PROJ_DATA`. The PROJ library (loaded
+by GDAL, which libBase.so uses for geospatial init) needs `PROJ_DATA` to find its datum
+grid files. Without it, PROJ initialization fails and libBase.so throws `std::exception`
+before DinamicaConsole produces any output.
+**Iteration 5 fix (no rebuild needed for diagnosis):** Test
+`--env PROJ_DATA=/opt/dinamica/usr/bin/Data/GDAL` on the current .sif. If confirmed,
+add to `%environment` and rebuild.
 
 ---
 
@@ -32,6 +31,9 @@ add both to `%environment` and rebuild.
 | 10 | PYTHONHOME override | `PYTHONHOME=/opt/dinamica/usr/bin/PyEnvironment` → still crash | PYTHONHOME hypothesis FALSIFIED |
 | 11 | Build+smoke iteration 3 (rocker/r-ver:4.4.3 Jammy rollback) | exit 5 | H5 FALSIFIED — crash is OS-independent |
 | 12 | Reference repo analysis (ethzplus/evoland-plus-HPC) | Working EGO 7 image uses `r-base:4.3.1` (Debian Bookworm); calls DinamicaConsole directly; **AppRun sets QT_PLUGIN_PATH** | Confirms AppRun env setup is the missing layer; `QT_PLUGIN_PATH` never in our `%environment` |
+| 13 | `ldd DinamicaConsole \| grep -i qt` + `ls /opt/dinamica/usr/plugins/platforms/` | **zero Qt libraries**; platforms/ dir does not exist | H6 FALSIFIED — DinamicaConsole has no Qt dependency whatsoever |
+| 14 | `QT_QPA_PLATFORM=offscreen --env QT_PLUGIN_PATH=... DinamicaConsole -version` | Still exits 5 with std::exception | H6 FALSIFIED (consistent with step 13) |
+| 15 | `cat /opt/dinamica/usr/bin/DinamicaEGO.sh` (full source) | Line: `export PROJ_DATA=${BIN_PATH}/Data/GDAL`; wrapper sets PROJ_DATA before calling DinamicaConsole | H7 candidate identified — `PROJ_DATA` never in our `%environment` |
 
 **Depth offset explanation (critical for reading extract-diff.log):**
 The `fresh` find uses `squashfs-root` as root; after prefix normalization, all 99 diff lines are `>`
@@ -119,60 +121,91 @@ independent.
 | `PYTHONPATH` | extended | **MISSING** |
 | `PYTHONDONTWRITEBYTECODE` | `1` | **MISSING** |
 
+**Status: FALSIFIED** — `ldd DinamicaConsole` shows zero Qt libraries. `/opt/dinamica/usr/plugins/platforms/` does not exist. DinamicaConsole has no Qt dependency; the crash cannot be a Qt platform plugin failure. `QT_PLUGIN_PATH` and `QT_QPA_PLATFORM` vars left in `%environment` are harmless but causally irrelevant.
+
+---
+
+### Hypothesis 7 — `PROJ_DATA` not set in container environment *(PRIMARY)*
+
+**Evidence:**
+
+1. **DinamicaEGO.sh source (Step 15):** The wrapper explicitly runs
+   `export PROJ_DATA=${BIN_PATH}/Data/GDAL` before calling `bin/DinamicaConsole`. When called via
+   D-104 (`cd /opt/dinamica/usr && bin/DinamicaEGO.sh <model>`), `BIN_PATH` resolves to
+   `/opt/dinamica/usr/bin`, making `PROJ_DATA=/opt/dinamica/usr/bin/Data/GDAL`.
+
+2. **`%environment` gap:** Our container `%environment` block exports
+   `DINAMICA_EGO_8_GDAL_DATA=/opt/dinamica/usr/bin/Data/GDAL` (the Dinamica-specific GDAL data
+   path) but has never exported `PROJ_DATA` (the PROJ library's own data path). These are
+   separate: `DINAMICA_EGO_8_GDAL_DATA` is read by Dinamica's conf system; `PROJ_DATA` is read
+   by the PROJ C library for datum/grid files.
+
+3. **Crash timing:** DinamicaConsole crashes before producing any output, even on
+   `DinamicaConsole -version`. This is consistent with PROJ/GDAL initialization failure in
+   libBase.so's static initializers or constructor — before `main()` argument processing.
+
+4. **ldd confirms GDAL dependency:** `ldd DinamicaConsole` includes `libGDAL.so` (via
+   libBase.so). GDAL initializes PROJ at load time. If `PROJ_DATA` is unset, PROJ searches
+   only system paths; the container (extracted AppImage) has no system-installed PROJ datum
+   files, only the bundled ones under `/opt/dinamica/usr/bin/Data/GDAL`.
+
+5. **DinamicaEGO.sh always sets it:** The wrapper script was written precisely because
+   the binary needs these paths. We call `DinamicaEGO.sh` from D-104, which sets `PROJ_DATA`
+   for the subprocess — but `%environment` (used when Apptainer invokes any command directly,
+   including `%test`) never had it, and a pure `apptainer exec ... DinamicaConsole` call (as
+   used in diagnostics) also bypasses the wrapper.
+
 **Status: UNTESTED — PRIMARY CANDIDATE**
 
 **Quick diagnostic (no rebuild needed on current .sif):**
 
 ```bash
-# Step A: verify Qt platform plugins are present in the container
+# Step A: confirm PROJ data files exist at the expected path
 apptainer exec "$DINAMICA_EGO_8_HOME" \
-    bash -c 'ls /opt/dinamica/usr/plugins/platforms/ 2>&1'
-# Expected: should list libqoffscreen.so and/or libqxcb.so etc.
+    bash -c 'ls /opt/dinamica/usr/bin/Data/GDAL/*.db 2>&1 | head -5'
+# Expected: proj.db and related PROJ datum files
 
-# Step B: test with Qt offscreen platform + plugin path
+# Step B: test with PROJ_DATA set
 apptainer exec \
     --home "$HPC_SCRATCH_ROOT/dinamica-home" \
     --env DINAMICA_EGO_8_TEMP_DIR="$HPC_SCRATCH_ROOT/dinamica-tmp" \
-    --env QT_QPA_PLATFORM=offscreen \
-    --env QT_PLUGIN_PATH=/opt/dinamica/usr/plugins \
+    --env PROJ_DATA=/opt/dinamica/usr/bin/Data/GDAL \
     "$DINAMICA_EGO_8_HOME" \
-    DinamicaConsole --version 2>&1
-# If H6 is the root cause: this should NOT crash.
-# If still crashes: run Step C to get Qt plugin debug output.
+    bash -c 'cd /opt/dinamica/usr && bin/DinamicaEGO.sh /cluster/home/bblack/nascent-lulcc/dinamica/dinamica_model/smoketest.ego' 2>&1
+# If H7 is the root cause: this should NOT crash with std::exception.
 
-# Step C: Qt plugin debug (if Step B still crashes)
+# Alternative: test DinamicaConsole directly (skips wrapper env setup)
 apptainer exec \
-    --env QT_DEBUG_PLUGINS=1 \
-    --env QT_QPA_PLATFORM=offscreen \
-    --env QT_PLUGIN_PATH=/opt/dinamica/usr/plugins \
+    --home "$HPC_SCRATCH_ROOT/dinamica-home" \
+    --env DINAMICA_EGO_8_TEMP_DIR="$HPC_SCRATCH_ROOT/dinamica-tmp" \
+    --env PROJ_DATA=/opt/dinamica/usr/bin/Data/GDAL \
     "$DINAMICA_EGO_8_HOME" \
-    DinamicaConsole --version 2>&1 | head -80
+    DinamicaConsole -version 2>&1
 ```
 
 ---
 
-## Proposed Fix — Plan 06 Iteration 4
+## Proposed Fix — Plan 06 Iteration 5
 
-**Precondition:** Step B above does not crash (H6 confirmed).
+**Precondition:** Step B above does not crash (H7 confirmed).
 
 Add to `%environment` in `rocker-geospatial-dinamica.def`:
 
 ```
-export QT_PLUGIN_PATH=/opt/dinamica/usr/plugins
-export QT_QPA_PLATFORM=offscreen
+export PROJ_DATA=/opt/dinamica/usr/bin/Data/GDAL
 ```
 
 **Rationale:**
-- `QT_PLUGIN_PATH=/opt/dinamica/usr/plugins` — AppRun sets this to `$APPDIR/usr/plugins`; our
-  flattened layout puts Qt plugins here. Without it, Qt searches system plugin paths and does not
-  find the AppImage-bundled plugins.
-- `QT_QPA_PLATFORM=offscreen` — Euler HPC nodes have no X11 DISPLAY. Setting this tells Qt to use
-  the bundled offscreen platform plugin instead of attempting xcb (X11) initialization.
-- **No rebuild required for diagnosis.** The above env vars can be tested immediately with
-  `--env` flags against the current .sif. Rebuild only needed if the test confirms the fix.
+- `DinamicaEGO.sh` sets `PROJ_DATA=${BIN_PATH}/Data/GDAL` for its subprocess, but the
+  container `%environment` (which covers all Apptainer exec invocations that don't go through
+  the wrapper) never had this variable.
+- The PROJ C library (linked via libGDAL.so → libBase.so) requires `PROJ_DATA` to locate
+  datum grid files (`proj.db` etc.). Without it, PROJ initialization fails at library load time.
+- **No rebuild required for diagnosis.** Test immediately with `--env PROJ_DATA=...` flags
+  against the current .sif. Rebuild only if the test confirms the fix.
 
-**Also retain** all current `%environment` additions from prior iterations (APPDIR, GDAL_DATA,
-LOG_PATH, GdalToolsData conf key) — these are correct and harmless.
+**Also retain** all current `%environment` additions (APPDIR, GDAL_DATA, LOG_PATH, Qt vars) —
+they are correct or at worst harmless.
 
 ---
 
@@ -188,10 +221,13 @@ LOG_PATH, GdalToolsData conf key) — these are correct and harmless.
 
 ## Rollback Guidance
 
-If H6 is confirmed by Step B and iteration 4 .def rebuild still exits 5, the next escalation:
-1. Run `QT_DEBUG_PLUGINS=1` (Step C above) to identify the exact plugin the system fails to load.
-2. Check PYTHONPATH: AppRun also sets PYTHONPATH. Add `PYTHONPATH=/opt/dinamica/usr/lib/python3/dist-packages:...` if Qt debug shows Python-related failure.
-3. File an issue at `https://github.com/ethzplus/rocker-geospatial-dinamica`.
+If H7 is confirmed by Step B and iteration 5 .def rebuild still exits 5, the next escalation:
+1. Check `PYTHONPATH`: AppRun sets `PYTHONPATH=/opt/dinamica/usr/lib/python3/dist-packages:...`.
+   Add it to `%environment` and test.
+2. Check `PYTHONSO`: `libBase.so` reads the `PYTHONSO` env var for its dlopen Python path.
+   Test `--env PYTHONSO=/opt/dinamica/usr/lib/libpython3.12.so.1.0`.
+3. Run `LD_DEBUG=all` inside container for the failing command to trace all symbol lookups.
+4. File an issue at `https://github.com/ethzplus/rocker-geospatial-dinamica`.
 
 ---
 
@@ -200,4 +236,4 @@ If H6 is confirmed by Step B and iteration 4 .def rebuild still exits 5, the nex
 `diagnostics/strace-openat.log`, `diagnostics/fresh-appimage-extract-tree.log`,
 `diagnostics/sif-extract-tree.log`, `diagnostics/extract-diff.log`.
 *Reference:* `ethzplus/evoland-plus-HPC/src/steps/10_LULCC/` (working Dinamica on Euler setup).
-*Feeds:* Plan 01.1-06 iteration 4 (Qt env vars, test on current .sif before rebuild).
+*Feeds:* Plan 01.1-06 iteration 5 (PROJ_DATA env var, test on current .sif before rebuild).
