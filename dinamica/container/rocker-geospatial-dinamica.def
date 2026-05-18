@@ -70,10 +70,6 @@ From: rocker/r-ver:4.5.3
     nascent-lulcc.upstream                 "ethzplus/rocker-geospatial-dinamica"
     nascent-lulcc.phase                    "1.1"
 
-%files
-    # LD_PRELOAD fix source for H8 circular init bug (compiled in Stage 6 below)
-    dinamica/container/dinamica_init_fix.cpp /tmp/dinamica_init_fix.cpp
-
 %post -c /bin/bash
     # `-c /bin/bash` selects bash as the script interpreter. Apptainer defaults
     # to /bin/sh (dash on Debian-derived images), which does not support
@@ -134,9 +130,53 @@ CONF
     mkdir -p /tmp/dinamica
 
     # Stage 6 - compile circular-init LD_PRELOAD fix (H8 — diagnostics/FINDINGS.md)
+    # Source inlined as heredoc (portable — no %files CWD-relative path dependency;
+    # canonical source also committed at dinamica/container/dinamica_init_fix.cpp).
     # Intercepts DFF::LogManager::Instance() + DFF::getContextualLog() to break the
-    # recursive init cycle in libBase.so that causes __gnu_cxx::recursive_init_error
-    # at DinamicaConsole startup. Fix confirmed live on Euler (step 30, FINDINGS.md).
+    # recursive init cycle in libBase.so that causes __gnu_cxx::recursive_init_error.
+    cat > /tmp/dinamica_init_fix.cpp <<'CPPEOF'
+// LD_PRELOAD fix for Dinamica EGO 8 libBase.so circular singleton init bug.
+// Root cause: DFF::LogManager::Instance() init -> LogHub -> FilesystemHelper ->
+// getNewTemporaryDirectory -> getContextualLog -> LogManager::Instance() [RECURSIVE]
+// -> __gnu_cxx::recursive_init_error.
+// See: .planning/phases/01.1-fix-dinamica-launch-contract/diagnostics/FINDINGS.md H8
+#define _GNU_SOURCE
+#include <dlfcn.h>
+#include <cstdio>
+
+typedef void* (*VoidFunc)();
+static __thread int logmanager_in_init = 0;
+
+extern "C" {
+
+void* _ZN3DFF10LogManager8InstanceEv() {
+    static VoidFunc real = nullptr;
+    if (!real) {
+        real = reinterpret_cast<VoidFunc>(
+            dlsym(RTLD_NEXT, "_ZN3DFF10LogManager8InstanceEv"));
+        if (!real) return nullptr;
+    }
+    if (logmanager_in_init) return nullptr;
+    logmanager_in_init = 1;
+    void* result;
+    try { result = real(); } catch (...) { logmanager_in_init = 0; throw; }
+    logmanager_in_init = 0;
+    return result;
+}
+
+void* _ZN3DFF16getContextualLogEv() {
+    if (logmanager_in_init) return nullptr;
+    static VoidFunc real = nullptr;
+    if (!real) {
+        real = reinterpret_cast<VoidFunc>(
+            dlsym(RTLD_NEXT, "_ZN3DFF16getContextualLogEv"));
+        if (!real) return nullptr;
+    }
+    return real();
+}
+
+} // extern "C"
+CPPEOF
     g++ -shared -fPIC -std=c++17 -O2 \
         -o /usr/local/lib/dinamica_init_fix.so \
         /tmp/dinamica_init_fix.cpp -ldl
