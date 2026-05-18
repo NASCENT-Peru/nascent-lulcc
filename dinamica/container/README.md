@@ -34,23 +34,12 @@ binary), so no published image exists to bootstrap from — the only sustainable
 contract is to inline the upstream `%post` steps and bootstrap from a public
 base.
 
-**Pinned base image: `rocker/r-ver:4.4.3`** (D-102). The Phase 1.1 DD-1
+**Pinned base image: `rocker/r-ver:4.5.3`** (D-102). The Phase 1.1 DD-1
 discretion was resolved in favour of `rocker/r-ver` over `rocker/geospatial`
 because the upstream Dockerfile already inlines the geospatial install steps
-from `install_geospatial.sh`; using `rocker/geospatial:4.4.3` would duplicate
+from `install_geospatial.sh`; using `rocker/geospatial:4.5.3` would duplicate
 that work and roughly triple the base-layer pull size (~1.27 GB vs ~348 MB
 compressed). The built `.sif` weighs in around 1018 MB after `%post`.
-
-> **Base image choice note (Phase 1.1 iteration 3):** The image was originally
-> pinned at `rocker/r-ver:4.5.3` (Ubuntu Noble 24.04), but three successive
-> rebuilds all produced `std::exception` crashes in `DinamicaConsole` despite
-> clean library loading (confirmed via LD_DEBUG=files). The rollback to
-> `rocker/r-ver:4.4.3` (Ubuntu Jammy 22.04) targets a suspected C++ ABI
-> runtime incompatibility between the Dinamica AppImage (compiled on Jammy)
-> and Noble's libstdc++14. See
-> `.planning/phases/01.1-fix-dinamica-launch-contract/diagnostics/FINDINGS.md`
-> H5 for the full diagnostic chain. Once confirmed working on Jammy, pin to
-> `4.4.3` until Dinamica publishes Noble-compatible binaries.
 
 ## Files
 
@@ -116,13 +105,10 @@ Rebuild and re-publish the `.sif` when any of these change:
    AppImage URL number (currently `nui_download/1960/`), AND update the
    `@version` line in `dinamica/dinamica_model/smoketest.ego-decoded` to
    match the new Dinamica version string.
-2. **Base-image bump** (e.g. `rocker/r-ver` moves to 4.5+ once Dinamica ships
-   Noble-compatible binaries, or `rocker/r-ver:4.4.x` bumps to a newer patch).
-   Update the `From:` tag in `rocker-geospatial-dinamica.def`. **Note:** do NOT
-   bump from `rocker/r-ver:4.4.x` (Jammy) to `rocker/r-ver:4.5.x` (Noble) until
-   the Dinamica AppImage is recompiled for Noble — see the base image note in the
-   Provenance section above. Verify that the upstream `install_geospatial.sh`
-   apt-package list still resolves cleanly on the new Ubuntu base.
+2. **Base-image bump** (e.g. `rocker/r-ver` moves to 4.6+). Update the
+   `From:` tag in `rocker-geospatial-dinamica.def`. Verify that the upstream
+   `install_geospatial.sh` apt-package list still resolves cleanly on the new
+   Ubuntu base.
 3. **`%post` or `%test` body changes** in `rocker-geospatial-dinamica.def`.
 4. **Euler runtime version bump** (`apptainer`/`singularity`) in a way that
    invalidates the image format.

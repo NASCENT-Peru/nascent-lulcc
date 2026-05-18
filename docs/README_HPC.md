@@ -15,18 +15,17 @@ detector that refuses to install conda envs under `$HOME` when
 `docker-archive://` workaround is no longer canonical; see
 `dinamica/container/README.md` for the build-flow contract.
 
-> **Phase 1.1 runtime caveat (iteration 3 in progress).** The launch shape and
+> **Phase 1.1 runtime caveat (iteration 4 in progress).** The launch shape and
 > detection contract below are mechanically validated and the D-107 error grep
 > correctly surfaces the current failure (exit 5). The `--live` smoke test does
-> **not** yet exit 0 against the rebuilt `.sif`: `DinamicaConsole` crashes with
-> `std::exception` on every rebuild from `rocker/r-ver:4.5.3` (Ubuntu Noble
-> 24.04). Three builds all produced identical crashes after all env-var, conf-key,
-> and APPDIR fixes — LD_DEBUG=files confirmed clean library loading, pointing to a
-> C++ ABI runtime incompatibility (Noble libstdc++14 vs the Jammy libstdc++12 the
-> AppImage was compiled against). The `.def` has been rolled back to
-> `rocker/r-ver:4.4.3` (Ubuntu Jammy 22.04) for the next build attempt. Full
-> diagnostic chain in `.planning/phases/01.1-fix-dinamica-launch-contract/diagnostics/FINDINGS.md`
-> H5; tracked in Open Issue 1 of `01.1-03-SUMMARY.md`.
+> **not** yet exit 0: `DinamicaConsole` crashes with `std::exception`. Root cause
+> identified as H6 — Qt platform plugin initialization failure. `AppRun` (the
+> AppImage bootstrap we bypass) sets `QT_PLUGIN_PATH` before launching
+> DinamicaConsole; without it, Qt cannot find its bundled platform plugins on a
+> headless HPC node. The `.def` now adds `QT_PLUGIN_PATH=/opt/dinamica/usr/plugins`
+> and `QT_QPA_PLATFORM=offscreen` to `%environment`. Full diagnostic chain in
+> `.planning/phases/01.1-fix-dinamica-launch-contract/diagnostics/FINDINGS.md`
+> H6; tracked in Open Issue 1 of `01.1-03-SUMMARY.md`.
 
 ## Stage 7 Dinamica-on-Euler contract (INFRA-01)
 

@@ -1,28 +1,29 @@
 Bootstrap: docker
-From: rocker/r-ver:4.4.3
+From: rocker/r-ver:4.5.3
 
 # -----------------------------------------------------------------------------
 # Apptainer / Singularity definition file for the external Dinamica EGO 8
 # image used by Stage 7 on Euler.
 #
 # Phase 1.1 - Rewrite per D-101, D-102, D-103.
-# Phase 1.1 gap-closure (Plan 06 iteration 3): rolled back from rocker/r-ver:4.5.3
-# (Ubuntu Noble 24.04) to rocker/r-ver:4.4.3 (Ubuntu Jammy 22.04). All env-var
-# and conf-key hypotheses were FALSIFIED across three builds; LD_DEBUG=files
-# showed clean library loading. The crash is a C++ ABI runtime incompatibility
-# between the Dinamica AppImage (compiled on Jammy) and Noble's libstdc++14.
-# See diagnostics/FINDINGS.md H5 for the full diagnostic chain.
+# Phase 1.1 gap-closure (Plan 06 iteration 4): reverted base image back to
+# rocker/r-ver:4.5.3 (Noble) — iteration 3 Jammy rollback FALSIFIED H5 (crash
+# is OS-independent). Root cause confirmed as H6: Qt platform plugin
+# initialization failure. AppRun sets QT_PLUGIN_PATH before launching
+# DinamicaConsole, but we bypass AppRun. Added QT_PLUGIN_PATH and
+# QT_QPA_PLATFORM=offscreen to %environment.
+# See diagnostics/FINDINGS.md H6 for the full diagnostic chain.
 #
 # Provenance
 # ----------
 # This definition inlines the upstream `ethzplus/rocker-geospatial-dinamica`
 # Dockerfile's install steps verbatim in %post, bootstrapping from the
-# publicly-pullable rocker/r-ver:4.4.3 base image instead of a GHCR-published
+# publicly-pullable rocker/r-ver:4.5.3 base image instead of a GHCR-published
 # composite image (D-101 - the upstream repo is Dockerfile-only because
 # Dinamica's license forbids redistribution).
 #
 # Pinned versions (D-102 - rebuild trigger conditions documented below):
-#   - rocker/r-ver:4.4.3 (Ubuntu Jammy 22.04 — rolled back from 4.5.3/Noble per FINDINGS.md H5)
+#   - rocker/r-ver:4.5.3
 #   - Dinamica EGO 8.7.0.20250814 via https://dinamicaego.com/nui_download/1960/
 #
 # When to rebuild:
@@ -128,19 +129,22 @@ CONF
     export PATH=$PATH:/opt/dinamica/usr/bin
     export DINAMICA_EGO_8_INSTALLATION_DIRECTORY=/opt/dinamica/usr/bin
     export DINAMICA_EGO_8_HOME_DIR=/opt/dinamica
-    # Phase 1.1 gap-closure (Plan 06 iteration 2): APPDIR is the AppImage
-    # squashfs mount path; DinamicaConsole uses it internally to construct
-    # Python home and resource paths. Without it, startup throws std::exception.
-    # Our extracted layout puts squashfs-root at /opt/dinamica — see
-    # diagnostics/FINDINGS.md for the full diagnostic chain.
     export APPDIR=/opt/dinamica
     export DINAMICA_EGO_8_GDAL_DATA=/opt/dinamica/usr/bin/Data/GDAL
     export DINAMICA_EGO_8_LOG_PATH=/tmp/dinamica
+    # Phase 1.1 gap-closure (Plan 06 iteration 4): AppRun (the AppImage bootstrap
+    # binary we bypass when calling DinamicaConsole directly) sets QT_PLUGIN_PATH
+    # to $APPDIR/usr/plugins before launching the application. Without it, Qt
+    # cannot find its platform plugins and throws std::exception during startup.
+    # QT_QPA_PLATFORM=offscreen is required on headless HPC nodes (no DISPLAY).
+    # See diagnostics/FINDINGS.md H6 for the full diagnostic chain.
+    export QT_PLUGIN_PATH=/opt/dinamica/usr/plugins
+    export QT_QPA_PLATFORM=offscreen
     # NOTE: DINAMICA_EGO_8_TEMP_DIR is NOT exported here - apptainer --env
     # overrides it at runtime per D-105.
 
 %test
-    # Apptainer runs %test under /bin/sh (dash on rocker/r-ver:4.5.3) and
+    # Apptainer runs %test under /bin/sh (dash on Debian-derived images) and
     # does NOT honor the `-c /bin/bash` section flag the way %post does
     # (verified against Euler Apptainer 1.x). Stick to POSIX-sh constructs
     # only — no `set -o pipefail`, no `[[ ]]`, no arrays. Body has no
