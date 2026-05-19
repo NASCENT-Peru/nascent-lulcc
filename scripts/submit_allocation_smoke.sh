@@ -7,7 +7,11 @@
 #SBATCH --error=logs/lulc-allocation-smoke-%j.err
 #SBATCH --profile=task
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -n "$SLURM_SUBMIT_DIR" ]; then
+    SCRIPT_DIR="$SLURM_SUBMIT_DIR/scripts"
+else
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 source "$SCRIPT_DIR/hpc_common.sh"
 
 ENV_NAME="allocation_env"
