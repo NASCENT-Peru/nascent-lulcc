@@ -2,7 +2,7 @@
 #SBATCH --job-name=lulc-allocation-smoke
 #SBATCH --time=12:00:00
 #SBATCH --cpus-per-task=4
-#SBATCH --mem-per-cpu=8G
+#SBATCH --mem-per-cpu=16G
 #SBATCH --output=logs/lulc-allocation-smoke-%j.out
 #SBATCH --error=logs/lulc-allocation-smoke-%j.err
 #SBATCH --profile=task
