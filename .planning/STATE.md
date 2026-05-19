@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01.1-04-PLAN.md — Phase 1.1 documentation surface closed; cross-language mirror test landed; INFRA-01 SC2 / MEM-06 SC5 deferred to gap-closure (01.1-03 Open Issue 1)
-last_updated: "2026-05-17T09:09:30Z"
-last_activity: 2026-05-17 -- Phase 01.1 Plan 04 complete; Phase 1.1 contract work landed (live runtime exit-0 gated on AppImage/base-image compat)
+stopped_at: Completed 01.1-07-PLAN.md — Phase 1.1 fully closed; Open Issue 1 RESOLVED via LD_PRELOAD fix (H8); live --live smoke exits 0; INFRA-01 + MEM-06 Complete
+last_updated: "2026-05-19T00:00:00Z"
+last_activity: 2026-05-19 -- Phase 01.1 fully closed; Plans 05-07 executed; INFRA-01 + MEM-06 Complete; next phase to determine
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 15
-  completed_plans: 12
-  percent: 80
+  completed_phases: 4
+  total_plans: 18
+  completed_plans: 15
+  percent: 83
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 01.1 (fix-dinamica-launch-contract) — COMPLETE (with documented runtime gap)
-Plan: 4 of 4 (all four plans executed)
-Status: Phase 01.1 contract work landed; INFRA-01 SC2 / MEM-06 SC5 deferred to gap-closure (01.1-03 Open Issue 1 — DinamicaConsole std::exception under Ubuntu Noble base)
-Last activity: 2026-05-17 -- Phase 01.1 Plan 04 complete; READMEs updated to D-101/D-104 contract; cross-language mirror assertion test landed
+Phase: 01.1 (fix-dinamica-launch-contract) — **FULLY COMPLETE** (2026-05-19)
+Plan: 7 of 7 (all seven plans executed including gap-closure Plans 05-07)
+Status: Open Issue 1 RESOLVED — LD_PRELOAD fix (H8) baked into container; live `--live` smoke exits 0; INFRA-01 + MEM-06 Complete; no open issues
+Last activity: 2026-05-19 -- Phase 01.1 fully closed; all seven SCs confirmed; next phase TBD
 
 Progress: [████████░░] 80%
 
@@ -45,15 +45,15 @@ Progress: [████████░░] 80%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1. Repair & Visibility | 4 | ~0.5h | ~8 min |
-| 1.1. Fix Dinamica Launch Contract | 4 (01.1-01, 01.1-02, 01.1-03, 01.1-04) | ~45 min combined (+ ~2h operator-side verification on Euler in 01.1-03) | ~11 min |
+| 1.1. Fix Dinamica Launch Contract | 7 (01.1-01–07) | ~45 min combined (+ ~4h operator-side on Euler across Plans 03/06/07) | ~11 min |
 | 2. Model Size Reduction | 4 (02-01, 02-02, 02-03, 02-04) | ~71 min combined | ~18 min |
 | 3. Parallelism & Memory Architecture | 0 | — | — |
 | 4. End-to-End Correctness & Performance | 0 | — | — |
 
 **Recent Trend:**
 
-- Last 5 plans: 02-04, 01.1-01, 01.1-02, 01.1-03, 01.1-04
-- Trend: Phase 1.1 (inserted) fully landed across 4 plans; documentation surface and cross-language mirror test in place; live runtime exit-0 closure gated on the Open Issue 1 deferred to gap-closure / phase 01.2.
+- Last 5 plans: 01.1-03, 01.1-04, 01.1-05, 01.1-06, 01.1-07
+- Trend: Phase 1.1 gap-closure fully executed across Plans 05–07; H8 root cause (circular singleton init in libBase.so) confirmed after 6 diagnostic iterations and fixed via LD_PRELOAD interceptor; live smoke exits 0.
 
 *Updated after each plan completion*
 
@@ -83,8 +83,7 @@ None yet.
 ### Blockers/Concerns
 
 - `MultisessionFuture interrupted` (OOM SIGKILL) at ~3 minutes locally — the project's defining failure mode; addressed structurally across Phases 2–3.
-- Phase 1 HPC-only verification gates (live Euler smoke test, live env solve, live SIGKILL test) pending operator confirmation — tracked in 01-HUMAN-UAT.md. Phase 1.1 rewrote the launch contract these tests target; re-running them is the closure path.
-- **Phase 1.1 Open Issue 1 (DinamicaConsole std::exception under rocker/r-ver:4.5.3 Noble base):** diagnosed live on Euler 2026-05-17; blocks INFRA-01 SC2 + MEM-06 SC5. Detection contract (D-107 grep) correctly catches it with exit 5. Resolution requires either (a) adding missing system libs to the .def %post, (b) changing base image to a Jammy 22.04-era tag matching the AppImage's expected runtime, or (c) pinning a different Dinamica AppImage version. Deferred to phase 01.1 gap-closure or phase 01.2. Full diagnostic in `.planning/phases/01.1-fix-dinamica-launch-contract/01.1-03-SUMMARY.md` Open Issue 1.
+- Phase 1 HPC-only verification gates (live Euler smoke test, live env solve, live SIGKILL test) pending operator confirmation — tracked in 01-HUMAN-UAT.md. **Phase 1.1 now closed** — the INFRA-01 live smoke gate is satisfied (exit 0).
 
 ## Deferred Items
 
@@ -95,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-17
-Stopped at: Completed 01.1-04-PLAN.md — Phase 1.1 documentation surface closed; cross-language mirror assertion test landed; READMEs reflect D-101/D-104 contract; INFRA-01 SC2 / MEM-06 SC5 deferred to gap-closure
+Last session: 2026-05-19
+Stopped at: Completed 01.1-07-PLAN.md — Phase 1.1 fully closed; Open Issue 1 RESOLVED; live --live smoke exits 0; INFRA-01 + MEM-06 Complete
 Resume file: None
