@@ -228,17 +228,22 @@ t_pin_threads <- prof_tic()
 pin_native_threads_to_one(verbose = TRUE)
 prof_toc(t_pin_threads, "stage=pin_native_threads_to_one")
 
-if (isTRUE(as.logical(Sys.getenv("ALLOCATION_DEV_STRICT_GLOBALS", "FALSE")))) {
-  options(future.globals.onReference = "error")
-  cat("DEV MODE: future.globals.onReference = 'error' enabled\n")
-}
-
 plan_choice <- select_allocation_plan()
 if (identical(plan_choice$strategy, "multicore")) {
   options(parallelly.fork.enable = TRUE)
   future::plan(future::multicore, workers = plan_choice$workers)
+  # externalptr objects (ranger forests, terra rasters) are safe under fork —
+  # workers inherit the parent address space without serialization.
+  if (isTRUE(as.logical(Sys.getenv("ALLOCATION_DEV_STRICT_GLOBALS", "FALSE")))) {
+    options(future.globals.onReference = "warning")
+    cat("DEV MODE: future.globals.onReference = 'warning' (multicore fork is safe for externalptr)\n")
+  }
 } else if (identical(plan_choice$strategy, "multisession")) {
   future::plan(future::multisession, workers = plan_choice$workers)
+  if (isTRUE(as.logical(Sys.getenv("ALLOCATION_DEV_STRICT_GLOBALS", "FALSE")))) {
+    options(future.globals.onReference = "error")
+    cat("DEV MODE: future.globals.onReference = 'error' enabled\n")
+  }
 } else {
   future::plan(future::sequential)
 }
