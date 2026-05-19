@@ -40,7 +40,7 @@ if [ ! -f "$R_SCRIPT" ]; then
     exit 1
 fi
 
-DEFAULT_YEAR_POST=$("$RSCRIPT_BIN" --vanilla -e "setwd(Sys.getenv('SLURM_SUBMIT_DIR')); source('src/setup.r'); cfg <- get_config(); cat(cfg[['simulation_start_year']] + cfg[['step_length']])")
+DEFAULT_YEAR_POST=$("$RSCRIPT_BIN" --vanilla -e "setwd(Sys.getenv('SLURM_SUBMIT_DIR')); source('src/setup.r'); cfg <- get_config(); cat(cfg[['simulation_start_year']] + cfg[['step_length']])" 2>/dev/null | grep -E '^[0-9]+$' | tail -1)
 if [ -z "${ALLOCATION_YEAR_POST_FILTER:-}" ]; then
     export ALLOCATION_YEAR_POST_FILTER="$DEFAULT_YEAR_POST"
 fi
