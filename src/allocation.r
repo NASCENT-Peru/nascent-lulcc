@@ -67,8 +67,10 @@
   if (requireNamespace("ps", quietly = TRUE)) {
     info <- tryCatch(ps::ps_memory_info(), error = function(e) NULL)
     if (!is.null(info)) {
-      r <- unname(info[["rss"]])
-      v <- unname(info[["vmem"]])
+      r <- tryCatch(unname(info[["rss"]]), error = function(e) NA_real_)
+      v <- tryCatch(unname(info[["vmem"]]),
+                    error = function(e) tryCatch(unname(info[["vms"]]),
+                                                  error = function(e) NA_real_))
       if (length(r) && is.numeric(r) && !is.na(r)) rss <- r / (1024 * 1024)
       if (length(v) && is.numeric(v) && !is.na(v)) vsize <- v / (1024 * 1024)
     }
