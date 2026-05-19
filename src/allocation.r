@@ -329,9 +329,16 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
         v <- config[[key]]
         if (is.character(v) && length(v) == 1L && nzchar(v)) v else NULL
       }
+      reg_dir <- config[["reg_dir"]]
+      regions_json <- if (is.character(reg_dir) && length(reg_dir) == 1L && nzchar(reg_dir)) {
+        file.path(reg_dir, "regions.json")
+      } else {
+        NULL
+      }
       files_expected <- c(
         maybe("ref_grid_path"),
-        maybe("lulc_aggregation_path")
+        maybe("lulc_aggregation_path"),
+        regions_json
       )
     }
     dinamica_backend <- Sys.getenv("DINAMICA_BACKEND", unset = "auto")
