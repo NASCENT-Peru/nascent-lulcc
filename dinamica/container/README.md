@@ -172,6 +172,7 @@ launch shape**:
 ```bash
 apptainer exec \
     --home   "$HPC_SCRATCH_ROOT/dinamica-home" \
+    --bind   "$HPC_SCRATCH_ROOT/dinamica-tmp:$HPC_SCRATCH_ROOT/dinamica-tmp" \
     --env    DINAMICA_EGO_8_TEMP_DIR="$HPC_SCRATCH_ROOT/dinamica-tmp" \
     "$DINAMICA_EGO_8_HOME" \
     bash -c 'cd /opt/dinamica/usr && bin/DinamicaEGO.sh /abs/path/to/model.ego'

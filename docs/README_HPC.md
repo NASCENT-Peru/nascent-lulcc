@@ -56,6 +56,7 @@ the **D-104** launch shape:
 ```bash
 apptainer exec \
     --home   "$HPC_SCRATCH_ROOT/dinamica-home" \
+    --bind   "$HPC_SCRATCH_ROOT/dinamica-tmp:$HPC_SCRATCH_ROOT/dinamica-tmp" \
     --env    DINAMICA_EGO_8_TEMP_DIR="$HPC_SCRATCH_ROOT/dinamica-tmp" \
     "$DINAMICA_EGO_8_HOME" \
     bash -c 'cd /opt/dinamica/usr && bin/DinamicaEGO.sh /abs/path/to/model.ego'
@@ -174,7 +175,7 @@ The live mode:
 4. Creates `$HPC_SCRATCH_ROOT/dinamica-{home,tmp}` if missing and seeds
    `.dinamica_ego_8.conf` idempotently.
 5. Runs the D-104 launch command
-   (`apptainer exec --home … --env DINAMICA_EGO_8_TEMP_DIR=… <sif> bash -c 'cd /opt/dinamica/usr && bin/DinamicaEGO.sh <abs-model>'`)
+   (`apptainer exec --home … --bind <tmp>:<tmp> --env DINAMICA_EGO_8_TEMP_DIR=… <sif> bash -c 'cd /opt/dinamica/usr && bin/DinamicaEGO.sh <abs-model>'`)
    and tees combined stdout/stderr into `logs/dinamica-smoke-<timestamp>.log`.
 6. After the subprocess returns, greps the log for the **D-107** error
    patterns (`Dinamica EGO exited with an error`,

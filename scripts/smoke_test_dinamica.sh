@@ -315,6 +315,7 @@ PLAN
 LAUNCH_CMD=(
     "$RESOLVED_RUNTIME" "exec"
     "--home" "$STAGED_HOME"
+    "--bind" "$STAGED_TMP:$STAGED_TMP"
     "--env" "DINAMICA_EGO_8_TEMP_DIR=$STAGED_TMP"
     "$ARTIFACT"
     "bash" "-c"
