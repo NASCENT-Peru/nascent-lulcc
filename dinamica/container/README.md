@@ -9,19 +9,15 @@ not** ship the built `.sif` artifact (D-10): the image stays external and is
 consumed by `exec_dinamica()` and `scripts/smoke_test_dinamica.sh` through the
 `DINAMICA_EGO_8_HOME` environment variable.
 
-> **Runtime caveat (Phase 1.1 open issue).** The build flow and launch shape
-> below are mechanically validated end-to-end (the `.sif` builds cleanly from
-> this `.def` on Euler, and the D-104 launch command is honoured by both the
-> R-side `resolve_dinamica_launch()` and the shell-side smoke test). However,
-> the live `--live` smoke test does **not** yet exit 0 against the rebuilt
-> image: `DinamicaConsole` crashes with `std::exception` on bare invocation
-> inside the `.sif`, independent of the `.ego` fixture. The D-107 post-hoc
-> error grep catches this (exit 5) — i.e. the *detection* contract works.
-> The remaining gap is a runtime/library-compatibility issue between the
-> Dinamica EGO 8 AppImage and the Ubuntu Noble base layer, and is tracked
-> for resolution in Phase 1.1 gap-closure / phase 01.2. See
-> `.planning/phases/01.1-fix-dinamica-launch-contract/01.1-03-SUMMARY.md`
-> "Open Issue 1" for the full diagnostic.
+> **Runtime status (Phase 1.1 gap-closure — resolved 2026-05-19):** The rebuilt `.sif`
+> builds cleanly AND the live `--live` smoke test exits 0 against
+> `dinamica/dinamica_model/smoketest.ego`. Open Issue 1 (DinamicaConsole `std::exception`
+> under rocker/r-ver:4.5.3 Noble base) was resolved by Plan 01.1-07: root cause was a
+> circular singleton init bug in `libBase.so` (H8), fixed by an LD_PRELOAD interceptor
+> compiled in `%post` Stage 6. See
+> `.planning/phases/01.1-fix-dinamica-launch-contract/01.1-07-SUMMARY.md` for the fix
+> detail and `.planning/phases/01.1-fix-dinamica-launch-contract/diagnostics/FINDINGS.md`
+> H8 for the full diagnostic chain.
 
 ## Provenance
 
@@ -227,11 +223,9 @@ not contain any of the D-107 error patterns
 2=resolution, 3=non-zero exit, 4=missing log, 5=D-107 error pattern matched
 despite exit 0) and prints which contract clause was violated.
 
-> Per the Phase 1.1 runtime caveat at the top of this file, the live smoke
-> test currently exits **5** against the rebuilt `.sif` because
-> `DinamicaConsole` crashes with `std::exception`. The D-107 detection
-> contract is validated; the underlying AppImage/base-library compatibility
-> fix is tracked in `01.1-03-SUMMARY.md` Open Issue 1.
+> Per the Phase 1.1 gap-closure (Plan 01.1-07, resolved 2026-05-19), the live smoke
+> test exits **0** against the rebuilt `.sif`. Open Issue 1 is RESOLVED — see
+> `01.1-07-SUMMARY.md` for the fix detail.
 
 A workstation dry-run (no apptainer/singularity required, no real `.sif`
 needed) is also available and is what `tests/`-style verification gates run:

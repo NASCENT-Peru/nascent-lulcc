@@ -15,17 +15,13 @@ detector that refuses to install conda envs under `$HOME` when
 `docker-archive://` workaround is no longer canonical; see
 `dinamica/container/README.md` for the build-flow contract.
 
-> **Phase 1.1 runtime caveat (iteration 4 in progress).** The launch shape and
-> detection contract below are mechanically validated and the D-107 error grep
-> correctly surfaces the current failure (exit 5). The `--live` smoke test does
-> **not** yet exit 0: `DinamicaConsole` crashes with `std::exception`. Root cause
-> identified as H6 — Qt platform plugin initialization failure. `AppRun` (the
-> AppImage bootstrap we bypass) sets `QT_PLUGIN_PATH` before launching
-> DinamicaConsole; without it, Qt cannot find its bundled platform plugins on a
-> headless HPC node. The `.def` now adds `QT_PLUGIN_PATH=/opt/dinamica/usr/plugins`
-> and `QT_QPA_PLATFORM=offscreen` to `%environment`. Full diagnostic chain in
-> `.planning/phases/01.1-fix-dinamica-launch-contract/diagnostics/FINDINGS.md`
-> H6; tracked in Open Issue 1 of `01.1-03-SUMMARY.md`.
+> **Phase 1.1 gap-closure — resolved 2026-05-19.** The `--live` smoke test now exits **0**
+> against `dinamica/dinamica_model/smoketest.ego`. Open Issue 1 (`DinamicaConsole`
+> `std::exception`) was resolved by Plan 01.1-07: root cause was a circular singleton init
+> bug in `libBase.so` (H8 — all prior H1–H7 hypotheses FALSIFIED over 6 diagnostic
+> iterations in Plans 05–06), fixed by an LD_PRELOAD interceptor compiled in `%post` Stage 6.
+> See `.planning/phases/01.1-fix-dinamica-launch-contract/01.1-07-SUMMARY.md` and
+> `diagnostics/FINDINGS.md` H8 for the full record.
 
 ## Stage 7 Dinamica-on-Euler contract (INFRA-01)
 
@@ -197,11 +193,8 @@ Exit-code contract (documented at the top of the script):
 | 4    | live Dinamica succeeded but no `dinamica-smoke-*.log` was written                        |
 | 5    | live Dinamica returned 0 BUT printed a D-107 error string in the log                     |
 
-> Per the Phase 1.1 runtime caveat at the top of this doc, the `--live`
-> command currently exits **5** against the rebuilt `.sif`: `DinamicaConsole`
-> crashes with `std::exception`, the D-107 grep catches it correctly, and
-> the underlying AppImage/base-library fix is tracked in 01.1-03-SUMMARY.md
-> Open Issue 1. End-to-end exit-0 closure is gated on resolving that issue.
+> Per the Phase 1.1 gap-closure (Plan 01.1-07, 2026-05-19), the `--live` command
+> exits **0**. Open Issue 1 is RESOLVED — see `01.1-07-SUMMARY.md`.
 
 ### Phase 1.1 — HPC env install root contract (D-112)
 

@@ -19,7 +19,7 @@
 - [ ] **MEM-03**: `future::multicore` (fork + COW) is used on Linux HPC; `future::multisession` is used on Windows local; backend is selected automatically based on OS
 - [ ] **MEM-04**: All model objects saved by `transition_modelling.r` are <200 MB each — achieved via tightened `butcher` axes, `bundle::bundle()` for XGBoost, and `ranger(save.memory=TRUE)`
 - [ ] **MEM-05**: Neighbourhood rasters are pre-computed once per region in the parent process and written to scratch as TIF files; workers receive file paths, not in-memory objects
-- [ ] **MEM-06**: `allocation_env.yml` includes all packages required for prediction: `r-parsnip`, `r-recipes`, `r-ranger`, `r-xgboost` (pinned 1.7.x), `r-tidypredict`, `r-butcher`, `r-ps`, `r-lobstr`, `r-bundle`, `r-qs`, `r-rhpcblasctl`
+- [x] **MEM-06**: `allocation_env.yml` includes all packages required for prediction: `r-parsnip`, `r-recipes`, `r-ranger`, `r-xgboost` (pinned 1.7.x), `r-tidypredict`, `r-butcher`, `r-ps`, `r-lobstr`, `r-bundle`, `r-qs`, `r-rhpcblasctl` *(closed Phase 1.1 / Plan 01.1-07: live `--live` smoke against `dinamica/dinamica_model/smoketest.ego` exits 0 on rebuilt .sif; Open Issue 1 resolved — see `01.1-07-SUMMARY.md`)*
 
 ### Performance & Resumability
 
@@ -29,7 +29,7 @@
 
 ### Infrastructure
 
-- [ ] **INFRA-01**: Dinamica EGO 8 runs inside a Singularity container on ETH Euler HPC — container built from the `ethzplus/rocker-geospatial-dinamica` Rocker image (reference: https://github.com/ethzplus/rocker-geospatial-dinamica), tested with a minimal allocation model, and invocable from `exec_dinamica()` via `DINAMICA_EGO_8_HOME` pointing to the container binary
+- [x] **INFRA-01**: Dinamica EGO 8 runs inside a Singularity container on ETH Euler HPC — container built from the `ethzplus/rocker-geospatial-dinamica` Rocker image (reference: https://github.com/ethzplus/rocker-geospatial-dinamica), tested with a minimal allocation model, and invocable from `exec_dinamica()` via `DINAMICA_EGO_8_HOME` pointing to the container binary *(closed Phase 1.1 / Plan 01.1-07: all SCs verified; live smoke exits 0; Open Issue 1 resolved — see `01.1-07-SUMMARY.md`)*
 
 ### Pipeline Correctness
 
@@ -78,11 +78,11 @@ Updated during roadmap creation.
 | MEM-03 | Phase 3 | Pending |
 | MEM-04 | Phase 2 | Pending |
 | MEM-05 | Phase 3 | Pending |
-| MEM-06 | Phase 1 + Phase 1.1 | Partial (`allocation_env.yml` package set closed by Phase 1; SC5 smoke fixture round-trip closed by 01.1-03 Task 3; DinamicaConsole-accepts-the-fixture gate deferred to gap-closure on 01.1-03 Open Issue 1) |
+| MEM-06 | Phase 1 + Phase 1.1 | Complete (closed Phase 1.1 / Plan 01.1-07; live --live smoke exit 0; CalculateRExpression block executed successfully in smoketest.ego) |
 | PERF-01 | Phase 4 | Pending |
 | PERF-02 | Phase 4 | Pending |
 | PERF-03 | Phase 4 | Pending |
-| INFRA-01 | Phase 1 + Phase 1.1 | Partial (SC1/SC3/SC4/SC6/SC7 closed; SC2 live `--live` exit 0 deferred to gap-closure on 01.1-03 Open Issue 1 — DinamicaConsole std::exception under rocker/r-ver:4.5.3 Noble base) |
+| INFRA-01 | Phase 1 + Phase 1.1 | Complete (closed Phase 1.1 / Plan 01.1-07; all SCs verified; live --live smoke exit 0; Open Issue 1 resolved by LD_PRELOAD fix for H8 circular init bug in libBase.so) |
 | PIPE-01 | Phase 1 | Pending |
 | PIPE-02 | Phase 4 | Pending |
 | PIPE-03 | Phase 1 | Pending |
