@@ -171,6 +171,7 @@ declare -a DEFAULT_ENVS=(
     "data_prep_env|$ENVS_DIR/data_prep_env.yml"
     "allocation_env|$ENVS_DIR/allocation_env.yml"
     "clim_data_env|$ENVS_DIR/clim_data_env.yml"
+    "trans_rate_estimation_env|$ENVS_DIR/trans_rate_estimation_env.yml"
 )
 
 # ---------------------------------------------------------------------------
