@@ -272,6 +272,8 @@ simulation_trans_rates_prep <- function(
       region_name,
       iLULC,
       jLULC,
+      `From.`,
+      `To.`,
       minRate,
       maxRate,
       meanRate,
@@ -828,12 +830,12 @@ optimize_region_scenario <- function(
       )
 
       # Create lookup: (from_val, to_val) → id_trans
+      # Use From./To. numeric values directly from viable_transitions_lists.csv
+      # rather than re-deriving via class_to_value[iLULC] — class name formats
+      # in the CSV may not match lulc_schema class_name keys.
       id_trans_lookup <- df_trans_source %>%
         dplyr::filter(region_name == r) %>%
-        dplyr::mutate(
-          from_val = class_to_value[iLULC],
-          to_val = class_to_value[jLULC]
-        ) %>%
+        dplyr::rename(from_val = `From.`, to_val = `To.`) %>%
         dplyr::select(from_val, to_val, id_trans) %>%
         dplyr::distinct()
 
