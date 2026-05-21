@@ -592,6 +592,7 @@ load_allocation_models <- function(region_labels, calibration_period, config) {
 
 write_nhood_tif <- function(anterior_path, pred_name, focal_matrices,
                             class_name_to_value, out_path) {
+  if (file.exists(out_path)) return(invisible(out_path))
   anterior <- terra::rast(anterior_path)
   rast <- compute_single_nhood_raster(
     anterior = anterior,
@@ -1728,20 +1729,20 @@ preload_region_predictor_data <- function(
   dyn_cols <- intersect(preds, names(ds_dynamic$schema))
 
   static_df <- if (length(static_cols) > 0L) {
-    ds_static %>%
-      dplyr::select(cell_id, dplyr::all_of(static_cols)) %>%
-      dplyr::filter(region == !!region_value) %>%
-      dplyr::collect() %>%
+    ds_static |>
+      dplyr::filter(region == !!region_value) |>
+      dplyr::select(cell_id, dplyr::all_of(static_cols)) |>
+      dplyr::collect() |>
       data.table::as.data.table()
   } else {
     data.table::data.table(cell_id = integer())
   }
 
   dyn_df <- if (length(dyn_cols) > 0L) {
-    ds_dynamic %>%
-      dplyr::select(cell_id, dplyr::all_of(dyn_cols)) %>%
-      dplyr::filter(region == !!region_value, .data$scenario == !!scenario) %>%
-      dplyr::collect() %>%
+    ds_dynamic |>
+      dplyr::filter(region == !!region_value, scenario == !!scenario) |>
+      dplyr::select(cell_id, dplyr::all_of(dyn_cols)) |>
+      dplyr::collect() |>
       data.table::as.data.table()
   } else {
     data.table::data.table(cell_id = integer())
@@ -2101,6 +2102,7 @@ generate_probability_maps <- function(
       if ("ID" %in% names(nhood_vals)) {
         nhood_vals[, ID := NULL]
       }
+      nhood_vals[, (nhood_needed) := lapply(.SD, as.integer), .SDcols = nhood_needed]
       from_data[, (nhood_needed) := nhood_vals[, nhood_needed, with = FALSE]]
       prof_toc(
         t_nhood_extract,
