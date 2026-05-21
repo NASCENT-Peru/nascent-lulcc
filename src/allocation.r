@@ -1697,6 +1697,84 @@ setup_allocation_inputs <- function(
 }
 
 
+#' Pre-load all parquet predictor columns for a region in one Arrow scan.
+#'
+#' Loads all static and dynamic predictor columns needed by any model for this
+#' region in a single Arrow read (filtered by region partition), keyed by
+#' cell_id. Callers then do fast in-memory data.table lookups per transition
+#' instead of 38+ separate Arrow scans with large cell_id IN filters.
+#'
+#' @param ds_static Arrow dataset for static predictors
+#' @param ds_dynamic Arrow dataset for dynamic predictors
+#' @param preds Character vector of predictor names to load (parquet columns only)
+#' @param region_value Integer region partition value
+#' @param scenario SSP scenario string for the dynamic partition filter
+#' @param log_file Optional path to per-worker log file
+#' @return data.table keyed by cell_id with all requested predictor columns
+preload_region_predictor_data <- function(
+  ds_static,
+  ds_dynamic,
+  preds,
+  region_value,
+  scenario,
+  log_file = NULL
+) {
+  preds <- unique(as.character(preds))
+  if (length(preds) == 0L) {
+    return(data.table::data.table(cell_id = integer()))
+  }
+
+  static_cols <- intersect(preds, names(ds_static$schema))
+  dyn_cols <- intersect(preds, names(ds_dynamic$schema))
+
+  static_df <- if (length(static_cols) > 0L) {
+    ds_static %>%
+      dplyr::select(cell_id, dplyr::all_of(static_cols)) %>%
+      dplyr::filter(region == !!region_value) %>%
+      dplyr::collect() %>%
+      data.table::as.data.table()
+  } else {
+    data.table::data.table(cell_id = integer())
+  }
+
+  dyn_df <- if (length(dyn_cols) > 0L) {
+    ds_dynamic %>%
+      dplyr::select(cell_id, dplyr::all_of(dyn_cols)) %>%
+      dplyr::filter(region == !!region_value, .data$scenario == !!scenario) %>%
+      dplyr::collect() %>%
+      data.table::as.data.table()
+  } else {
+    data.table::data.table(cell_id = integer())
+  }
+
+  if (nrow(static_df) == 0L && nrow(dyn_df) == 0L) {
+    return(data.table::data.table(cell_id = integer()))
+  }
+
+  result <- if (nrow(static_df) > 0L && nrow(dyn_df) > 0L) {
+    merge(static_df, dyn_df, by = "cell_id", all = TRUE)
+  } else if (nrow(static_df) > 0L) {
+    static_df
+  } else {
+    dyn_df
+  }
+
+  data.table::setkeyv(result, "cell_id")
+  log_msg(
+    sprintf(
+      "    Region predictor data preloaded: %d cells, %d static cols (%s), %d dynamic cols (%s)",
+      nrow(result),
+      length(static_cols),
+      paste(static_cols, collapse = ", "),
+      length(dyn_cols),
+      paste(dyn_cols, collapse = ", ")
+    ),
+    log_file
+  )
+  result
+}
+
+
 #' Generate probability maps for all transitions in a region
 #'
 #' Loads fitted tidymodels workflows one at a time, predicts transition
@@ -1860,6 +1938,27 @@ generate_probability_maps <- function(
     log_file
   )
 
+  # Pre-load ALL parquet predictor columns for the region in one Arrow scan.
+  # This replaces per-transition cell_id %in% Arrow filters (which are very
+  # slow for large cell_id vectors) with a single region-partition read
+  # followed by fast in-memory data.table keyed lookups per transition.
+  all_preds_flat <- unique(unlist(model_info$predictor_names, use.names = FALSE))
+  all_parquet_preds <- setdiff(all_preds_flat, grep("_nhood_", all_preds_flat, value = TRUE))
+  t_pred_preload <- prof_tic()
+  region_pred_dt <- preload_region_predictor_data(
+    ds_static = ds_static,
+    ds_dynamic = ds_dynamic,
+    preds = all_parquet_preds,
+    region_value = region_val,
+    scenario = ssp_name,
+    log_file = log_file
+  )
+  prof_toc(
+    t_pred_preload,
+    sprintf("region=%s stage=predictor_preload", region_suffix),
+    log_file
+  )
+
   # Map (from_val, to_val) pairs to their trans_rates.csv row index so we can
   # write TIFs with the row-number prefix that Dinamica's probability-map
   # cube expects.
@@ -1950,22 +2049,17 @@ generate_probability_maps <- function(
     pred_data <- NULL
 
     if (length(parquet_needed) > 0L) {
-      log_msg(
-        sprintf(
-          "        Loading predictor data from Parquet for predictors: %s",
-          paste(parquet_needed, collapse = ", ")
-        ),
-        log_file
-      )
       t_predictor_load <- prof_tic()
-      pred_data <- data.table::as.data.table(load_predictor_data(
-        ds_static = ds_static,
-        ds_dynamic = ds_dynamic,
-        cell_ids = from_data$ref_cell_id,
-        preds = parquet_needed,
-        region_value = region_val,
-        scenario = ssp_name
-      ))
+      avail_cols <- intersect(parquet_needed, setdiff(names(region_pred_dt), "cell_id"))
+      if (length(avail_cols) > 0L && nrow(region_pred_dt) > 0L) {
+        # Fast in-memory keyed lookup: O(n log N) vs. repeated Arrow scans
+        lookup_keys <- from_data$ref_cell_id
+        pred_data <- region_pred_dt[J(lookup_keys), nomatch = NA]
+        keep_cols <- c("cell_id", avail_cols)
+        pred_data <- pred_data[, ..keep_cols]
+        data.table::setnames(pred_data, "cell_id", "ref_cell_id")
+        from_data <- pred_data[from_data, on = "ref_cell_id"]
+      }
       prof_toc(
         t_predictor_load,
         sprintf(
@@ -1976,11 +2070,6 @@ generate_probability_maps <- function(
         ),
         log_file
       )
-      if ("cell_id" %in% names(pred_data)) {
-        data.table::setnames(pred_data, "cell_id", "ref_cell_id")
-      }
-      # Right-join: preserve every from_data row; missing predictors -> NA
-      from_data <- pred_data[from_data, on = "ref_cell_id"]
     }
 
     if (length(nhood_needed) > 0L) {

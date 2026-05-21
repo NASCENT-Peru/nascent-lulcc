@@ -213,7 +213,14 @@ simulation_trans_rates_prep <- function(
     stop(sprintf("File not found: %s", trans_rates_path))
   }
   hist_trans_rates <- read.csv(trans_rates_path) %>%
-    dplyr::rename(iLULC = from_lulc, jLULC = to_lulc)
+    dplyr::rename(iLULC = from_lulc, jLULC = to_lulc) %>%
+    dplyr::mutate(
+      region_name = dplyr::recode(
+        region_name,
+        !!!setNames(regions_schema$label, regions_schema$pretty),
+        .default = region_name
+      )
+    )
   message(sprintf("  ✓ Transition rates: %d rows", nrow(hist_trans_rates)))
 
   # ================================
@@ -272,8 +279,6 @@ simulation_trans_rates_prep <- function(
       region_name,
       iLULC,
       jLULC,
-      `From.`,
-      `To.`,
       minRate,
       maxRate,
       meanRate,
@@ -830,12 +835,14 @@ optimize_region_scenario <- function(
       )
 
       # Create lookup: (from_val, to_val) → id_trans
-      # Use From./To. numeric values directly from viable_transitions_lists.csv
-      # rather than re-deriving via class_to_value[iLULC] — class name formats
-      # in the CSV may not match lulc_schema class_name keys.
+      # Derive numeric values via class_to_value[iLULC] so they have the same
+      # type as lulc_ids (both come from class_to_value, guaranteeing type match).
       id_trans_lookup <- df_trans_source %>%
         dplyr::filter(region_name == r) %>%
-        dplyr::rename(from_val = `From.`, to_val = `To.`) %>%
+        dplyr::mutate(
+          from_val = class_to_value[iLULC],
+          to_val = class_to_value[jLULC]
+        ) %>%
         dplyr::select(from_val, to_val, id_trans) %>%
         dplyr::distinct()
 
