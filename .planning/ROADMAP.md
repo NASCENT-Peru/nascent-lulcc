@@ -17,6 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Model Size Reduction** - Replace tidymodels with mlr3 in transition_modelling.r; save models as .qs via qs::qsave() with ranger save.memory=TRUE; all artefacts <200 MB *(completed 2026-05-07)*
 - [ ] **Phase 3: Parallelism & Memory Architecture** - Switch to fork-based multicore on Linux, share nhood rasters, eliminate OOM
 - [ ] **Phase 3.1: Allocation Correctness & Dinamica Integration** *(INSERTED 2026-05-22)* - Fix model over-loading (filter to active transitions), eliminate phantom NA TIFs (nomatch=NULL), fix Dinamica HPC fallback guard, and verify end-to-end allocation including the Dinamica CA step via dedicated smoke test
+- [ ] **Phase 3.2: Transition Pipeline Consistency** *(INSERTED 2026-05-22)* - Harden the end-to-end flow of viable transitions from identification through feature selection, modelling, rate preparation, and allocation so each stage operates on exactly the same transition set with no silent additions, drops, or mismatches.
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port
 
 ## Phase Details
@@ -135,6 +136,27 @@ Plans:
 Plans:
 - [ ] 03.1-01-PLAN.md - Apply smoke_test_dinamica.sh bind-mount fix (Fix 4b), verify all four src/ fixes, commit, and run Dinamica-only smoke on HPC to confirm posterior.tif ≠ anterior.tif.
 
+### Phase 3.2: Transition Pipeline Consistency *(INSERTED 2026-05-22)*
+**Goal**: Each stage of the LULCC pipeline operates on exactly the same set of viable transitions — `transition_identification.r` deduces theoretical candidates per region from historic maps, `transition_feature_selection.r` confirms statistical viability and writes the definitive viable set, `transition_modelling.r` produces a fitted model for every viable transition, `simulation_trans_rates_prep.r` computes future rates over the viable set with scenario narrative exclusions applied as an explicit logged filter, and `allocation.r` loads only the models whose transitions appear in the active rate table — eliminating information loss and silent mismatches between stages.
+**Depends on**: Phase 3.1
+**Requirements**: PIPE-01, PIPE-02
+**Success Criteria** (what must be TRUE):
+  1. The transitions output by `transition_identification.r` for each region exactly match the candidate set fed into `transition_feature_selection.r` — no silent additions or drops between the two files.
+  2. The viable transitions written by `transition_feature_selection.r` to `viable_transitions_lists.csv` are the complete input set used by `transition_modelling.r` — every viable transition has a fitted model; no silently skipped transitions.
+  3. `simulation_trans_rates_prep.r` computes future rates using only the viable set from `viable_transitions_lists.csv`; scenario narrative exclusions are applied as a documented, explicit filter on top of that set (not a separate hard-coded list) and the excluded transitions are logged.
+  4. `allocation.r` loads exactly the transition models whose transitions appear in the active rate table for the current region × scenario × timestep — model count equals active-rate-table row count for the BAU × costa_peruana × 2022→2026 smoke (no over-loading, no missing models).
+  5. A cross-stage audit (script or documented manual check) confirms transition sets are consistent across all four pipeline stages for at least one reference region × scenario combination.
+**Plans**: 3 plans
+
+Plans:
+
+**Wave 1** *(parallel — no files_modified overlap)*
+- [ ] 03.2-01-PLAN.md — Fix transition_feature_selection.r crash bug (undefined final_summary return); replace hardcoded year_steps/scalars/mining-prohibition in simulation_trans_rates_prep.r with config-driven values; add forbidden_from_classes key to both config YAMLs.
+- [ ] 03.2-02-PLAN.md — Add stage 2→3 structured audit block in perform_transition_modelling(); add stage 4 rate CSV audit log in optimize_region_scenario(); promote stage 5 missing-model warning to stop in generate_probability_maps().
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 03.2-03-PLAN.md — Create scripts/audit_transition_pipeline.r: reads viable_transitions_lists.csv, reconciliation RDS, and rate CSVs; compares id_trans sets across stages 1-4; reports set differences; exits 1 when differences found.
+
 ### Phase 4: End-to-End Correctness & Performance
 **Goal**: All four scenarios run to completion across all regions and timesteps, with `predict` no longer dominating wall time, restarts skipping completed work atomically, and the latent correctness gaps (raster/terra split, missing CVXR loop, drifted intervention paths) closed.
 **Depends on**: Phase 3
@@ -160,4 +182,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 2. Model Size Reduction | 4/4 | Complete | 2026-05-07 |
 | 3. Parallelism & Memory Architecture | 0/TBD | Not started | - |
 | 3.1. Allocation Correctness & Dinamica Integration | 0/TBD | Not started (INSERTED 2026-05-22) | - |
+| 3.2. Transition Pipeline Consistency | 0/3 | Not started (INSERTED 2026-05-22) | - |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
