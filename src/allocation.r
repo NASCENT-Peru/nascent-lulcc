@@ -961,17 +961,50 @@ predict_saved_transition_prob <- function(model_obj, new_data, log_file = NULL) 
     if (!is.null(model_obj$model_type) && model_obj$model_type == "mlr3") {
       log_msg("        Path: mlr3 learner; predict_newdata()", log_file)
       new_data_subset <- subset_saved_transition_data(new_data, predictor_names)
-      pred <- tryCatch(
+      pred_attempt <- tryCatch(
         model_obj$learner$predict_newdata(newdata = new_data_subset),
-        error = function(e) log_and_stop(sprintf(
-          "mlr3 predict_newdata() failed: %s", conditionMessage(e)
-        ))
+        error = function(e) e
       )
-      # pred$prob is a matrix; columns are named by class label ("0", "1")
-      # Always index by name, not position — factor levels may vary (Risk 6, RESEARCH)
-      prob_1 <- pred$prob[, "1"]
+
+      prob_1 <- if (!inherits(pred_attempt, "error")) {
+        # Happy path: mlr3 R6 bindings match installed version
+        # pred$prob is a matrix; columns named by class label ("0","1") — Risk 6
+        log_msg("        Path: mlr3 — prediction complete", log_file)
+        pred_attempt$prob[, "1"]
+      } else {
+        # predict_newdata() clones the stored train_task whose R6 method bindings
+        # may not match the current mlr3 installation (version mismatch). Fall back
+        # to direct prediction on the underlying fitted model, bypassing R6 entirely.
+        log_msg(sprintf(
+          "        mlr3 predict_newdata() failed (%s); falling back to direct model prediction",
+          conditionMessage(pred_attempt)
+        ), log_file)
+        underlying <- model_obj$learner$model
+        lvl_1 <- which(as.character(model_obj$response_levels) == "1")
+        if (!length(lvl_1)) lvl_1 <- 2L  # default: second level = positive class
+
+        p1 <- if (inherits(underlying, "ranger")) {
+          raw <- predict(underlying, data = new_data_subset)
+          # ranger returns probability matrix when probability=TRUE (set by classif.ranger)
+          as.numeric(raw$predictions[, lvl_1])
+        } else if (inherits(underlying, c("glmnet", "cv.glmnet"))) {
+          x_mat <- as.matrix(new_data_subset[, predictor_names, drop = FALSE])
+          s_val <- if (inherits(underlying, "cv.glmnet")) "lambda.min" else
+            tryCatch(model_obj$learner$param_set$values$s, error = function(e) 0.01)
+          # glmnet type="response" returns P(y == second_level) for binomial
+          as.numeric(predict(underlying, newx = x_mat, type = "response", s = s_val))
+        } else {
+          log_and_stop(sprintf(
+            "mlr3 predict_newdata() failed and no direct fallback for model class '%s': %s",
+            paste(class(underlying), collapse = "/"),
+            conditionMessage(pred_attempt)
+          ))
+        }
+        log_msg("        Path: mlr3 direct fallback — prediction complete", log_file)
+        p1
+      }
+
       result <- data.frame(.pred_0 = 1 - prob_1, .pred_1 = prob_1)
-      log_msg("        Path: mlr3 — prediction complete", log_file)
       return(result)
     }
 

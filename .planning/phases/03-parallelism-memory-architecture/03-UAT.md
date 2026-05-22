@@ -76,10 +76,10 @@ All 26 transitions predicted successfully:
 
 ## Open Tests — Current Status
 
-- [ ] **SC2 re-verify**: Re-run `test_prob_maps.r` (or smoke run) with fix applied — confirm TIFs are written and the save loop completes
+- [ ] **SC2 re-verify**: Resubmit HPC smoke run with all three fixes — confirm predictions complete and at least one posterior TIF written
 - [ ] **SC1 confirm**: Backend selection not tested — smoke script forces sequential. Either remove the override or submit a separate run without `ALLOCATION_PARALLEL_STRATEGY=sequential` on Linux HPC.
-- [ ] **HPC investigation**: Check HPC worker log at `/cluster/scratch/bblack/nascent-lulcc/outputs/simulations/BAU/2026/region_costa_peruana/worker_logs/` — did predictions actually run (and log there) while only parent preload appeared in SLURM stdout?
-- [x] **SC3 predictor_preload timing**: `elapsed=28.277s` ✓ (well under 60s, confirmed local)
+- [x] **SC2 local save**: `test_prob_map_save.r` completed in 247.9s, 28 TIFs written ✓ (save loop fix confirmed)
+- [x] **SC3 predictor_preload timing**: HPC `elapsed=33.259s` ✓ (Arrow deadlock fix confirmed)
 - [x] **SC4 nhood TIF paths**: "Reopening neighbourhood rasters from TIF paths" confirmed every transition ✓
 - [x] **SC5 thread pinning**: `OMP_NUM_THREADS=1` confirmed HPC ✓
 
