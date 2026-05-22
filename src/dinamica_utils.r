@@ -105,6 +105,9 @@ detect_dinamica_backend <- function() {
 #' @param model_path Path to the `.ego` (or `.ego-decoded`) model file.
 #' @param backend One of "auto" (resolve from env), "local", or "hpc".
 #' @param disable_parallel Whether to add `-disable-parallel-steps`.
+#' @param disable_native_compilation Whether to add `-disable-expression-compilation`.
+#'   Defaults to TRUE on HPC where the Enhancement Plugin JIT compiler is not
+#'   installed in the container — avoids repeated failed compilation attempts.
 #' @param log_level Optional `-log-level N` flag.
 #' @param runtime_override Optional explicit runtime name. If supplied for
 #'   the HPC backend, skips the live PATH probe (use this for verification
@@ -124,6 +127,7 @@ resolve_dinamica_launch <- function(
   model_path,
   backend = "auto",
   disable_parallel = TRUE,
+  disable_native_compilation = NULL,
   log_level = NULL,
   runtime_override = NULL,
   probe_runtime = TRUE,
@@ -156,10 +160,20 @@ resolve_dinamica_launch <- function(
     )
   }
 
+  # On HPC the Enhancement Plugin JIT compiler is not installed; default TRUE
+  # to skip failed compilation attempts. On local, default FALSE (leave as-is).
+  if (is.null(disable_native_compilation)) {
+    disable_native_compilation <- identical(backend, "hpc") ||
+      (identical(backend, "auto") && identical(detect_dinamica_backend(), "hpc"))
+  }
+
   # Pass-through Dinamica flags + model path.
   console_args <- character()
   if (isTRUE(disable_parallel)) {
     console_args <- c(console_args, "-disable-parallel-steps")
+  }
+  if (isTRUE(disable_native_compilation)) {
+    console_args <- c(console_args, "-disable-expression-compilation")
   }
   if (!is.null(log_level)) {
     console_args <- c(console_args, "-log-level", as.character(log_level))
@@ -256,6 +270,9 @@ resolve_dinamica_launch <- function(
     flags <- character()
     if (isTRUE(disable_parallel)) {
       flags <- c(flags, "-disable-parallel-steps")
+    }
+    if (isTRUE(disable_native_compilation)) {
+      flags <- c(flags, "-disable-expression-compilation")
     }
     if (!is.null(log_level)) {
       flags <- c(flags, "-log-level", as.character(log_level))
@@ -385,6 +402,7 @@ DINAMICA_ERROR_PATTERNS <- c(
 exec_dinamica <- function(
   model_path,
   disable_parallel = TRUE,
+  disable_native_compilation = NULL,
   log_level = NULL,
   write_logfile = TRUE,
   echo = FALSE,
@@ -393,13 +411,14 @@ exec_dinamica <- function(
   work_dir = NULL
 ) {
   launch <- resolve_dinamica_launch(
-    model_path        = model_path,
-    backend           = backend,
-    disable_parallel  = disable_parallel,
-    log_level         = log_level,
-    runtime_override  = runtime_override,
-    probe_runtime     = TRUE,
-    work_dir          = work_dir
+    model_path                = model_path,
+    backend                   = backend,
+    disable_parallel          = disable_parallel,
+    disable_native_compilation = disable_native_compilation,
+    log_level                 = log_level,
+    runtime_override          = runtime_override,
+    probe_runtime             = TRUE,
+    work_dir                  = work_dir
   )
 
   # Pre-flight: verify the actual command exists on PATH before launching.
