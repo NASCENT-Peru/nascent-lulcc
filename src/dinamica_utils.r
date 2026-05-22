@@ -750,6 +750,18 @@ run_allocation_dinamica <- function(work_dir = NULL,
     error = function(e) e
   )
 
+  # Dinamica writes per-process log_N.txt and debug_N.txt into the working
+  # directory. Their content is already captured in the central log file, so
+  # remove them to keep the scratch work_dir clean.
+  scratch_logs <- list.files(
+    work_dir,
+    pattern = "^(log|debug)_[0-9]+\\.txt$",
+    full.names = TRUE
+  )
+  if (length(scratch_logs) > 0) {
+    file.remove(scratch_logs)
+  }
+
   if (inherits(res, "error")) {
     emit("FAIL", reason = "exec_dinamica-error",
          message = shQuote(conditionMessage(res)))
