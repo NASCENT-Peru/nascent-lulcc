@@ -16,6 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 1.1: Fix Dinamica Launch Contract** *(INSERTED 2026-05-15; 4/4 mainline plans landed 2026-05-17; gap-closure plans 01.1-05 + 01.1-06 added 2026-05-17 to close Open Issue 1 — DinamicaConsole std::exception under rebuilt .sif blocking INFRA-01 SC2 + MEM-06 SC5)* - Repaired the seven structural defects in the Dinamica-on-HPC launch path. Launch-contract mechanics (D-101–D-108, D-112, D-114) all landed and the cross-language drift safety net is in place. Live `--live` smoke does not yet exit 0 against the rebuilt `.sif` — DinamicaConsole crashes with `std::exception` regardless of `.ego` content; the 2026-05-17 ldd diagnostic FALSIFIED the library-compat hypothesis. Gap-closure Plan 01.1-05 captures diagnostic evidence on Euler; Plan 01.1-06 applies the resulting targeted fix to the `.def` and re-verifies the live smoke exits 0.
 - [x] **Phase 2: Model Size Reduction** - Replace tidymodels with mlr3 in transition_modelling.r; save models as .qs via qs::qsave() with ranger save.memory=TRUE; all artefacts <200 MB *(completed 2026-05-07)*
 - [ ] **Phase 3: Parallelism & Memory Architecture** - Switch to fork-based multicore on Linux, share nhood rasters, eliminate OOM
+- [ ] **Phase 3.1: Allocation Correctness & Dinamica Integration** *(INSERTED 2026-05-22)* - Fix model over-loading (filter to active transitions), eliminate phantom NA TIFs (nomatch=NULL), fix Dinamica HPC fallback guard, and verify end-to-end allocation including the Dinamica CA step via dedicated smoke test
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port
 
 ## Phase Details
@@ -120,6 +121,17 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 03-03-PLAN.md - Add the reproducible HPC smoke-run wrapper and automated verifier proving no OOM, bounded worker RSS, and readable output.
 
+### Phase 3.1: Allocation Correctness & Dinamica Integration *(INSERTED 2026-05-22)*
+**Goal**: The first end-to-end allocation that includes Dinamica running under apptainer produces a real posterior.tif (not an anterior copy), model loading is bounded to only the transitions active in the current scenario/year, and the probability map save writes exactly the TIFs that were predicted (no phantom NA-prob placeholders).
+**Depends on**: Phase 3 (smoke run infrastructure and probability map generation confirmed working)
+**Requirements**: MEM-01 (model memory), INFRA-01 (Dinamica HPC launch)
+**Success Criteria** (what must be TRUE):
+  1. `load_allocation_models` log line shows N models loaded where N equals the number of active transitions from trans_rates_df — not the total number of .qs files on disk. For the BAU × costa_peruana × 2022→2026 smoke, this means ≤26 models (not 38).
+  2. Probability map save writes exactly the TIFs that had a valid prediction — no 1-cell NA-prob placeholder TIFs for transitions missing a model. `find probability_map_dir/ -name '*.tif' | wc -l` equals the number of active transitions that have both a non-zero rate and a fitted model.
+  3. `submit_allocation_dinamica_only.sh` completes: `posterior.tif` exists in the region work_dir, is a valid GeoTIFF, and contains values different from `anterior.tif` (i.e., Dinamica actually ran, not the fallback copy).
+  4. The `DINAMICA_START model=<fallback-copy>` breadcrumb does NOT appear in any HPC allocation log. On HPC the breadcrumb is `DINAMICA_START model=<path/to/allocation.ego>`.
+**Plans**: TBD
+
 ### Phase 4: End-to-End Correctness & Performance
 **Goal**: All four scenarios run to completion across all regions and timesteps, with `predict` no longer dominating wall time, restarts skipping completed work atomically, and the latent correctness gaps (raster/terra split, missing CVXR loop, drifted intervention paths) closed.
 **Depends on**: Phase 3
@@ -144,4 +156,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1.1. Fix Dinamica Launch Contract | 4/6 | Mainline contract complete; gap-closure 01.1-05 + 01.1-06 pending (closes INFRA-01 SC2 / MEM-06 SC5 on Open Issue 1) | partial — mainline 2026-05-17 |
 | 2. Model Size Reduction | 4/4 | Complete | 2026-05-07 |
 | 3. Parallelism & Memory Architecture | 0/TBD | Not started | - |
+| 3.1. Allocation Correctness & Dinamica Integration | 0/TBD | Not started (INSERTED 2026-05-22) | - |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |

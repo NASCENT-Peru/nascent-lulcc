@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01.1-07-PLAN.md — Phase 1.1 fully closed; Open Issue 1 RESOLVED via LD_PRELOAD fix (H8); live --live smoke exits 0; INFRA-01 + MEM-06 Complete
-last_updated: "2026-05-19T00:00:00Z"
-last_activity: 2026-05-19 -- Phase 01.1 fully closed; Plans 05-07 executed; INFRA-01 + MEM-06 Complete; next phase to determine
+stopped_at: Phase 3.1 inserted (2026-05-22) — allocation correctness fixes applied; Dinamica-only smoke test scripts written; ready to submit
+last_updated: "2026-05-22T00:00:00Z"
+last_activity: 2026-05-22 -- Phase 3 smoke run (Job 364249) confirmed R pipeline; Dinamica fallback bug found; Phase 3.1 inserted to close Dinamica + model-loading gaps
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 4
   total_plans: 18
   completed_plans: 15
-  percent: 83
+  percent: 75
 ---
 
 # Project State
@@ -25,10 +25,14 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 01.1 (fix-dinamica-launch-contract) — **FULLY COMPLETE** (2026-05-19)
-Plan: 7 of 7 (all seven plans executed including gap-closure Plans 05-07)
-Status: Open Issue 1 RESOLVED — LD_PRELOAD fix (H8) baked into container; live `--live` smoke exits 0; INFRA-01 + MEM-06 Complete; no open issues
-Last activity: 2026-05-19 -- Phase 01.1 fully closed; all seven SCs confirmed; next phase TBD
+Phase: 3.1 (allocation-correctness-and-dinamica)
+Plan: 0 of TBD — not yet planned
+Status: Code fixes applied (Dinamica fallback guard, nomatch=NULL, model filter); Dinamica-only smoke scripts written; pending HPC submission
+Last activity: 2026-05-22 -- Phase 3.1 inserted; three targeted fixes applied to src/; submit_allocation_dinamica_only.sh written for Euler
+
+### Roadmap Evolution
+
+- Phase 3.1 inserted after Phase 3 (2026-05-22, URGENT): Job 364249 confirmed R pipeline; Dinamica never ran (fallback guard fired on HPC); model preload wasteful (38 vs 26 active); phantom TIFs from nomatch=NA; fixes applied, Dinamica-only smoke test ready
 
 Progress: [████████░░] 80%
 

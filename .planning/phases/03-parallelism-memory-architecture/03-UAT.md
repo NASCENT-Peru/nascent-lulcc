@@ -10,7 +10,7 @@ A full allocation run on HPC completes for at least one scenario × region × ti
 | # | Criterion | Status | Evidence |
 |---|-----------|--------|----------|
 | SC1 | `future::multicore` selected automatically on Linux HPC; `future::multisession` on Windows | PENDING | Smoke script forces `ALLOCATION_PARALLEL_STRATEGY=sequential` — auto-selection not yet tested |
-| SC2 | At least one scenario × region × timestep runs to completion without OOM | PENDING | Three HPC runs attempted — blocked by sequential bugs (fixed). OOM on 4th run — memory increased to 128GB |
+| SC2 | At least one scenario × region × timestep runs to completion without OOM | PARTIAL | Job 364249: R pipeline complete (28 prob TIFs, no OOM, peak RSS ~97GB). Dinamica step bypassed — `run_allocation_dinamica()` short-circuits on `Sys.which("DinamicaConsole") == ""` before reaching the apptainer path. Posterior = anterior copy. |
 | SC3 | RSS profiling shows per-worker memory bounded; `models_list` loaded once in parent | CONFIRMED ✓ | Full PROFILE RSS lines in both local and HPC runs. `predictor_preload elapsed=33.259s` on HPC |
 | SC4 | Nhood rasters as TIF files; workers receive paths; strict-globals passes | CONFIRMED ✓ | "Reopening neighbourhood rasters from TIF paths for predictors" logged before every transition |
 | SC5 | BLAS/data.table/arrow/GDAL threads pinned to 1 before `future::plan()` | CONFIRMED ✓ | HPC log: `pin_native_threads_to_one OMP_NUM_THREADS=1 data.table_threads=1` |
@@ -56,8 +56,8 @@ Note: fixing the mlr3 version mismatch (Fix 3) would NOT resolve this — the me
 
 ## Open Tests
 
-- [ ] **SC2**: Resubmit smoke run with 128GB RAM — confirm predictions complete and at least one posterior TIF written
-- [ ] **SC1**: Backend auto-selection not tested — smoke script forces sequential. Either remove `ALLOCATION_PARALLEL_STRATEGY=sequential` override or submit a separate run on Linux HPC without it.
+- [ ] **SC2 — Fix 5**: `run_allocation_dinamica()` checks `Sys.which("DinamicaConsole") == ""` and falls back before reaching `exec_dinamica()` / apptainer. On HPC, `DinamicaConsole` is never on PATH. Fix: guard the fallback behind `backend == "local"` only, or remove it and let `exec_dinamica()` handle both backends. Also verify `DINAMICA_EGO_8_HOME` (.sif path) is exported in the smoke script.
+- [ ] **SC1**: Backend auto-selection not tested — smoke script still forces `ALLOCATION_PARALLEL_STRATEGY=sequential`. Either remove the override or submit a separate HPC run without it to validate `future::multicore` selection on Linux. **Non-blocking for phase goal.**
 
 ---
 
@@ -81,5 +81,8 @@ Predictor preload: 33s ✓. mlr3 version mismatch on first prediction → Fix 3 
 ### Session 6 — 2026-05-22 Local `test_prob_map_save.r`
 Synthetic normalized table (106M rows, same shape as real). Save loop: 247.9s, 28 TIFs ✓ (Fix 2 confirmed).
 
-### Session 7 — PENDING
-Resubmit with 128GB (`--mem-per-cpu=32G`). Expected: predictions complete, posterior TIF written.
+### Session 7 — 2026-05-22 HPC run #5 (Job 364249, 128GB)
+Resubmitted with `--mem-per-cpu=32G` (128GB total). All 26 transitions predicted via mlr3 direct fallback. 28 probability TIFs written. Peak RSS ~97GB, within budget. SENTINEL reason=ok. Total runtime 3.61h. Status: **success for R pipeline**. However: `run_allocation_dinamica()` short-circuits on `Sys.which("DinamicaConsole") == ""` — fires on HPC because DinamicaConsole is never on PATH (apptainer is the HPC runtime). Posterior = anterior copy. Dinamica CA model did not execute.
+
+### Session 8 — PENDING
+Fix `run_allocation_dinamica()` fallback guard + verify `DINAMICA_EGO_8_HOME` in smoke script, then resubmit to confirm Dinamica runs via apptainer.

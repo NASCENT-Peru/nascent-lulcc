@@ -542,11 +542,19 @@ load_transition_model_file <- function(file_path) {
   }
 }
 
-load_allocation_models <- function(region_labels, calibration_period, config) {
+load_allocation_models <- function(region_labels, calibration_period, config,
+                                   active_transitions = NULL) {
   class_name_to_value <- load_allocation_class_map(config)
   model_dir <- file.path(config[["transition_model_dir"]], calibration_period)
   models_by_region <- vector("list", length(region_labels))
   names(models_by_region) <- gsub(" ", "_", tolower(region_labels))
+
+  # Pre-build active key set once for all regions (from_val_to_val strings)
+  active_key <- if (!is.null(active_transitions)) {
+    paste(active_transitions[["from_val"]], active_transitions[["to_val"]], sep = "_")
+  } else {
+    NULL
+  }
 
   for (region_label in region_labels) {
     region_suffix <- gsub(" ", "_", tolower(region_label))
@@ -584,6 +592,20 @@ load_allocation_models <- function(region_labels, calibration_period, config) {
         to_val = as.integer(class_name_to_value[posterior_class])
       )
     ]
+
+    # Filter to active transitions before deserializing — avoids loading
+    # models for transitions that have zero rate or don't exist in this scenario.
+    if (!is.null(active_key)) {
+      model_key <- paste(model_info[["from_val"]], model_info[["to_val"]], sep = "_")
+      model_info <- model_info[model_key %in% active_key]
+      if (nrow(model_info) == 0L) {
+        stop(sprintf(
+          "No model files matched active transitions for region '%s'",
+          region_suffix
+        ))
+      }
+    }
+
     model_info[, model_obj := lapply(file_path, load_transition_model_file)]
     model_info[, predictor_names := lapply(model_obj, get_saved_transition_predictors)]
     models_by_region[[region_suffix]] <- model_info
@@ -656,16 +678,41 @@ prepare_region_nhood_paths <- function(anterior_path, region_models, scenario,
   out_paths
 }
 
-prepare_region_worker_inputs <- function(scenario, year_post, current_lulc_path,
+prepare_region_worker_inputs <- function(scenario, year_ant, year_post,
+                                         current_lulc_path,
                                          regions, region_rast_path,
                                          calibration_period, timestep_dir,
                                          config) {
   class_name_to_value <- load_allocation_class_map(config)
+
+  # Read trans_rates CSVs to build the set of transitions that are actually
+  # active for this scenario/year. Models outside this set are never used and
+  # loading them wastes ~10GB of RAM for a 6-class region.
+  scalar_str <- sprintf("%.1f", config[["selected_scalar"]])
+  active_rows <- lapply(regions$label, function(region_label) {
+    csv_path <- file.path(
+      config[["trans_rate_table_dir"]],
+      paste0("simulation-lulc-areas-scalar-", scalar_str, "x"),
+      scenario,
+      region_label,
+      paste0(scenario, "-", region_label, "-trans_rates-", year_ant, ".csv")
+    )
+    if (!file.exists(csv_path)) return(NULL)
+    df <- utils::read.csv(csv_path, check.names = FALSE)
+    data.table::data.table(
+      from_val = as.integer(df[["From*"]]),
+      to_val   = as.integer(df[["To*"]])
+    )
+  })
+  active_transitions <- unique(data.table::rbindlist(active_rows))
+  if (nrow(active_transitions) == 0L) active_transitions <- NULL
+
   t_preload_models <- prof_tic()
   models_list <- load_allocation_models(
     region_labels = regions$label,
     calibration_period = calibration_period,
-    config = config
+    config = config,
+    active_transitions = active_transitions
   )
   prof_toc(
     t_preload_models,
@@ -1358,6 +1405,7 @@ run_allocation_one_timestep <- function(
   ensure_dir(timestep_dir)
   region_inputs <- prepare_region_worker_inputs(
     scenario = scenario,
+    year_ant = year_ant,
     year_post = year_post,
     current_lulc_path = current_lulc_path,
     regions = regions,
@@ -2222,7 +2270,7 @@ generate_probability_maps <- function(
       next
     }
 
-    dt_j <- normalized[.(k)]
+    dt_j <- normalized[.(k), nomatch = NULL]
     if (nrow(dt_j) == 0L) {
       next
     }

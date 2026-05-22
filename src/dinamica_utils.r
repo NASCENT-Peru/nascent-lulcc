@@ -637,8 +637,11 @@ run_allocation_dinamica <- function(work_dir = NULL,
     project_root <- find_project_root()
   }
 
-  # Fallback if DinamicaConsole not available (for testing)
-  if (Sys.which("DinamicaConsole") == "") {
+  # Fallback if DinamicaConsole not available — local backend only.
+  # On HPC the runtime is apptainer (resolved inside exec_dinamica), so
+  # DinamicaConsole is never on PATH and the check must not fire there.
+  if (identical(detect_dinamica_backend(), "local") &&
+        Sys.which("DinamicaConsole") == "") {
     warning(
       "DinamicaConsole not found on PATH; ",
       "Copying anterior.tif to posterior.tif as fallback so we can test."
