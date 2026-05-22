@@ -130,7 +130,10 @@ Plans:
   2. Probability map save writes exactly the TIFs that had a valid prediction — no 1-cell NA-prob placeholder TIFs for transitions missing a model. `find probability_map_dir/ -name '*.tif' | wc -l` equals the number of active transitions that have both a non-zero rate and a fitted model.
   3. `submit_allocation_dinamica_only.sh` completes: `posterior.tif` exists in the region work_dir, is a valid GeoTIFF, and contains values different from `anterior.tif` (i.e., Dinamica actually ran, not the fallback copy).
   4. The `DINAMICA_START model=<fallback-copy>` breadcrumb does NOT appear in any HPC allocation log. On HPC the breadcrumb is `DINAMICA_START model=<path/to/allocation.ego>`.
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 03.1-01-PLAN.md - Apply smoke_test_dinamica.sh bind-mount fix (Fix 4b), verify all four src/ fixes, commit, and run Dinamica-only smoke on HPC to confirm posterior.tif ≠ anterior.tif.
 
 ### Phase 4: End-to-End Correctness & Performance
 **Goal**: All four scenarios run to completion across all regions and timesteps, with `predict` no longer dominating wall time, restarts skipping completed work atomically, and the latent correctness gaps (raster/terra split, missing CVXR loop, drifted intervention paths) closed.

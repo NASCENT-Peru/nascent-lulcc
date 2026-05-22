@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 3.1 inserted (2026-05-22) — allocation correctness fixes applied; Dinamica-only smoke test scripts written; ready to submit
+stopped_at: Phase 3.1 planned (2026-05-22) — 03.1-01-PLAN.md written; Task 1 (Fix 4b + commit) ready to execute; waiting for operator HPC submission
 last_updated: "2026-05-22T00:00:00Z"
-last_activity: 2026-05-22 -- Phase 3 smoke run (Job 364249) confirmed R pipeline; Dinamica fallback bug found; Phase 3.1 inserted to close Dinamica + model-loading gaps
+last_activity: 2026-05-22 -- Phase 3.1 plan written; four correctness fixes documented (Fixes 1–4 in src/ already applied; Fix 4b in smoke_test_dinamica.sh pending Task 1)
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 18
+  total_plans: 19
   completed_plans: 15
   percent: 75
 ---
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** allocation.r completes reliably for all scenarios × regions × timesteps, producing simulated LULC maps without crashing.
-**Current focus:** Phase 01.1 — fix-dinamica-launch-contract
+**Current focus:** Phase 3.1 — allocation-correctness-and-dinamica
 
 ## Current Position
 
 Phase: 3.1 (allocation-correctness-and-dinamica)
-Plan: 0 of TBD — not yet planned
-Status: Code fixes applied (Dinamica fallback guard, nomatch=NULL, model filter); Dinamica-only smoke scripts written; pending HPC submission
-Last activity: 2026-05-22 -- Phase 3.1 inserted; three targeted fixes applied to src/; submit_allocation_dinamica_only.sh written for Euler
+Plan: 1 of 1 — 03.1-01-PLAN.md written; Task 1 ready to execute
+Status: Four correctness fixes identified; Fixes 1–4 already applied to src/; Fix 4b (smoke_test_dinamica.sh bind-mount) is Task 1; Task 2 = HPC Dinamica-only smoke
+Last activity: 2026-05-22 -- 03.1-01-PLAN.md written; apptainer Read-only FS error root cause confirmed (HPC_SCRATCH_ROOT not bound); all four fixes documented
 
 ### Roadmap Evolution
 

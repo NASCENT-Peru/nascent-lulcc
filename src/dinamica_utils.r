@@ -269,7 +269,7 @@ resolve_dinamica_launch <- function(
     container_args <- c(
       "exec",
       "--home", staged_home,
-      "--bind", paste0(staged_tmp, ":", staged_tmp),
+      "--bind", paste0(hpc_scratch_root, ":", hpc_scratch_root),
       "--env", paste0("DINAMICA_EGO_8_TEMP_DIR=", staged_tmp),
       artifact_path,
       "bash", "-c", bash_payload
