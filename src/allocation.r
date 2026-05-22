@@ -984,7 +984,7 @@ predict_saved_transition_prob <- function(model_obj, new_data, log_file = NULL) 
         if (!length(lvl_1)) lvl_1 <- 2L  # default: second level = positive class
 
         p1 <- if (inherits(underlying, "ranger")) {
-          raw <- predict(underlying, data = new_data_subset)
+          raw <- predict(underlying, data = new_data_subset, num.threads = 1L)
           # ranger returns probability matrix when probability=TRUE (set by classif.ranger)
           as.numeric(raw$predictions[, lvl_1])
         } else if (inherits(underlying, c("glmnet", "cv.glmnet"))) {
