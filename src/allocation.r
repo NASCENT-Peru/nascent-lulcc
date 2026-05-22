@@ -1715,7 +1715,9 @@ setup_allocation_inputs <- function(
   }
 
   # Expansion table: From*, To*, Perc_expander
+  # Dinamica's PercentMatrix type expects fractions [0,1], not percentages [0,100].
   expansion_tbl <- alloc_params[, c("From*", "To*", "Perc_expander")]
+  expansion_tbl[["Perc_expander"]] <- expansion_tbl[["Perc_expander"]] / 100
   write.csv(
     expansion_tbl,
     file.path(work_dir, "expansion_table.csv"),
