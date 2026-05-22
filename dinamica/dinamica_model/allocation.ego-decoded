@@ -10,19 +10,21 @@ Script {{
         outputString("posteriorMapPath", file.path(getwd(), "posterior.tif"))
 
         # the 2 is for two key columns, which i don't know how to set when using LoadTable
+        # check.names=FALSE preserves From* / To* column names (R default mangles * to .)
         outputTable(
             "expansionTable",
-            read.csv(file.path(getwd(), "expansion_table.csv")),
+            read.csv(file.path(getwd(), "expansion_table.csv"), check.names = FALSE),
             2
         )
         outputTable(
             "patcherTable",
-            read.csv(file.path(getwd(), "patcher_table.csv")),
+            read.csv(file.path(getwd(), "patcher_table.csv"), check.names = FALSE),
             2
         )
+        trans_rates_raw <- read.csv(file.path(getwd(), "trans_rates.csv"), check.names = FALSE)
         outputTable(
             "transitionRatesTable",
-            read.csv(file.path(getwd(), "trans_rates.csv")),
+            trans_rates_raw[, c("From*", "To*", "Rate")],
             2
         )
     " .no {{ }};
