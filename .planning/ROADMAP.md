@@ -150,12 +150,14 @@ Plans:
 
 Plans:
 
-**Wave 1** *(parallel — no files_modified overlap)*
-- [ ] 03.2-01-PLAN.md — Fix transition_feature_selection.r crash bug (undefined final_summary return); replace hardcoded year_steps/scalars/mining-prohibition in simulation_trans_rates_prep.r with config-driven values; add forbidden_from_classes key to both config YAMLs.
-- [ ] 03.2-02-PLAN.md — Add stage 2→3 structured audit block in perform_transition_modelling(); add stage 4 rate CSV audit log in optimize_region_scenario(); promote stage 5 missing-model warning to stop in generate_probability_maps().
+**Wave 1**
+- [ ] 03.2-01-PLAN.md — Fix `final_summary` crash bug in `transition_feature_selection.r`; move hardcoded `year_steps`, `scalars`, and mining prohibition to config; verify PIPE-01/PIPE-02 no-regression.
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 03.2-03-PLAN.md — Create scripts/audit_transition_pipeline.r: reads viable_transitions_lists.csv, reconciliation RDS, and rate CSVs; compares id_trans sets across stages 1-4; reports set differences; exits 1 when differences found.
+- [ ] 03.2-02-PLAN.md — Add structured AUDIT log lines at stage 2→3 boundary (`transition_modelling.r`), stage 4 (`simulation_trans_rates_prep.r`), and promote stage 5 warning to stop() (`allocation.r`).
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 03.2-03-PLAN.md — Create `scripts/audit_transition_pipeline.r` cross-stage consistency checker covering all four pipeline stages (id_trans set-difference via Stages 1, 2, 3, 4 artifacts).
 
 ### Phase 4: End-to-End Correctness & Performance
 **Goal**: All four scenarios run to completion across all regions and timesteps, with `predict` no longer dominating wall time, restarts skipping completed work atomically, and the latent correctness gaps (raster/terra split, missing CVXR loop, drifted intervention paths) closed.

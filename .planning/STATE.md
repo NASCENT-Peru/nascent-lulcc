@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 3.1 planned (2026-05-22) — 03.1-01-PLAN.md written; Task 1 (Fix 4b + commit) ready to execute; waiting for operator HPC submission
+stopped_at: Phase 3.2 planned (2026-05-22) — 3 plans in 3 waves ready to execute; Phase 3.1 still awaiting operator HPC submission
 last_updated: "2026-05-22T00:00:00Z"
-last_activity: 2026-05-22 -- Phase 3.1 plan written; four correctness fixes documented (Fixes 1–4 in src/ already applied; Fix 4b in smoke_test_dinamica.sh pending Task 1)
+last_activity: 2026-05-22 -- Phase 3.2 planned; 3 plans created covering transition pipeline consistency (bug fixes, AUDIT log lines, cross-stage audit script)
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 4
-  total_plans: 19
+  total_plans: 22
   completed_plans: 15
   percent: 75
 ---
@@ -25,14 +25,15 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 3.1 (allocation-correctness-and-dinamica)
-Plan: 1 of 1 — 03.1-01-PLAN.md written; Task 1 ready to execute
-Status: Four correctness fixes identified; Fixes 1–4 already applied to src/; Fix 4b (smoke_test_dinamica.sh bind-mount) is Task 1; Task 2 = HPC Dinamica-only smoke
-Last activity: 2026-05-22 -- 03.1-01-PLAN.md written; apptainer Read-only FS error root cause confirmed (HPC_SCRATCH_ROOT not bound); all four fixes documented
+Phase: 3.1 (allocation-correctness-and-dinamica) → 3.2 (transition-pipeline-consistency)
+Plan: Phase 3.1: 1 of 1 — awaiting HPC operator execution; Phase 3.2: 3 plans written and verified, ready to execute
+Status: Phase 3.1 plan complete, Task 1 (Fix 4b) ready for HPC submission; Phase 3.2 planned — 3 plans in 3 waves, verification passed
+Last activity: 2026-05-22 -- Phase 3.2 planned (3 plans: bug fix + AUDIT logs + audit script); verification passed after 2 revision iterations
 
 ### Roadmap Evolution
 
 - Phase 3.1 inserted after Phase 3 (2026-05-22, URGENT): Job 364249 confirmed R pipeline; Dinamica never ran (fallback guard fired on HPC); model preload wasteful (38 vs 26 active); phantom TIFs from nomatch=NA; fixes applied, Dinamica-only smoke test ready
+- Phase 3.2 inserted after Phase 3.1 (2026-05-22, URGENT): Viable transition set found to drift silently across pipeline stages (identification → feature selection → modelling → rate prep → allocation); phase hardens end-to-end consistency so each stage operates on exactly the same transition set
 
 Progress: [████████░░] 80%
 
