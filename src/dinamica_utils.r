@@ -160,11 +160,11 @@ resolve_dinamica_launch <- function(
     )
   }
 
-  # On HPC the Enhancement Plugin JIT compiler is not installed; default TRUE
-  # to skip failed compilation attempts. On local, default FALSE (leave as-is).
+  # Default FALSE — the correct Dinamica CLI flag name for disabling the
+  # Enhancement Plugin JIT compiler is not yet confirmed. Set explicitly to
+  # TRUE (and pass the verified flag name) once the flag is known.
   if (is.null(disable_native_compilation)) {
-    disable_native_compilation <- identical(backend, "hpc") ||
-      (identical(backend, "auto") && identical(detect_dinamica_backend(), "hpc"))
+    disable_native_compilation <- FALSE
   }
 
   # Pass-through Dinamica flags + model path.
