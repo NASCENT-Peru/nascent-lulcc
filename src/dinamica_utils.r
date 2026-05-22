@@ -105,9 +105,13 @@ detect_dinamica_backend <- function() {
 #' @param model_path Path to the `.ego` (or `.ego-decoded`) model file.
 #' @param backend One of "auto" (resolve from env), "local", or "hpc".
 #' @param disable_parallel Whether to add `-disable-parallel-steps`.
-#' @param disable_native_compilation Whether to add `-disable-expression-compilation`.
-#'   Defaults to TRUE on HPC where the Enhancement Plugin JIT compiler is not
-#'   installed in the container — avoids repeated failed compilation attempts.
+#' @param disable_native_compilation Whether to add `-disable-native-expressions`.
+#'   Defaults to TRUE on HPC — the Enhancement Plugin JIT compiler is not
+#'   installed in the container, so every step emits a warning without this flag.
+#' @param n_processors Integer or NULL. Passes `-processors=N` to Dinamica to
+#'   override the auto-detected core count. On HPC, defaults to the value of the
+#'   `SLURM_CPUS_PER_TASK` env var so Dinamica's thread pool matches the SLURM
+#'   allocation. Pass 0 to let Dinamica use all detected cores.
 #' @param log_level Optional `-log-level N` flag.
 #' @param runtime_override Optional explicit runtime name. If supplied for
 #'   the HPC backend, skips the live PATH probe (use this for verification
@@ -128,6 +132,7 @@ resolve_dinamica_launch <- function(
   backend = "auto",
   disable_parallel = TRUE,
   disable_native_compilation = NULL,
+  n_processors = NULL,
   log_level = NULL,
   runtime_override = NULL,
   probe_runtime = TRUE,
@@ -160,11 +165,22 @@ resolve_dinamica_launch <- function(
     )
   }
 
-  # Default FALSE — the correct Dinamica CLI flag name for disabling the
-  # Enhancement Plugin JIT compiler is not yet confirmed. Set explicitly to
-  # TRUE (and pass the verified flag name) once the flag is known.
+  # On HPC the Enhancement Plugin JIT compiler is not installed in the container;
+  # default TRUE to suppress the per-step warning with the correct flag.
   if (is.null(disable_native_compilation)) {
-    disable_native_compilation <- FALSE
+    disable_native_compilation <- identical(backend, "hpc") ||
+      (identical(backend, "auto") && identical(detect_dinamica_backend(), "hpc"))
+  }
+
+  # On HPC default to SLURM_CPUS_PER_TASK so Dinamica's thread pool matches
+  # the SLURM allocation (avoids oversubscription when cpuset is not enforced).
+  if (is.null(n_processors)) {
+    slurm_cpus <- suppressWarnings(
+      as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", unset = ""))
+    )
+    if (!is.na(slurm_cpus) && slurm_cpus > 0L) {
+      n_processors <- slurm_cpus
+    }
   }
 
   # Pass-through Dinamica flags + model path.
@@ -173,7 +189,10 @@ resolve_dinamica_launch <- function(
     console_args <- c(console_args, "-disable-parallel-steps")
   }
   if (isTRUE(disable_native_compilation)) {
-    console_args <- c(console_args, "-disable-expression-compilation")
+    console_args <- c(console_args, "-disable-native-expressions")
+  }
+  if (!is.null(n_processors)) {
+    console_args <- c(console_args, paste0("-processors=", as.integer(n_processors)))
   }
   if (!is.null(log_level)) {
     console_args <- c(console_args, "-log-level", as.character(log_level))
@@ -272,7 +291,10 @@ resolve_dinamica_launch <- function(
       flags <- c(flags, "-disable-parallel-steps")
     }
     if (isTRUE(disable_native_compilation)) {
-      flags <- c(flags, "-disable-expression-compilation")
+      flags <- c(flags, "-disable-native-expressions")
+    }
+    if (!is.null(n_processors)) {
+      flags <- c(flags, paste0("-processors=", as.integer(n_processors)))
     }
     if (!is.null(log_level)) {
       flags <- c(flags, "-log-level", as.character(log_level))
@@ -403,6 +425,7 @@ exec_dinamica <- function(
   model_path,
   disable_parallel = TRUE,
   disable_native_compilation = NULL,
+  n_processors = NULL,
   log_level = NULL,
   write_logfile = TRUE,
   echo = FALSE,
@@ -411,14 +434,15 @@ exec_dinamica <- function(
   work_dir = NULL
 ) {
   launch <- resolve_dinamica_launch(
-    model_path                = model_path,
-    backend                   = backend,
-    disable_parallel          = disable_parallel,
+    model_path                 = model_path,
+    backend                    = backend,
+    disable_parallel           = disable_parallel,
     disable_native_compilation = disable_native_compilation,
-    log_level                 = log_level,
-    runtime_override          = runtime_override,
-    probe_runtime             = TRUE,
-    work_dir                  = work_dir
+    n_processors               = n_processors,
+    log_level                  = log_level,
+    runtime_override           = runtime_override,
+    probe_runtime              = TRUE,
+    work_dir                   = work_dir
   )
 
   # Pre-flight: verify the actual command exists on PATH before launching.
