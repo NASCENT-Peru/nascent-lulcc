@@ -852,8 +852,10 @@ optimize_region_scenario <- function(
       for (t in seq_len(T_steps_val)) {
         x_val <- res$getValue(x_vars[[t]])
         area_t <- area_mat[, t]
-        # rate[i,j] = flow[i,j] / area[i]
-        rate_mat <- x_val / pmax(area_t, 1e-12)
+        # rate[i,j] = flow[i,j] / area[i] — both must be in the same units.
+        # x_val is in optimizer fraction space; area_mat is scaled by scale_fac,
+        # so divide area_t back to fractions before the ratio.
+        rate_mat <- x_val / pmax(area_t / scale_fac, 1e-12)
 
         from_ids <- rep(lulc_ids, each = L)
         to_ids <- rep(lulc_ids, times = L)
