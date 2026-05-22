@@ -708,8 +708,8 @@ run_allocation_dinamica <- function(work_dir = NULL,
     stop("allocation.ego-decoded not found at: ", decoded_file)
   }
 
-  # Copy .ego-decoded to work_dir
-  file.copy(decoded_file, file.path(work_dir, "allocation.ego-decoded"))
+  # Copy .ego-decoded to work_dir (overwrite=TRUE so updated repo files always win)
+  file.copy(decoded_file, file.path(work_dir, "allocation.ego-decoded"), overwrite = TRUE)
 
   # Copy submodels directory
   submodels_dst <- file.path(work_dir, "allocation_ego_Submodels")
@@ -717,7 +717,7 @@ run_allocation_dinamica <- function(work_dir = NULL,
     dir.create(submodels_dst, recursive = TRUE)
   }
   submodel_files <- list.files(submodels_src, full.names = TRUE)
-  file.copy(submodel_files, submodels_dst)
+  file.copy(submodel_files, submodels_dst, overwrite = TRUE)
 
   # Encode .ego-decoded -> .ego
   ego_decoded <- file.path(work_dir, "allocation.ego-decoded")
