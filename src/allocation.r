@@ -209,7 +209,9 @@ pin_native_threads_to_one <- function(verbose = FALSE) {
   }
   if (requireNamespace("arrow", quietly = TRUE)) {
     try(arrow::set_cpu_count(1L), silent = !verbose)
-    try(arrow::set_io_thread_count(1L), silent = !verbose)
+    # IO threads are blocked on disk/network, not CPU — pinning them to 1
+    # alongside cpu_count=1 deadlocks Arrow's executor on shared filesystems
+    # (Lustre) where IO latency is high enough to trigger backpressure.
   }
   invisible(NULL)
 }
@@ -2166,6 +2168,7 @@ generate_probability_maps <- function(
   normalized[, tot_prob := sum(prob), by = cell_id]
   normalized[tot_prob > 1, prob := prob / tot_prob]
   normalized[, tot_prob := NULL]
+  data.table::setkey(normalized, row_idx)
 
   #todo integrate more recent approach to spatial intervention from NCCS project
   # (placeholder retained from previous implementation)
@@ -2186,7 +2189,7 @@ generate_probability_maps <- function(
       next
     }
 
-    dt_j <- normalized[row_idx == k]
+    dt_j <- normalized[.(k)]
     if (nrow(dt_j) == 0L) {
       next
     }
@@ -2197,17 +2200,14 @@ generate_probability_maps <- function(
     )
 
     t_raster_write <- prof_tic()
-    terra::rasterize(
-      x = as.matrix(dt_j[, .(x, y)]),
-      y = anterior,
-      values = dt_j[["prob"]],
-      fun = "first"
-    ) |>
-      terra::writeRaster(
-        filename = tif_path,
-        overwrite = TRUE,
-        NAflag = -999
-      )
+    r <- terra::setValues(anterior, NA_real_)
+    r[dt_j[["cell_id"]]] <- dt_j[["prob"]]
+    terra::writeRaster(
+      r,
+      filename = tif_path,
+      overwrite = TRUE,
+      NAflag = -999
+    )
     prof_toc(
       t_raster_write,
       sprintf(
