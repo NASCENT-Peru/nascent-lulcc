@@ -850,7 +850,9 @@ optimize_region_scenario <- function(
       dir.create(rate_dir, recursive = TRUE, showWarnings = FALSE)
 
       for (t in seq_len(T_steps_val)) {
-        x_val <- res$getValue(x_vars[[t]])
+        # Clamp solver output to >= 0: OSQP/SCS can return tiny negative values
+        # (~1e-18) due to numerical tolerances even when x_t >= 0 is constrained.
+        x_val <- pmax(res$getValue(x_vars[[t]]), 0)
         area_t <- area_mat[, t]
         # rate[i,j] = flow[i,j] / area[i] — both must be in the same units.
         # x_val is in optimizer fraction space; area_mat is scaled by scale_fac,
