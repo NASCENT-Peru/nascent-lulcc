@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Phase 3.2 planned (2026-05-22) — 3 plans in 3 waves ready to execute; Phase 3.1 still awaiting operator HPC submission
-last_updated: "2026-05-22T00:00:00Z"
-last_activity: 2026-05-22 -- Phase 3.2 planned; 3 plans created covering transition pipeline consistency (bug fixes, AUDIT log lines, cross-stage audit script)
+status: Phase 3.1 closed; demand CSV bug fixed; Dinamica allocating real transitions (4,477 cells changed in BAU costa_peruana smoke); follow-up concern logged about low allocation throughput
+stopped_at: Phase 3.3 context gathered
+last_updated: "2026-05-26T20:11:14.958Z"
+last_activity: 2026-05-25 -- Phase 3.1 confirmed via second smoke run (1299s); root cause of original 0-cell result was Excel-to-CSV thousand-separator corruption breaking clean_numeric() in demand parsing
 progress:
-  total_phases: 7
-  completed_phases: 4
+  total_phases: 8
+  completed_phases: 5
   total_plans: 22
-  completed_plans: 15
-  percent: 75
+  completed_plans: 19
+  percent: 63
 ---
 
 # Project State
@@ -21,19 +21,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** allocation.r completes reliably for all scenarios × regions × timesteps, producing simulated LULC maps without crashing.
-**Current focus:** Phase 3.1 — allocation-correctness-and-dinamica
+**Current focus:** Phase 3.2 — transition-pipeline-consistency
 
 ## Current Position
 
-Phase: 3.1 (allocation-correctness-and-dinamica) → 3.2 (transition-pipeline-consistency)
-Plan: Phase 3.1: 1 of 1 — awaiting HPC operator execution; Phase 3.2: 3 plans written and verified, ready to execute
-Status: Phase 3.1 plan complete, Task 1 (Fix 4b) ready for HPC submission; Phase 3.2 planned — 3 plans in 3 waves, verification passed
-Last activity: 2026-05-22 -- Phase 3.2 planned (3 plans: bug fix + AUDIT logs + audit script); verification passed after 2 revision iterations
+Phase: 3.2 (transition-pipeline-consistency)
+Plan: Phase 3.1: 1/1 complete; Phase 3.2: 3 plans in 3 waves ready to execute
+Status: Phase 3.1 closed; demand CSV bug fixed; Dinamica allocating real transitions (4,477 cells changed in BAU costa_peruana smoke); follow-up concern logged about low allocation throughput
+Last activity: 2026-05-25 -- Phase 3.1 confirmed via second smoke run (1299s); root cause of original 0-cell result was Excel-to-CSV thousand-separator corruption breaking clean_numeric() in demand parsing
 
 ### Roadmap Evolution
 
 - Phase 3.1 inserted after Phase 3 (2026-05-22, URGENT): Job 364249 confirmed R pipeline; Dinamica never ran (fallback guard fired on HPC); model preload wasteful (38 vs 26 active); phantom TIFs from nomatch=NA; fixes applied, Dinamica-only smoke test ready
 - Phase 3.2 inserted after Phase 3.1 (2026-05-22, URGENT): Viable transition set found to drift silently across pipeline stages (identification → feature selection → modelling → rate prep → allocation); phase hardens end-to-end consistency so each stage operates on exactly the same transition set
+- Phase 3.3 inserted after Phase 3.2 (2026-05-26, URGENT): Dinamica allocation throughput observed at ~1% in Phase 3.1 (4,477 of hundreds of thousands of requested cells placed); root cause likely probability maps with too few non-zero values to support the demanded volume; phase diagnoses and remediates
 
 Progress: [████████░░] 80%
 
@@ -99,6 +100,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-19
-Stopped at: Completed 01.1-07-PLAN.md — Phase 1.1 fully closed; Open Issue 1 RESOLVED; live --live smoke exits 0; INFRA-01 + MEM-06 Complete
-Resume file: None
+Last session: 2026-05-26T20:11:14.942Z
+Stopped at: Phase 3.3 context gathered
+Resume file: .planning/phases/03.3-probability-map-saturation-allocation-throughput/03.3-CONTEXT.md
