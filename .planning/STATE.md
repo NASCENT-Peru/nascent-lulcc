@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Phase 3.1 closed; demand CSV bug fixed; Dinamica allocating real transitions (4,477 cells changed in BAU costa_peruana smoke); follow-up concern logged about low allocation throughput
-stopped_at: Phase 3.3 context gathered
-last_updated: "2026-05-26T20:11:14.958Z"
+stopped_at: Phase 3.3 planned (5 plans, 4 waves; checker skipped — usage limit)
+last_updated: "2026-05-27T13:10:09.058Z"
 last_activity: 2026-05-25 -- Phase 3.1 confirmed via second smoke run (1299s); root cause of original 0-cell result was Excel-to-CSV thousand-separator corruption breaking clean_numeric() in demand parsing
 progress:
   total_phases: 8
   completed_phases: 5
-  total_plans: 22
+  total_plans: 27
   completed_plans: 19
   percent: 63
 ---
@@ -100,6 +100,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-26T20:11:14.942Z
-Stopped at: Phase 3.3 context gathered
-Resume file: .planning/phases/03.3-probability-map-saturation-allocation-throughput/03.3-CONTEXT.md
+Last session: 2026-05-27T13:10:09.009Z
+Stopped at: Phase 3.3 planned (5 plans, 4 waves; checker skipped — usage limit)
+Resume file: .planning/phases/03.3-probability-map-saturation-allocation-throughput/03.3-01-PLAN.md
