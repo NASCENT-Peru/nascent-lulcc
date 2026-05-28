@@ -99,6 +99,8 @@ simulation_trans_rates_params:
   num_workers: 6
   scale_factor: [1.0, 3.0, 5.0, 9.0]  # Scale factors to apply to the transition rates for each scenario (in same order as scenario_names)
   forbidden_from_classes: ["mining"]  # LULC classes for which ALL outgoing transitions are globally forbidden
+  saturation_threshold: 0.90
+  saturation_exempt: []  # entries: {from_lulc: <int>, to_lulc: <int>, reason: <text>}
 
 transition_identification_params:
   num_workers: 8
