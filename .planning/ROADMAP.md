@@ -16,8 +16,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 1.1: Fix Dinamica Launch Contract** *(INSERTED 2026-05-15; 4/4 mainline plans landed 2026-05-17; gap-closure plans 01.1-05 + 01.1-06 added 2026-05-17 to close Open Issue 1 — DinamicaConsole std::exception under rebuilt .sif blocking INFRA-01 SC2 + MEM-06 SC5)* - Repaired the seven structural defects in the Dinamica-on-HPC launch path. Launch-contract mechanics (D-101–D-108, D-112, D-114) all landed and the cross-language drift safety net is in place. Live `--live` smoke does not yet exit 0 against the rebuilt `.sif` — DinamicaConsole crashes with `std::exception` regardless of `.ego` content; the 2026-05-17 ldd diagnostic FALSIFIED the library-compat hypothesis. Gap-closure Plan 01.1-05 captures diagnostic evidence on Euler; Plan 01.1-06 applies the resulting targeted fix to the `.def` and re-verifies the live smoke exits 0.
 - [x] **Phase 2: Model Size Reduction** - Replace tidymodels with mlr3 in transition_modelling.r; save models as .qs via qs::qsave() with ranger save.memory=TRUE; all artefacts <200 MB *(completed 2026-05-07)*
 - [ ] **Phase 3: Parallelism & Memory Architecture** - Switch to fork-based multicore on Linux, share nhood rasters, eliminate OOM
-- [ ] **Phase 3.1: Allocation Correctness & Dinamica Integration** *(INSERTED 2026-05-22)* - Fix model over-loading (filter to active transitions), eliminate phantom NA TIFs (nomatch=NULL), fix Dinamica HPC fallback guard, and verify end-to-end allocation including the Dinamica CA step via dedicated smoke test
+- [x] **Phase 3.1: Allocation Correctness & Dinamica Integration** *(INSERTED 2026-05-22; completed 2026-05-25)* - Fix model over-loading (filter to active transitions), eliminate phantom NA TIFs (nomatch=NULL), fix Dinamica HPC fallback guard, re-export demand CSV from XLSX (`clean_numeric` couldn't parse Excel-introduced thousand-separator format), and verify end-to-end allocation including the Dinamica CA step via dedicated smoke test
 - [ ] **Phase 3.2: Transition Pipeline Consistency** *(INSERTED 2026-05-22)* - Harden the end-to-end flow of viable transitions from identification through feature selection, modelling, rate preparation, and allocation so each stage operates on exactly the same transition set with no silent additions, drops, or mismatches.
+- [ ] **Phase 3.3: Probability Map Saturation & Allocation Throughput** *(INSERTED 2026-05-26)* - Address Dinamica's low allocation throughput: probability maps don't contain sufficient non-zero values, causing Expander/Patcher to place only a small fraction of the change matrix demand (e.g., 4,477 of hundreds of thousands of requested transitions in Phase 3.1 BAU costa_peruana smoke).
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port
 
 ## Phase Details
@@ -134,7 +135,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 03.1-01-PLAN.md - Apply smoke_test_dinamica.sh bind-mount fix (Fix 4b), verify all four src/ fixes, commit, and run Dinamica-only smoke on HPC to confirm posterior.tif ≠ anterior.tif.
+- [x] 03.1-01-PLAN.md - Apply smoke_test_dinamica.sh bind-mount fix (Fix 4b), verify all four src/ fixes, commit, and run Dinamica-only smoke on HPC to confirm posterior.tif ≠ anterior.tif.
 
 ### Phase 3.2: Transition Pipeline Consistency *(INSERTED 2026-05-22)*
 **Goal**: Each stage of the LULCC pipeline operates on exactly the same set of viable transitions — `transition_identification.r` deduces theoretical candidates per region from historic maps, `transition_feature_selection.r` confirms statistical viability and writes the definitive viable set, `transition_modelling.r` produces a fitted model for every viable transition, `simulation_trans_rates_prep.r` computes future rates over the viable set with scenario narrative exclusions applied as an explicit logged filter, and `allocation.r` loads only the models whose transitions appear in the active rate table — eliminating information loss and silent mismatches between stages.
@@ -158,6 +159,17 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 03.2-03-PLAN.md — Create `scripts/audit_transition_pipeline.r` cross-stage consistency checker covering all four pipeline stages (id_trans set-difference via Stages 1, 2, 3, 4 artifacts).
+
+### Phase 3.3: Probability Map Saturation & Allocation Throughput *(INSERTED 2026-05-26)*
+**Goal**: Dinamica's Expander + Patcher allocate substantially all of the requested change matrix cells (target: ≥90% of demanded transitions placed) for a reference scenario × region × timestep, rather than the ~1% throughput observed in Phase 3.1 (4,477 of hundreds of thousands of requested cells in BAU × costa_peruana × 2022→2026). The root cause — probability maps not containing enough non-zero high-probability cells to support the demanded volume of transitions — is identified and remediated through one or more of: model calibration adjustments, prediction post-processing (e.g., probability map smoothing or floor), Patcher parameter tuning (`Mean_Patch_Size`, `Patch_Size_Variance`, `Patch_Isometry`), Expander `Perc_expander` rebalancing, or probability map generation improvements.
+**Depends on**: Phase 3.2 (clean transition pipeline required so allocation throughput is the only variable being studied)
+**Requirements**: TBD — to be added during /gsd-discuss-phase
+**Success Criteria** (what must be TRUE):
+  1. The fraction of requested transition cells actually placed by Dinamica (Expander + Patcher combined) reaches ≥90% for at least one reference scenario × region × timestep (e.g., BAU × costa_peruana × 2022→2026); residual unallocated counts logged in the run summary.
+  2. Probability map quality metrics are computed and logged per transition (e.g., fraction of cells with probability > 0, distribution percentiles, spatial autocorrelation) and meet thresholds documented in PROJECT.md.
+  3. A diagnostic script (e.g., `scripts/diagnose_allocation_saturation.r`) compares the requested change matrix against the actual posterior transition counts and identifies which transitions are saturation-limited vs successfully allocated.
+  4. Root cause (probability map sparseness, Patcher parameters, Expander rebalancing, or other) is documented in the phase summary with quantitative evidence; remediation applied is reproducible.
+**Plans**: TBD (run /gsd-plan-phase 3.3 to break down)
 
 ### Phase 4: End-to-End Correctness & Performance
 **Goal**: All four scenarios run to completion across all regions and timesteps, with `predict` no longer dominating wall time, restarts skipping completed work atomically, and the latent correctness gaps (raster/terra split, missing CVXR loop, drifted intervention paths) closed.
@@ -183,6 +195,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1.1. Fix Dinamica Launch Contract | 4/6 | Mainline contract complete; gap-closure 01.1-05 + 01.1-06 pending (closes INFRA-01 SC2 / MEM-06 SC5 on Open Issue 1) | partial — mainline 2026-05-17 |
 | 2. Model Size Reduction | 4/4 | Complete | 2026-05-07 |
 | 3. Parallelism & Memory Architecture | 0/TBD | Not started | - |
-| 3.1. Allocation Correctness & Dinamica Integration | 0/TBD | Not started (INSERTED 2026-05-22) | - |
+| 3.1. Allocation Correctness & Dinamica Integration | 1/1 | Complete — 4,477 cells changed (103→105); demand CSV fix unblocked optimizer | 2026-05-25 |
 | 3.2. Transition Pipeline Consistency | 0/3 | Not started (INSERTED 2026-05-22) | - |
+| 3.3. Probability Map Saturation & Allocation Throughput | 0/TBD | Not started (INSERTED 2026-05-26) | - |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |

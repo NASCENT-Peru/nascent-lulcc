@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 3.1 closed; demand CSV bug fixed; Dinamica allocating real transitions (4,477 cells changed in BAU costa_peruana smoke); follow-up concern logged about low allocation throughput
+status: completed
 stopped_at: Phase 3.2 context captured (year_steps decision; Plan 01 needs revision)
-last_updated: "2026-05-27T14:10:46.569Z"
-last_activity: 2026-05-25 -- Phase 3.1 confirmed via second smoke run (1299s); root cause of original 0-cell result was Excel-to-CSV thousand-separator corruption breaking clean_numeric() in demand parsing
+last_updated: "2026-05-28T07:24:46.313Z"
+last_activity: 2026-05-28 -- Phase 03.2 marked complete
 progress:
   total_phases: 8
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 27
-  completed_plans: 19
-  percent: 63
+  completed_plans: 22
+  percent: 75
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** allocation.r completes reliably for all scenarios × regions × timesteps, producing simulated LULC maps without crashing.
-**Current focus:** Phase 3.2 — transition-pipeline-consistency
+**Current focus:** Phase 03.2 — transition-pipeline-consistency
 
 ## Current Position
 
-Phase: 3.2 (transition-pipeline-consistency)
-Plan: Phase 3.1: 1/1 complete; Phase 3.2: 3 plans in 3 waves ready to execute
-Status: Phase 3.1 closed; demand CSV bug fixed; Dinamica allocating real transitions (4,477 cells changed in BAU costa_peruana smoke); follow-up concern logged about low allocation throughput
-Last activity: 2026-05-25 -- Phase 3.1 confirmed via second smoke run (1299s); root cause of original 0-cell result was Excel-to-CSV thousand-separator corruption breaking clean_numeric() in demand parsing
+Phase: 03.2 — COMPLETE
+Plan: 3 of 3
+Status: Phase 03.2 complete
+Last activity: 2026-05-28 -- Phase 03.2 marked complete
 
 ### Roadmap Evolution
 
@@ -36,7 +36,7 @@ Last activity: 2026-05-25 -- Phase 3.1 confirmed via second smoke run (1299s); r
 - Phase 3.2 inserted after Phase 3.1 (2026-05-22, URGENT): Viable transition set found to drift silently across pipeline stages (identification → feature selection → modelling → rate prep → allocation); phase hardens end-to-end consistency so each stage operates on exactly the same transition set
 - Phase 3.3 inserted after Phase 3.2 (2026-05-26, URGENT): Dinamica allocation throughput observed at ~1% in Phase 3.1 (4,477 of hundreds of thousands of requested cells placed); root cause likely probability maps with too few non-zero values to support the demanded volume; phase diagnoses and remediates
 
-Progress: [████████░░] 80%
+Progress: [████████░░] 81%
 
 ## Performance Metrics
 
