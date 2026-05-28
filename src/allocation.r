@@ -2323,12 +2323,36 @@ generate_probability_maps <- function(
     rate <- trans_rates_dt[["Rate"]][k]
     id_trans <- trans_rates_dt[["id_trans"]][k]
 
-    if (from_val == to_val || rate == 0) {
-      next
-    }
-
+    # Persistence (from_val == to_val) and zero-rate rows are pre-filtered
+    # upstream by setup_allocation_inputs() (Phase 3.3 D-02/D-03), so no skip
+    # is needed here. The %03d prefix is now gap-free by construction.
     dt_j <- normalized[.(k), nomatch = NULL]
     if (nrow(dt_j) == 0L) {
+      # Active transition with no predictions — still write an all-NA TIF at
+      # the correct %03d prefix so the alphabetic sequence Dinamica binds to
+      # the trans_rates rows stays gap-free (Phase 3.3 Pitfall 2). Dinamica
+      # reads the cube and interprets the all-NA layer as zero probability for
+      # that transition — no allocation happens for that row, but the row
+      # position remains valid and the alignment contract holds.
+      tif_path <- file.path(
+        prob_map_dir,
+        sprintf("%03d_id_trans_%d.tif", k, id_trans)
+      )
+      r <- terra::setValues(anterior, NA_real_)
+      terra::writeRaster(
+        r,
+        filename = tif_path,
+        overwrite = TRUE,
+        NAflag = -999
+      )
+      log_msg(
+        sprintf(
+          "WARN id_trans=%d row=%d has no predictions; wrote empty TIF",
+          id_trans,
+          k
+        ),
+        log_file
+      )
       next
     }
 
