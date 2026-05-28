@@ -41,6 +41,14 @@
 - [ ] **PIPE-06**: Intervention YAML files (`config/SSP*_interventions.yml`) reference `inputs/spat_prob_perturb/` paths matching the config schema — not legacy `Data/Spat_prob_perturb_layers/` paths
 - [ ] **PIPE-07**: Dinamica EGO log files are written to the central `logs/` directory — not scattered across region work directories
 
+### Allocation Throughput
+
+- [ ] **ALLOC-06**: The four work_dir Dinamica artifacts (`trans_rates.csv`, `expansion_table.csv`, `patcher_table.csv`, `probability_map_dir/*.tif`) are written from a single filtered, id_trans-sorted source data frame; persistence and zero-rate rows are dropped before any artifact is written; no `%03d_id_trans_*.tif` prefix gaps exist
+- [ ] **ALLOC-07**: Per-transition allocation throughput (placed cells / demanded cells) reaches >=`saturation_threshold` (default 0.90) for every active transition in BAU x all Peruvian regions x 2022->2026, except transitions enumerated in `saturation_exempt`; residual unallocated counts logged per region in `saturation_summary.csv` + `AUDIT stage=saturation ...` line
+- [ ] **ALLOC-08**: `alloc_params.csv` row coverage of the active `id_trans` set is enforced as a hard precondition: if any active `id_trans` lacks an `alloc_params` row, allocation `stop()`s with the full missing list
+- [ ] **ALLOC-09**: A standalone `scripts/diagnose_allocation_saturation.r` produces a post-hoc per-transition saturation report comparing the demanded change matrix against actual posterior counts, reusing the same metric helpers as the inline summary
+- [ ] **ALLOC-10**: Probability-map quality metrics (coverage; P50/P90/P95/P99/max; demand-vs-capacity ratio) are computed and logged for every active transition during each region run
+
 ## v2 Requirements
 
 ### Model Framework
@@ -90,19 +98,26 @@ Updated during roadmap creation.
 | PIPE-05 | Phase 4 | Pending |
 | PIPE-06 | Phase 4 | Pending |
 | PIPE-07 | Phase 1 | Pending |
+| ALLOC-06 | Phase 3.3 | Pending |
+| ALLOC-07 | Phase 3.3 | Pending |
+| ALLOC-08 | Phase 3.3 | Pending |
+| ALLOC-09 | Phase 3.3 | Pending |
+| ALLOC-10 | Phase 3.3 | Pending |
 
 **Coverage:**
-- v1 requirements: 21 total
-- Mapped to phases: 21 ✓
+- v1 requirements: 26 total
+- Mapped to phases: 26 ✓
 - Unmapped: 0
 
 **Phase totals:**
 - Phase 1 (Repair & Visibility): 10 requirements — OBS-01, OBS-02, OBS-03, OBS-04, MEM-06, INFRA-01, PIPE-01, PIPE-03, PIPE-04, PIPE-07
 - Phase 2 (Model Size Reduction): 1 requirement — MEM-04
 - Phase 3 (Parallelism & Memory Architecture): 4 requirements — MEM-01, MEM-02, MEM-03, MEM-05
+- Phase 3.3 (Allocation Throughput): 5 requirements - ALLOC-06, ALLOC-07, ALLOC-08, ALLOC-09, ALLOC-10
 - Phase 4 (End-to-End Correctness & Performance): 6 requirements — PERF-01, PERF-02, PERF-03, PIPE-02, PIPE-05, PIPE-06
 
 ---
 *Requirements defined: 2026-05-05*
 *Last updated: 2026-05-17 — Phase 1.1 closed PIPE-04 + OBS-02; INFRA-01 + MEM-06 partial (deferred to gap-closure on 01.1-03 Open Issue 1)*
 *Last updated: 2026-05-22 — Phase 3.2 closed PIPE-01 + PIPE-02 (pre-satisfied, verified no regression)*
+*Last updated: 2026-05-26 - Phase 3.3 added ALLOC-06..10 (saturation alignment + diagnostic surfaces); status pending operator gate*

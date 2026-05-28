@@ -163,13 +163,28 @@ Plans:
 ### Phase 3.3: Probability Map Saturation & Allocation Throughput *(INSERTED 2026-05-26)*
 **Goal**: Dinamica's Expander + Patcher allocate substantially all of the requested change matrix cells (target: ≥90% of demanded transitions placed) for a reference scenario × region × timestep, rather than the ~1% throughput observed in Phase 3.1 (4,477 of hundreds of thousands of requested cells in BAU × costa_peruana × 2022→2026). The root cause — probability maps not containing enough non-zero high-probability cells to support the demanded volume of transitions — is identified and remediated through one or more of: model calibration adjustments, prediction post-processing (e.g., probability map smoothing or floor), Patcher parameter tuning (`Mean_Patch_Size`, `Patch_Size_Variance`, `Patch_Isometry`), Expander `Perc_expander` rebalancing, or probability map generation improvements.
 **Depends on**: Phase 3.2 (clean transition pipeline required so allocation throughput is the only variable being studied)
-**Requirements**: TBD — to be added during /gsd-discuss-phase
+**Requirements**: ALLOC-06, ALLOC-07, ALLOC-08, ALLOC-09, ALLOC-10
 **Success Criteria** (what must be TRUE):
   1. The fraction of requested transition cells actually placed by Dinamica (Expander + Patcher combined) reaches ≥90% for at least one reference scenario × region × timestep (e.g., BAU × costa_peruana × 2022→2026); residual unallocated counts logged in the run summary.
   2. Probability map quality metrics are computed and logged per transition (e.g., fraction of cells with probability > 0, distribution percentiles, spatial autocorrelation) and meet thresholds documented in PROJECT.md.
   3. A diagnostic script (e.g., `scripts/diagnose_allocation_saturation.r`) compares the requested change matrix against the actual posterior transition counts and identifies which transitions are saturation-limited vs successfully allocated.
   4. Root cause (probability map sparseness, Patcher parameters, Expander rebalancing, or other) is documented in the phase summary with quantitative evidence; remediation applied is reproducible.
-**Plans**: TBD (run /gsd-plan-phase 3.3 to break down)
+**Plans**: 5 plans
+
+Plans:
+
+**Wave 1**
+- [x] 03.3-01-PLAN.md — Region reconnaissance (regions.json discovery), saturation_threshold + saturation_exempt config keys, src/saturation_diagnostics.r helper module.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 03.3-02-PLAN.md — Single-source writer refactor in src/allocation.r (filter persistence + zero-rate, alloc_params stop, TIF writer no-skip, inline saturation hook).
+
+**Wave 3** *(blocked on Wave 2 completion — Plan 03 and Plan 04 run in parallel)*
+- [x] 03.3-03-PLAN.md — Standalone scripts/diagnose_allocation_saturation.r post-hoc diagnostic with saturation_class classification + Dinamica-log Remaining-Transitions cross-validation.
+- [x] 03.3-04-PLAN.md — Test coverage: tests/testthat/test-allocation-single-source-writer.R (ALLOC-06/08) + tests/testthat/test-saturation-diagnostics.R (ALLOC-07/10).
+
+**Wave 4** *(blocked on Wave 2, Wave 3 completion; has operator-gate checkpoint)*
+- [ ] 03.3-05-PLAN.md — Add ALLOC-06..10 to REQUIREMENTS.md; update ROADMAP.md; operator-gate live HPC verification (BAU x all Peruvian regions x 2022->2026); write 03.3-SUMMARY.md.
 
 ### Phase 4: End-to-End Correctness & Performance
 **Goal**: All four scenarios run to completion across all regions and timesteps, with `predict` no longer dominating wall time, restarts skipping completed work atomically, and the latent correctness gaps (raster/terra split, missing CVXR loop, drifted intervention paths) closed.
@@ -197,5 +212,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 3. Parallelism & Memory Architecture | 0/TBD | Not started | - |
 | 3.1. Allocation Correctness & Dinamica Integration | 1/1 | Complete — 4,477 cells changed (103→105); demand CSV fix unblocked optimizer | 2026-05-25 |
 | 3.2. Transition Pipeline Consistency | 0/3 | Not started (INSERTED 2026-05-22) | - |
-| 3.3. Probability Map Saturation & Allocation Throughput | 0/TBD | Not started (INSERTED 2026-05-26) | - |
+| 3.3. Probability Map Saturation & Allocation Throughput | 4/5 | Wave 1-3 plans complete; operator gate pending (03.3-05) | partial — Wave 1-3 2026-05-26 |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
