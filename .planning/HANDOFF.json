@@ -1,0 +1,37 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-05-28T07:47:13.790Z",
+  "source": "pause-work",
+  "partial": false,
+  "phase": "03.3",
+  "phase_name": "probability-map-saturation-allocation-throughput",
+  "phase_dir": ".planning/phases/03.3-probability-map-saturation-allocation-throughput",
+  "plan": 3,
+  "task": 1,
+  "total_tasks": null,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": "03.3-01", "name": "Region recon + config keys + saturation_diagnostics.r helpers", "status": "done", "commit": "0b1a97e"},
+    {"id": "03.3-02", "name": "Single-source allocation writer + alloc_params hard-stop + TIF no-skip + inline saturation hook", "status": "done", "commit": "81aea46"}
+  ],
+  "remaining_tasks": [
+    {"id": "03.3-03", "name": "Standalone scripts/diagnose_allocation_saturation.r CLI", "status": "not_started", "wave": 3},
+    {"id": "03.3-04", "name": "Test suite: test-allocation-single-source-writer.R + test-saturation-diagnostics.R", "status": "not_started", "wave": 3},
+    {"id": "03.3-05", "name": "Docs consolidation + operator HPC gate + 03.3-SUMMARY.md", "status": "not_started", "wave": 4, "autonomous": false, "has_checkpoint": true}
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {
+      "action": "Run live HPC smoke on Euler: Rscript scripts/run_allocation.r for BAU x all 4 Peruvian regions (andes, cuenca_del_amazonas, costa_peruana, selva_andina) x 2022->2026 timestep",
+      "context": "Plan 03.3-05 Task 3 is a blocking operator gate — Claude prepares the recipe; operator runs it; reports per-region saturation_summary.csv results back so Claude can write 03.3-SUMMARY.md",
+      "blocking": true
+    }
+  ],
+  "decisions": [
+    {"decision": "Wave 3 plans 03 and 04 run in parallel (no files_modified overlap)", "rationale": "03.3-03 touches scripts/diagnose_allocation_saturation.r; 03.3-04 touches tests/ only", "phase": "03.3"},
+    {"decision": "Plan 05 is non-autonomous — has human-verify checkpoint for HPC live smoke", "rationale": "Empirical throughput verification cannot be done without running on actual HPC with real rasters", "phase": "03.3"}
+  ],
+  "uncommitted_files": [".planning/STATE.md"],
+  "next_action": "Resume Wave 3: spawn 03.3-03 and 03.3-04 in parallel (no overlap), then Wave 4 operator gate",
+  "context_notes": "Paused mid-wave-3. Waves 1+2 fully merged onto allocation-step branch at HEAD 81aea46. Wave 3 was interrupted before any agents were spawned — plans 03 and 04 are completely unstarted. Wave 4 (plan 05) has a blocking human checkpoint for Euler HPC verification. The structural fix (single-source writer) landed in 03.3-02 and is expected to drive throughput from ~1% to >=90%."
+}

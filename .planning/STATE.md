@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
+status: executing
 stopped_at: Phase 3.2 context captured (year_steps decision; Plan 01 needs revision)
-last_updated: "2026-05-28T07:24:46.313Z"
-last_activity: 2026-05-28 -- Phase 03.2 marked complete
+last_updated: "2026-05-28T07:46:01.370Z"
+last_activity: 2026-05-28
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 27
-  completed_plans: 22
+  completed_plans: 24
   percent: 75
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** allocation.r completes reliably for all scenarios × regions × timesteps, producing simulated LULC maps without crashing.
-**Current focus:** Phase 03.2 — transition-pipeline-consistency
+**Current focus:** Phase 03.3 — probability-map-saturation-allocation-throughput
 
 ## Current Position
 
-Phase: 03.2 — COMPLETE
-Plan: 3 of 3
-Status: Phase 03.2 complete
-Last activity: 2026-05-28 -- Phase 03.2 marked complete
+Phase: 03.3 (probability-map-saturation-allocation-throughput) — EXECUTING
+Plan: 3 of 5
+Status: Ready to execute
+Last activity: 2026-05-28
 
 ### Roadmap Evolution
 
