@@ -1669,12 +1669,37 @@ setup_allocation_inputs <- function(
     ))
   }
   trans_rates_dst <- file.path(work_dir, "trans_rates.csv")
-  file.copy(trans_rate_src, trans_rates_dst, overwrite = TRUE)
 
-  trans_rates_df <- read.csv(trans_rates_dst, check.names = FALSE)
-
-  # sort by id_trans
+  # Single-source filter (Phase 3.3 D-02/D-03): read Stage 4 source, drop
+  # persistence (From* == To*) and zero-rate rows, sort by id_trans, then write
+  # the filtered df to work_dir. The Stage 4 source CSV on disk is unchanged —
+  # only the work_dir copy is filtered. check.names = FALSE preserves the
+  # `From*` / `To*` markers Dinamica requires (Pitfall 4 / commit 2c599a2).
+  trans_rates_raw <- utils::read.csv(trans_rate_src, check.names = FALSE)
+  n_in <- nrow(trans_rates_raw)
+  trans_rates_df <- trans_rates_raw[
+    trans_rates_raw[["From*"]] != trans_rates_raw[["To*"]] &
+      trans_rates_raw[["Rate"]] != 0,
+  ]
   trans_rates_df <- trans_rates_df[order(trans_rates_df[["id_trans"]]), ]
+  rownames(trans_rates_df) <- NULL
+  n_out <- nrow(trans_rates_df)
+  utils::write.csv(trans_rates_df, trans_rates_dst, row.names = FALSE)
+  log_msg(
+    sprintf(
+      paste0(
+        "AUDIT stage=allocation_filter scenario=%s region=%s year_ant=%d ",
+        "input_rows=%d filtered_rows=%d dropped=%d"
+      ),
+      scenario,
+      region_label,
+      year_ant,
+      n_in,
+      n_out,
+      n_in - n_out
+    ),
+    log_file
+  )
 
   # 2. Extract expansion table from allocation params
   alloc_params_path <- file.path(
@@ -1699,20 +1724,36 @@ setup_allocation_inputs <- function(
     alloc_params[["id_trans"]] %in% trans_rates_df[["id_trans"]],
   ]
 
-  # warn if any id_trans values in trans_rates_df are missing from alloc_params
+  # Hard-stop if any id_trans values in trans_rates_df are missing from
+  # alloc_params (Phase 3.3 D-04 / ALLOC-08). Promoted from warning() to
+  # stop() so the run fails loudly rather than silently shipping a truncated
+  # expansion/patcher table — the operator must regenerate alloc_params.
   missing_alloc_params <- setdiff(
     trans_rates_df[["id_trans"]],
     alloc_params[["id_trans"]]
   )
   if (length(missing_alloc_params) > 0) {
-    warning(log_msg(
+    stop(log_msg(
       sprintf(
-        "The following id_trans values are present in trans_rates_df but missing from alloc_params: %s",
+        paste0(
+          "Allocation params missing for active id_trans values ",
+          "(regenerate alloc_params for region %s period %s): %s"
+        ),
+        region_label,
+        calibration_period,
         paste(missing_alloc_params, collapse = ", ")
       ),
       log_file
-    ))
+    ), call. = FALSE)
   }
+
+  # Defence-in-depth row-order alignment (Phase 3.3 Pitfall 5): reorder
+  # alloc_params so its rows align 1:1 by id_trans with trans_rates_df.
+  # The downstream expansion_tbl / patcher_tbl slices auto-inherit this order.
+  alloc_params <- alloc_params[
+    match(trans_rates_df[["id_trans"]], alloc_params[["id_trans"]]),
+  ]
+  stopifnot(identical(alloc_params[["id_trans"]], trans_rates_df[["id_trans"]]))
 
   # Expansion table: From*, To*, Perc_expander
   # Dinamica's PercentMatrix type expects fractions [0,1], not percentages [0,100].
