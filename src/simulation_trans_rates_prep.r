@@ -870,6 +870,13 @@ optimize_region_scenario <- function(
       rate_dir <- file.path(output_dir, s, r)
       dir.create(rate_dir, recursive = TRUE, showWarnings = FALSE)
 
+      # Stage 4 boundary audit precompute: per-region viable input and
+      # forbidden-excluded counts (independent of timestep)
+      n_viable_input <- nrow(df_trans_source[df_trans_source$region_name == r, ])
+      n_forbidden_excluded <- nrow(forbid_pairs_df[
+        is.na(forbid_pairs_df$region_name) | forbid_pairs_df$region_name == r,
+      ])
+
       for (t in seq_len(T_steps_val)) {
         # Clamp solver output to >= 0: OSQP/SCS can return tiny negative values
         # (~1e-18) due to numerical tolerances even when x_t >= 0 is constrained.
@@ -908,6 +915,10 @@ optimize_region_scenario <- function(
           paste0(s, "-", r, "-trans_rates-", year_steps[t], ".csv")
         )
         readr::write_csv(rate_df, file = rate_file)
+        message(sprintf(
+          "AUDIT stage=4 scenario=%s region=%s timestep=%s viable_input=%d forbidden_excluded=%d rate_csv_rows=%d",
+          s, r, year_steps[t], n_viable_input, n_forbidden_excluded, nrow(rate_df)
+        ))
       }
 
       log_msg(

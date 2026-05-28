@@ -1943,15 +1943,29 @@ generate_probability_maps <- function(
     sort = FALSE
   )
 
-  # what id_trans values are present in trans_rates_df but missing from model_info? these represent transitions that have a transition rate but no fitted model (e.g. zero-rate or not in this scenario). we should log these so we know which transitions are being skipped in the prediction step.
+  # Stage 5 boundary audit: compare rate-table row count to fitted-model row
+  # count for this region. Any id_trans present in trans_rates_df but absent
+  # from model_info is a hard failure (Plan 03.2-02): a missing model means
+  # the probability map for that transition cannot be produced, which would
+  # silently truncate Dinamica's input set and drop allocation throughput.
   missing_models <- setdiff(
     trans_rates_df[["id_trans"]],
     model_info[["id_trans"]]
   )
+  n_rate_rows  <- nrow(trans_rates_df)
+  n_model_rows <- nrow(model_info)
+  log_msg(sprintf(
+    "AUDIT stage=5 region=%s rate_table_rows=%d model_count=%d missing_model_id_trans=%s",
+    region_label,
+    n_rate_rows,
+    n_model_rows,
+    if (length(missing_models) > 0L) paste(missing_models, collapse = ",") else "none"
+  ), log_file)
   if (length(missing_models) > 0L) {
-    warning(log_msg(
+    stop(log_msg(
       sprintf(
-        "The following id_trans values are present in trans_rates_df but missing from model_info (i.e. no fitted model found for these transitions, likely due to zero-rate or not being in this scenario): %s",
+        "generate_probability_maps(): %d id_trans value(s) present in rate table but no fitted model found: %s. Run transition_modelling() to produce missing models or remove the transition from viable_transitions_lists.csv.",
+        length(missing_models),
         paste(missing_models, collapse = ", ")
       ),
       log_file
