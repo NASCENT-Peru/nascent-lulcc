@@ -74,6 +74,7 @@ configuration_settings:
     SOC: "ssp126"
   simulation_start_year: 2022
   simulation_end_year: 2060
+  simulation_year_steps: [2022, 2024, 2028, 2032, 2036, 2040, 2044, 2048, 2052, 2056, 2060]  # explicit list — see 03.2-CONTEXT.md D-01
   selected_scalar: 9.0
   max_training_rows: 1000000  # Higher threshold on HPC nodes; operator should tune to actual node RAM (Phase 2, D-11)
 
@@ -97,6 +98,7 @@ simulation_trans_rates_params:
   forbid_inflow: []
   num_workers: 6
   scale_factor: [1.0, 3.0, 5.0, 9.0]  # Scale factors to apply to the transition rates for each scenario (in same order as scenario_names)
+  forbidden_from_classes: ["mining"]  # LULC classes for which ALL outgoing transitions are globally forbidden
 
 transition_identification_params:
   num_workers: 8

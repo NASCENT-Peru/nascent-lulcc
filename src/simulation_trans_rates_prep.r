@@ -240,12 +240,27 @@ simulation_trans_rates_prep <- function(
   ))
 
   # set up table of forbidden transitions. This will be used in the optimization to set hard constraints on certain transitions.
-  forbid_pairs_df <- tidyr::expand_grid(
-    region_name = NA_character_,
-    From = "mining",
-    To = setdiff(lulcs_global, "mining")
-  ) %>%
-    tibble::as_tibble()
+  # Class-level exclusions are config-driven via sim_config[["forbidden_from_classes"]]
+  # (see 03.2-CONTEXT.md and threat T-3.2-01-1: null-guard defaults to empty list so the
+  # pipeline continues without exclusions when the key is absent).
+  forbidden_from_classes <- sim_config[["forbidden_from_classes"]]
+  if (is.null(forbidden_from_classes)) forbidden_from_classes <- character(0)
+  if (length(forbidden_from_classes) > 0) {
+    message(sprintf(
+      "  - Applying global class exclusions from config (forbidden_from_classes): %s",
+      paste(forbidden_from_classes, collapse = ", ")
+    ))
+  }
+  forbid_pairs_df <- if (length(forbidden_from_classes) > 0) {
+    tidyr::expand_grid(
+      region_name = NA_character_,
+      From = forbidden_from_classes,
+      To = setdiff(lulcs_global, forbidden_from_classes)
+    ) %>%
+      tibble::as_tibble()
+  } else {
+    tibble::tibble(region_name = character(), From = character(), To = character())
+  }
 
   unmodelled_df <- load_unmodelled_transitions(config)
   message(sprintf(
@@ -285,28 +300,34 @@ simulation_trans_rates_prep <- function(
       id_trans
     )
 
-  # year_steps <- unique(c(
-  #   seq(
-  #     config[["simulation_start_year"]],
-  #     config[["simulation_end_year"]],
-  #     by = config[["step_length"]]
-  #   ),
-  #   config[["simulation_end_year"]]
-  # ))
-
-  year_steps <- c(
-    2022,
-    2024,
-    2028,
-    2032,
-    2036,
-    2040,
-    2044,
-    2048,
-    2052,
-    2056,
-    2060
-  )
+  # Read year_steps from config as an explicit ordered list (see 03.2-CONTEXT.md D-01..D-03).
+  # No derivation: the explicit list preserves the intentional 2-year first step (2022 -> 2024)
+  # that any cadence-based generator would silently relocate. The anchor keys for the start and
+  # end years are kept as canonical references against which the list is validated below.
+  year_steps <- config[["simulation_year_steps"]]
+  if (is.null(year_steps) || length(year_steps) == 0) {
+    stop("config[[\"simulation_year_steps\"]] is missing or empty. Add an explicit ordered list to your config YAML — see 03.2-CONTEXT.md D-01.")
+  }
+  sim_start <- config[["simulation_start_year"]]
+  sim_end   <- config[["simulation_end_year"]]
+  if (year_steps[1] != sim_start) {
+    stop(sprintf(
+      "simulation_year_steps[1] is %d but simulation_start_year is %d — update one to match the other before continuing.",
+      year_steps[1], sim_start
+    ))
+  }
+  if (tail(year_steps, 1) != sim_end) {
+    stop(sprintf(
+      "simulation_year_steps ends at %d but simulation_end_year is %d — update one to match the other before continuing.",
+      tail(year_steps, 1), sim_end
+    ))
+  }
+  if (!all(diff(year_steps) > 0)) {
+    stop(sprintf(
+      "simulation_year_steps must be strictly increasing — observed diffs: %s",
+      paste(diff(year_steps), collapse = ", ")
+    ))
+  }
 
   step_length <- diff(year_steps)
   T_steps_val <- length(step_length)
@@ -1285,9 +1306,13 @@ run_scalar_optimization_loop <- function(
 
   message("\n[5/7] Setting up scalar iterations...")
 
-  # scalars <- config$simulation_trans_rates_params$scale_factor
-  # scalars <- 5
-  scalars <- c(1.0, seq(3.0, 9.0, by = 2))
+  # scalars come from config (see threat T-3.2-01-2: stop() with actionable message if absent).
+  # sim_config is NOT in scope here — run_scalar_optimization_loop() does not receive it;
+  # read directly from config which IS a parameter of this function.
+  scalars <- config[["simulation_trans_rates_params"]][["scale_factor"]]
+  if (is.null(scalars) || length(scalars) == 0) {
+    stop("config[[\"simulation_trans_rates_params\"]][[\"scale_factor\"]] is missing or empty. Add it to your config YAML.")
+  }
   message(sprintf("  ✓ Scalars: %s", paste(scalars, collapse = ", ")))
 
   # Extract colors from lulc_schema, keyed by class_name to match lulc_name in data
