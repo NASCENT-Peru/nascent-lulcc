@@ -60,7 +60,7 @@ transition_feature_selection <- function(
   # Reset parallel plan
   future::plan(sequential)
 
-  return(final_summary)
+  return(invisible(NULL))
 }
 
 #' Extract names by group type from predictor table
@@ -124,10 +124,11 @@ perform_feature_selection <- function(
     transitions_info$to_lulc,
     sep = "-"
   )
+  n_viable_stage1 <- nrow(transitions_info)
   message(sprintf(
-    "Loaded %d viable transitions for period %s",
-    nrow(transitions_info),
-    period
+    "AUDIT stage=1->2 period=%s whole_map_transitions=%d (loaded from viable_transitions_lists.csv)",
+    period,
+    n_viable_stage1
   ))
 
   lulc_schema <- jsonlite::fromJSON(
