@@ -33,8 +33,8 @@
 
 ### Pipeline Correctness
 
-- [ ] **PIPE-01**: `simulation_trans_rates_prep.r` reads LULC demand from the config-driven CSV path (`config[["lulc_demand_path"]]`) — the hardcoded Windows xlsx path is removed
-- [ ] **PIPE-02**: The CVXR convex optimisation loop is ported from `src/old/simulation_transition_rates_estimation.R` into `simulation_trans_rates_prep.r` section G and produces valid transition rate tables
+- [x] **PIPE-01**: `simulation_trans_rates_prep.r` reads LULC demand from the config-driven CSV path (`config[["lulc_demand_path"]]`) — the hardcoded Windows xlsx path is removed *(pre-satisfied — verified no xlsx/xls regression in Phase 3.2; grep src/simulation_trans_rates_prep.r src/allocation.r returns zero matches)*
+- [x] **PIPE-02**: The CVXR convex optimisation loop is ported from `src/old/simulation_transition_rates_estimation.R` into `simulation_trans_rates_prep.r` section G and produces valid transition rate tables *(pre-satisfied — full CVXR loop `optimize_region_scenario`/`build_mats`/`run_scalar_optimization_loop` confirmed present; Phase 3.2 hardens its inputs only)*
 - [ ] **PIPE-03**: `calibration_predictor_prep.r` reads terra temp directory from `Sys.getenv("TERRA_TEMP", unset = tempdir())` — not hardcoded `E:/terra_temp`
 - [x] **PIPE-04**: HPC shell scripts use `$USER` in all paths — no hardcoded `bblack` references in `hpc_common.sh`, `setup_environments.sh`, or `.env.template` *(closed Phase 1.1 / Plan 01.1-02: `setup_environments.sh` rewrite + three-signal HPC-detection refusal D-112; `tests/shell/test-setup-environments-hpc-refusal.sh` PASS:5/FAIL:0)*
 - [ ] **PIPE-05**: All active source files (outside `src/old/`) use `terra` only — 73 `raster::` call sites in `lulcc.spatprobmanipulation.r`, `spatial_interventions_prep.r`, and `landscape_pattern_analysis.r` are migrated or removed
@@ -83,8 +83,8 @@ Updated during roadmap creation.
 | PERF-02 | Phase 4 | Pending |
 | PERF-03 | Phase 4 | Pending |
 | INFRA-01 | Phase 1 + Phase 1.1 | Complete (closed Phase 1.1 / Plan 01.1-07; all SCs verified; live --live smoke exit 0; Open Issue 1 resolved by LD_PRELOAD fix for H8 circular init bug in libBase.so) |
-| PIPE-01 | Phase 1 | Pending |
-| PIPE-02 | Phase 4 | Pending |
+| PIPE-01 | Phase 3.2 | Complete (pre-satisfied; verified no regression in Phase 3.2 — grep src/simulation_trans_rates_prep.r src/allocation.r returns zero xlsx/xls matches) |
+| PIPE-02 | Phase 3.2 | Complete (pre-satisfied; full CVXR loop confirmed present; Phase 3.2 hardens inputs only) |
 | PIPE-03 | Phase 1 | Pending |
 | PIPE-04 | Phase 1 + Phase 1.1 | Complete (closed Plan 01.1-02 via setup_environments.sh rewrite + D-112 refusal; test-setup-environments-hpc-refusal.sh PASS:5/FAIL:0) |
 | PIPE-05 | Phase 4 | Pending |
@@ -105,3 +105,4 @@ Updated during roadmap creation.
 ---
 *Requirements defined: 2026-05-05*
 *Last updated: 2026-05-17 — Phase 1.1 closed PIPE-04 + OBS-02; INFRA-01 + MEM-06 partial (deferred to gap-closure on 01.1-03 Open Issue 1)*
+*Last updated: 2026-05-22 — Phase 3.2 closed PIPE-01 + PIPE-02 (pre-satisfied, verified no regression)*
