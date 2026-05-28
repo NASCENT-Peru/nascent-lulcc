@@ -888,6 +888,32 @@ perform_transition_modelling <- function(
     config = config
   )
 
+  # Stage 2 -> 3 boundary audit: log structured counts of FS outcomes
+  .audit_23 <- reconciliation %>%
+    dplyr::count(fs_status, name = "n") %>%
+    dplyr::mutate(label = paste0(fs_status, "=", n)) %>%
+    dplyr::pull(label) %>%
+    paste(collapse = " ")
+  n_expected <- nrow(reconciliation)
+  n_fs_success <- sum(reconciliation$fs_status == "success")
+  n_fs_failed  <- sum(reconciliation$fs_status == "failed")
+  n_fs_missing <- sum(reconciliation$fs_status == "missing")
+  message(sprintf(
+    "AUDIT stage=2->3 period=%s expected=%d fs_success=%d fs_failed=%d fs_missing=%d",
+    period, n_expected, n_fs_success, n_fs_failed, n_fs_missing
+  ))
+  if ((n_fs_failed + n_fs_missing) > 0L) {
+    affected <- reconciliation %>%
+      dplyr::filter(fs_status %in% c("failed", "missing")) %>%
+      dplyr::mutate(.label = paste0(transition, "@", region, "[", fs_status, "]")) %>%
+      dplyr::pull(.label)
+    warning(sprintf(
+      "Stage 2->3 [period=%s]: %d transition(s) will not be modelled (fs_failed=%d, fs_missing=%d): %s",
+      period, n_fs_failed + n_fs_missing, n_fs_failed, n_fs_missing,
+      paste(affected, collapse = "; ")
+    ))
+  }
+
   fs_summary <- reconciliation %>%
     dplyr::filter(
       fs_status == "success",
