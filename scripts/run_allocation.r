@@ -89,6 +89,7 @@ src_files <- c(
   "src/setup.r",
   "src/utils.r",
   "src/dinamica_utils.r",
+  "src/saturation_diagnostics.r",
   "src/allocation.r"
 )
 

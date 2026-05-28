@@ -1569,6 +1569,30 @@ run_allocation_one_timestep <- function(
         sprintf("region=%s stage=dinamica", region_suffix),
         log_file
       )
+
+      # Saturation diagnostic (Phase 3.3 D-05/D-06): per-transition
+      # placed-vs-demanded summary. Writes work_dir/saturation_summary.csv
+      # and emits one AUDIT stage=saturation line via log_audit_saturation_line().
+      # Helper resolves because scripts/run_allocation.r sources
+      # src/saturation_diagnostics.r into the worker before src/allocation.r.
+      t_saturation <- prof_tic()
+      write_saturation_summary(
+        work_dir       = region_work_dir,
+        scenario       = scenario,
+        region_label   = region_label,
+        region_suffix  = region_suffix,
+        year_ant       = year_ant,
+        anterior_path  = region_input$anterior_path,
+        posterior_path = posterior_path,
+        config         = config,
+        log_file       = log_file
+      )
+      prof_toc(
+        t_saturation,
+        sprintf("region=%s stage=saturation_summary", region_suffix),
+        log_file
+      )
+
       log_msg(
         sprintf("    Completed region: %s (ID=%d)", region_label, region_val),
         log_file
