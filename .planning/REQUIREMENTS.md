@@ -40,6 +40,8 @@
 - [ ] **PIPE-05**: All active source files (outside `src/old/`) use `terra` only — 73 `raster::` call sites in `lulcc.spatprobmanipulation.r`, `spatial_interventions_prep.r`, and `landscape_pattern_analysis.r` are migrated or removed
 - [ ] **PIPE-06**: Intervention YAML files (`config/SSP*_interventions.yml`) reference `inputs/spat_prob_perturb/` paths matching the config schema — not legacy `Data/Spat_prob_perturb_layers/` paths
 - [ ] **PIPE-07**: Dinamica EGO log files are written to the central `logs/` directory — not scattered across region work directories
+- [ ] **PIPE-08**: Simulation trans_rates CSVs must be regenerated whenever `transition_modelling()` or `transition_feature_selection()` produces new outputs — the pipeline has no automated staleness guard between these stages; a stale trans_rates CSV can include transitions with no model, bypassing the ALLOC-08 hard stop
+- [ ] **PIPE-09**: The HPC deployment procedure includes an explicit `git pull` + `git status` check before any SLURM job submission to confirm the working tree matches the intended branch head — stale HPC tree is the root cause of the Phase 3.3 ALLOC-08 regression
 
 ### Allocation Throughput
 
@@ -98,6 +100,8 @@ Updated during roadmap creation.
 | PIPE-05 | Phase 4 | Pending |
 | PIPE-06 | Phase 4 | Pending |
 | PIPE-07 | Phase 1 | Pending |
+| PIPE-08 | Phase 3.4 | Pending |
+| PIPE-09 | Phase 3.4 | Pending |
 | ALLOC-06 | Phase 3.3 | Pending |
 | ALLOC-07 | Phase 3.3 | Pending |
 | ALLOC-08 | Phase 3.3 | Pending |
@@ -105,8 +109,8 @@ Updated during roadmap creation.
 | ALLOC-10 | Phase 3.3 | Pending |
 
 **Coverage:**
-- v1 requirements: 26 total
-- Mapped to phases: 26 ✓
+- v1 requirements: 28 total
+- Mapped to phases: 28 ✓
 - Unmapped: 0
 
 **Phase totals:**
