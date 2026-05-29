@@ -19,6 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3.1: Allocation Correctness & Dinamica Integration** *(INSERTED 2026-05-22; completed 2026-05-25)* - Fix model over-loading (filter to active transitions), eliminate phantom NA TIFs (nomatch=NULL), fix Dinamica HPC fallback guard, re-export demand CSV from XLSX (`clean_numeric` couldn't parse Excel-introduced thousand-separator format), and verify end-to-end allocation including the Dinamica CA step via dedicated smoke test
 - [ ] **Phase 3.2: Transition Pipeline Consistency** *(INSERTED 2026-05-22)* - Harden the end-to-end flow of viable transitions from identification through feature selection, modelling, rate preparation, and allocation so each stage operates on exactly the same transition set with no silent additions, drops, or mismatches.
 - [ ] **Phase 3.3: Probability Map Saturation & Allocation Throughput** *(INSERTED 2026-05-26)* - Address Dinamica's low allocation throughput: probability maps don't contain sufficient non-zero values, causing Expander/Patcher to place only a small fraction of the change matrix demand (e.g., 4,477 of hundreds of thousands of requested transitions in Phase 3.1 BAU costa_peruana smoke).
+- [ ] **Phase 3.4: Stale Pipeline Artifact Re-run** *(INSERTED 2026-05-29)* - Regenerate simulation trans_rates CSVs and alloc_params on HPC with Phase 3.2-corrected code; unblocks Phase 3.3 operator gate. Root cause: rate CSVs were generated before `forbidden_from_classes` config key and `load_unmodelled_transitions()` were active, so id_trans=34 (mining→high_intensity_agricultural) survived into the active set and triggered the ALLOC-08 hard stop.
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port
 
 ## Phase Details
@@ -186,6 +187,21 @@ Plans:
 **Wave 4** *(blocked on Wave 2, Wave 3 completion; has operator-gate checkpoint)*
 - [ ] 03.3-05-PLAN.md — Add ALLOC-06..10 to REQUIREMENTS.md; update ROADMAP.md; operator-gate live HPC verification (BAU x all Peruvian regions x 2022->2026); write 03.3-SUMMARY.md.
 
+### Phase 3.4: Stale Pipeline Artifact Re-run *(INSERTED 2026-05-29)*
+**Goal**: Simulation trans_rates CSVs and alloc_params.csv on Euler are regenerated with Phase 3.2-corrected code so id_trans=34 (and any other no-model transition) is excluded from the active set before allocation runs — removing the ALLOC-08 blocker for Phase 3.3's operator gate.
+**Depends on**: Phase 3.2 (code fixes landed), Phase 3.3 Plans 01–04 (ALLOC-08 hard stop in place)
+**Requirements**: PIPE-08, PIPE-09
+**Success Criteria** (what must be TRUE):
+  1. `git log --oneline -1` on Euler shows a commit ≥ `9166fc4` (Phase 3.2 Plan 01) before any SLURM job is submitted.
+  2. After `submit_simulation_trans_rates_estimation.sh` completes, `AUDIT stage=4` log lines for every region show `forbidden_excluded > 0`.
+  3. `grep ",34," outputs/transition_tables/simulation-lulc-areas-scalar-9.0x/BAU/<region>/BAU-<region>-trans_rates-2022.csv` returns no matches for all 4 regions.
+  4. After `submit_calibrate_allocation_parameters.sh` completes, alloc_params.csv for each region covers all active id_trans values with no gaps (verified by spot-check Rscript).
+  5. `sbatch scripts/submit_allocation_smoke.sh` completes for all 4 regions with no ALLOC-08 stop.
+**Plans**: 1 plan
+
+Plans:
+- [ ] 03.4-01-PLAN.md — Operator pre-flight, trans_rates re-run, alloc_params calibration, and allocation smoke for all 4 regions
+
 ### Phase 4: End-to-End Correctness & Performance
 **Goal**: All four scenarios run to completion across all regions and timesteps, with `predict` no longer dominating wall time, restarts skipping completed work atomically, and the latent correctness gaps (raster/terra split, missing CVXR loop, drifted intervention paths) closed.
 **Depends on**: Phase 3
@@ -213,4 +229,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 3.1. Allocation Correctness & Dinamica Integration | 1/1 | Complete — 4,477 cells changed (103→105); demand CSV fix unblocked optimizer | 2026-05-25 |
 | 3.2. Transition Pipeline Consistency | 0/3 | Not started (INSERTED 2026-05-22) | - |
 | 3.3. Probability Map Saturation & Allocation Throughput | 4/5 | Wave 1-3 plans complete; operator gate pending (03.3-05) | partial — Wave 1-3 2026-05-26 |
+| 3.4. Stale Pipeline Artifact Re-run | 0/TBD | Not started (INSERTED 2026-05-29) | - |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
