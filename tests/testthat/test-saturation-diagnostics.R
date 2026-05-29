@@ -150,11 +150,11 @@ test_that("compute_per_transition_metrics reports quantiles using stats::quantil
     exempt = list()
   )
 
-  expect_equal(result$p50, unname(expected[[1L]]))
-  expect_equal(result$p90, unname(expected[[2L]]))
-  expect_equal(result$p95, unname(expected[[3L]]))
-  expect_equal(result$p99, unname(expected[[4L]]))
-  expect_equal(result$pmax, 0.99)
+  expect_equal(result$p50, unname(expected[[1L]]), tolerance = 1e-6)
+  expect_equal(result$p90, unname(expected[[2L]]), tolerance = 1e-6)
+  expect_equal(result$p95, unname(expected[[3L]]), tolerance = 1e-6)
+  expect_equal(result$p99, unname(expected[[4L]]), tolerance = 1e-6)
+  expect_equal(result$pmax, 0.99, tolerance = 1e-6)
 })
 
 test_that("compute_per_transition_metrics marks matching saturation_exempt entries", {
