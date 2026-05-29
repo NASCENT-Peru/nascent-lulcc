@@ -10,7 +10,11 @@
 # ----------------------------------------------------------
 # Load common HPC functions
 # ----------------------------------------------------------
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -n "$SLURM_SUBMIT_DIR" ]; then
+    SCRIPT_DIR="$SLURM_SUBMIT_DIR/scripts"
+else
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 source "$SCRIPT_DIR/hpc_common.sh"
 
 # ----------------------------------------------------------
@@ -51,7 +55,7 @@ echo "Parallel workers: $ALLOCATION_NUM_WORKERS"
 # ----------------------------------------------------------
 # Run allocation simulations
 # ----------------------------------------------------------
-R_SCRIPT="$SLURM_SUBMIT_DIR/run_allocation.r"
+R_SCRIPT="$SLURM_SUBMIT_DIR/scripts/run_allocation.r"
 
 if [ ! -f "$R_SCRIPT" ]; then
     echo "ERROR: run_allocation.r not found at: $R_SCRIPT"
