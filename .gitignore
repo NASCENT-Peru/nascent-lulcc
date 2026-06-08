@@ -34,3 +34,18 @@ renv*
 Agent-tool-input-(l9orum).txt
 allocation_step_integration_plan.md
 .claude/settings.json
+
+# spatial-interventions working / planning files (local-only)
+spatial_interventions_integration_protocol.md
+
+# spatial_masks/: source data folders (too large for git, kept locally)
+spatial_masks/Results_NASCENT_priorities_protected_areas_deleglise/
+spatial_masks/comunidad-nativa-titulada/
+spatial_masks/comunidades-campesinas-tituladas-cofopri/
+
+# spatial_masks/: mask-build R scripts (preparation code, not model code)
+spatial_masks/build_*.R
+spatial_masks/build_*.r
+
+# spatial_masks/: temporary directories
+spatial_masks/.tmp_*/
