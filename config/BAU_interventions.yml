@@ -1,0 +1,72 @@
+# =============================================================================
+# BAU_interventions.yml — Business as Usual scenario (SSP2-aligned)
+# =============================================================================
+#
+# Spatial intervention configuration for the BAU scenario, applied inside
+# generate_probability_maps() in src/allocation.r between probability
+# prediction and per-transition TIF writes.
+#
+# Authored 2026-06-05 from the design recorded in
+# spatial_interventions_integration_protocol.md §4a.
+#
+# Narrative anchor (from scenario_narratives.txt):
+#   - Conservation: existing PAs only (no expansion beyond 17.9%); weak
+#     enforcement leaks conversions through despite the PA designation.
+#     Encoded as Relative-Decrease (soft) inside the static current-PA mask
+#     rather than Absolute=0 (hard block) — this is what makes the
+#     conservation "ineffective" in narrative terms.
+#   - Mining: continued expansion, no spatial constraint. No intervention.
+#   - Urban sprawl: weak zoning enforcement; no spatial constraint on where
+#     urban LULC lands. No intervention.
+#   - Mountain-to-coast migration: encoded via demand-side regional
+#     differences + fitted models (smaller Andean urban demand, larger
+#     coastal demand). No spatial intervention — see protocol §3.7
+#     for the rationale.
+#   - No Indigenous_land_OECM in BAU: narrative explicitly notes weak
+#     enforcement of Indigenous land rights.
+#
+# Years: 4-year simulation steps from 2024 to 2060 (LULC baseline = 2022).
+# Class names follow config/lulc_schema.json.
+# Mask paths are relative to the project root.
+#
+# BAU intentionally has only one spatial intervention. The "sprawl plus
+# extractivism" narrative is largely encoded by the ABSENCE of constraints
+# (no urban densification, no mining freeze, no Indigenous OECM) combined
+# with the BAU regional demand projections, not by positive spatial pushes.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. ineffective_conservation
+#    Inside the static current-PA mask (Peru's 17.9% protected area as of
+#    2023, no expansion): soft Relative-Decrease on transitions to
+#    high-impact land uses. Mechanism choice is intentional: Relative
+#    leaves bottom-percentile cells unmodified, so some conversions still
+#    "leak through" the PAs despite the formal designation. This is the
+#    "ineffective" narrative.
+# -----------------------------------------------------------------------------
+- Intervention_stage: Allocation
+  Intervention_ID: ineffective_conservation
+  Intervention_ranking: 1
+  Time_steps_implemented:
+    - 2024
+    - 2028
+    - 2032
+    - 2036
+    - 2040
+    - 2044
+    - 2048
+    - 2052
+    - 2056
+    - 2060
+  Transition_target_classes:
+    - built_up_and_barren_lands
+    - high_intensity_agricultural_areas
+    - mining
+  Prob_adjust_type: Relative
+  Prob_adjust_valency: Decrease
+  Prob_adjust_intervention_percentile: 90
+  Prob_adjust_non_intervention_percentile: 90
+  Prob_adjust_threshold: 5
+  Prob_adjust_zone: Inside
+  Mask_type: Static
+  Intervention_mask: spatial_masks/protected_areas_mask_BAU.tif

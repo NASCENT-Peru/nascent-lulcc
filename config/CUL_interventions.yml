@@ -1,0 +1,203 @@
+# =============================================================================
+# CUL_interventions.yml — Nature as Culture scenario (SSP1-aligned)
+# =============================================================================
+#
+# Spatial intervention configuration for the CUL scenario, applied inside
+# generate_probability_maps() in src/allocation.r between probability
+# prediction and per-transition TIF writes.
+#
+# Authored 2026-06-05 from the design recorded in
+# spatial_interventions_integration_protocol.md §4a.
+#
+# Narrative anchor (from scenario_narratives.txt):
+#   - Conservation expansion to 30% by 2030 via OECMs, community-managed,
+#     prioritized for cultural heritage / ecoregion representativeness.
+#   - Mining: continues but strictly regulated; soft suppression of new
+#     mining outside existing concessions (continuous regulatory drag,
+#     not a freeze).
+#   - Urban densification: lower than NAT/SOC (81.5% urban by 2060) and
+#     gentler — boost inside settlement zones but do NOT actively suppress
+#     growth outside (no Increase_inside_decrease_outside; just Increase).
+#   - Indigenous_land_OECM: ENABLED. CUL's Buen Vivir narrative is strongly
+#     Indigenous-led; titled community lands carry significant weight as
+#     OECMs.
+#
+# Years: 4-year simulation steps from 2024 to 2060 (LULC baseline = 2022).
+# Class names follow config/lulc_schema.json.
+# Mask paths are relative to the project root.
+#
+# TODO: differentiate from NAT.  CUL currently uses the same Indigenous OECM
+# magnitudes as NAT. Possible refinements: stronger Indigenous suppression
+# (e.g. Prob_adjust_threshold raised to 10 or lower percentile for broader
+# bite) and stricter conservation magnitude in OECM areas.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Conservation_expansion_and_preservation
+#    Hard-block high-impact transitions inside the time-staggered PA mask.
+#    Mask = Deléglise-derived CUL PAs (cultural-heritage / OECM-prioritised),
+#    phase-staggered:
+#      phase0 (current, 17.9%) for 2024-2028
+#      phase1 (target, ~30% reached by 2030) for 2032
+#      phase2 (full + connectivity) for 2036-2060
+# -----------------------------------------------------------------------------
+- Intervention_stage: Allocation
+  Intervention_ID: Conservation_expansion_and_preservation
+  Intervention_ranking: 1
+  Time_steps_implemented:
+    - 2024
+    - 2028
+    - 2032
+    - 2036
+    - 2040
+    - 2044
+    - 2048
+    - 2052
+    - 2056
+    - 2060
+  Transition_target_classes:
+    - built_up_and_barren_lands
+    - high_intensity_agricultural_areas
+    - mining
+  Prob_adjust_type: Absolute
+  Prob_adjust_value: 0
+  Prob_adjust_zone: Inside
+  Mask_type: Dynamic
+  Intervention_mask:
+    '2024': spatial_masks/protected_areas_mask_CUL_phase0_current.tif
+    '2028': spatial_masks/protected_areas_mask_CUL_phase0_current.tif
+    '2032': spatial_masks/protected_areas_mask_CUL_phase1_target.tif
+    '2036': spatial_masks/protected_areas_mask_CUL_phase2_full.tif
+    '2040': spatial_masks/protected_areas_mask_CUL_phase2_full.tif
+    '2044': spatial_masks/protected_areas_mask_CUL_phase2_full.tif
+    '2048': spatial_masks/protected_areas_mask_CUL_phase2_full.tif
+    '2052': spatial_masks/protected_areas_mask_CUL_phase2_full.tif
+    '2056': spatial_masks/protected_areas_mask_CUL_phase2_full.tif
+    '2060': spatial_masks/protected_areas_mask_CUL_phase2_full.tif
+
+# -----------------------------------------------------------------------------
+# 2. Mining_outside_restraint
+#    Outside the existing concession mask: soft Relative-Decrease on
+#    transitions to mining. Continuous from 2024 (regulation is in place
+#    from the start). Less aggressive than NAT's post-2030 freeze, which
+#    is Absolute=0.
+# -----------------------------------------------------------------------------
+- Intervention_stage: Allocation
+  Intervention_ID: Mining_outside_restraint
+  Intervention_ranking: 2
+  Time_steps_implemented:
+    - 2024
+    - 2028
+    - 2032
+    - 2036
+    - 2040
+    - 2044
+    - 2048
+    - 2052
+    - 2056
+    - 2060
+  Transition_target_classes: mining
+  Prob_adjust_type: Relative
+  Prob_adjust_valency: Decrease
+  Prob_adjust_intervention_percentile: 90
+  Prob_adjust_non_intervention_percentile: 90
+  Prob_adjust_threshold: 5
+  Prob_adjust_zone: Outside
+  Mask_type: Static
+  Intervention_mask: spatial_masks/mining_concessions_mask.tif
+
+# -----------------------------------------------------------------------------
+# 3. Indigenous_land_OECM_forest
+#    Inside titled Indigenous lands (SICNA Amazonian + COFOPRI Andean),
+#    suppress forest-loss transitions to high-impact destinations.
+#    Same settings as NAT for now (TODO: differentiate).
+# -----------------------------------------------------------------------------
+- Intervention_stage: Allocation
+  Intervention_ID: Indigenous_land_OECM_forest
+  Intervention_ranking: 3
+  Time_steps_implemented:
+    - 2024
+    - 2028
+    - 2032
+    - 2036
+    - 2040
+    - 2044
+    - 2048
+    - 2052
+    - 2056
+    - 2060
+  Transition_target_classes:
+    - built_up_and_barren_lands
+    - high_intensity_agricultural_areas
+    - mining
+  From_lulc_filter: forested_areas
+  Prob_adjust_type: Relative
+  Prob_adjust_valency: Decrease
+  Prob_adjust_intervention_percentile: 90
+  Prob_adjust_non_intervention_percentile: 90
+  Prob_adjust_threshold: 5
+  Prob_adjust_zone: Inside
+  Mask_type: Static
+  Intervention_mask: spatial_masks/indigenous_lands_mask.tif
+
+# -----------------------------------------------------------------------------
+# 4. Indigenous_land_OECM_ag
+#    Inside titled Indigenous lands, suppress agricultural intensification
+#    (low-intensity ag -> high-intensity ag).
+#    Same settings as NAT for now (TODO: differentiate).
+# -----------------------------------------------------------------------------
+- Intervention_stage: Allocation
+  Intervention_ID: Indigenous_land_OECM_ag
+  Intervention_ranking: 4
+  Time_steps_implemented:
+    - 2024
+    - 2028
+    - 2032
+    - 2036
+    - 2040
+    - 2044
+    - 2048
+    - 2052
+    - 2056
+    - 2060
+  Transition_target_classes: high_intensity_agricultural_areas
+  From_lulc_filter: low_intensity_agricultural_areas
+  Prob_adjust_type: Relative
+  Prob_adjust_valency: Decrease
+  Prob_adjust_intervention_percentile: 90
+  Prob_adjust_non_intervention_percentile: 90
+  Prob_adjust_threshold: 5
+  Prob_adjust_zone: Inside
+  Mask_type: Static
+  Intervention_mask: spatial_masks/indigenous_lands_mask.tif
+
+# -----------------------------------------------------------------------------
+# 5. Urban_densification
+#    GENTLER than NAT/SOC: boost top-percentile cells inside the settlement
+#    mask but do NOT suppress cells outside. Reflects CUL's lower
+#    urbanisation (81.5% vs NAT/SOC 92%) and the narrative preference for
+#    people dwelling closer to nature.
+# -----------------------------------------------------------------------------
+- Intervention_stage: Allocation
+  Intervention_ID: Urban_densification
+  Intervention_ranking: 5
+  Time_steps_implemented:
+    - 2024
+    - 2028
+    - 2032
+    - 2036
+    - 2040
+    - 2044
+    - 2048
+    - 2052
+    - 2056
+    - 2060
+  Transition_target_classes: built_up_and_barren_lands
+  Prob_adjust_type: Relative
+  Prob_adjust_valency: Increase
+  Prob_adjust_intervention_percentile: 90
+  Prob_adjust_non_intervention_percentile: 90
+  Prob_adjust_threshold: 5
+  Prob_adjust_zone: Inside
+  Mask_type: Static
+  Intervention_mask: spatial_masks/urban_settlement_mask.tif

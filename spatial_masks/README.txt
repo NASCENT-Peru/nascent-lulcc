@@ -422,31 +422,54 @@ USED BY
 
 
 ===============================================================================
-BUILD ARTEFACTS (not consumed by the model)
+WHAT LIVES HERE vs IN spatial_masks_misc/
 ===============================================================================
 
-  build_urban_settlement_mask.R                Script for #1.
-  build_urban_settlement_mask.log              Last run log (#1).
-  build_urban_settlement_mask_threshold_sweep.R    Threshold-sweep utility
-                                                   used during parameter
-                                                   selection (#1).
-  build_urban_settlement_mask_threshold_sweep.log  Sweep log.
-  urban_settlement_mask_methodology.txt        Full methodology document
-                                                for #1 (logical + technical).
-  build_mining_concessions_mask.R              Script for #2.
-  build_mining_concessions_mask.log            Last run log (#2).
-  build_protected_areas_masks.R                Script for #3.
-  build_protected_areas_masks.log              Last run log (#3).
-  build_indigenous_lands_mask.R                Script for #4.
-  build_indigenous_lands_mask.log              Last run log (#4).
-  build_low_es_value_mask.R                    Script for #5.
-  build_low_es_value_mask.log                  Last run log (#5).
-  .tmp_urban_mask/                              Tempdir for terra during
-                                                urban-mask build runs.
-                                                Empty between runs.
-  .tmp_low_es/                                  Tempdir for terra during
-                                                low-ES-mask build. Empty
-                                                between runs.
+This folder contains ONLY what the spatial-interventions pipeline reads at
+simulation time:
+
+  - The five (sets of) binary intervention masks (#1-5 above).
+  - This README.txt.
+  - urban_settlement_mask_methodology.txt (full methodology document for #1).
+
+Everything used to BUILD the masks — source vectors and rasters, build
+scripts, run logs, terra temp dirs — lives in the sibling folder
+../spatial_masks_misc/. That separation keeps this directory minimal and
+makes the gitignore rules simpler. Specifically, spatial_masks_misc/ holds:
+
+  - NCP_baseline.tif   (source for low_es_value_mask.tif; from the
+                        NASCENT project's InVEST-based NCP pipeline)
+  - Results_NASCENT_priorities_protected_areas_deleglise/
+                       (source for protected_areas_mask_*.tif; Deléglise
+                        et al. 2024 outputs + report PDF + weights Excel)
+  - comunidad-nativa-titulada/
+                       (source vector for indigenous_lands_mask.tif —
+                        SICNA via LandMark)
+  - comunidades-campesinas-tituladas-cofopri/
+                       (source vector for indigenous_lands_mask.tif —
+                        COFOPRI / MINAGRI via geogpsperu)
+  - build_urban_settlement_mask.R             Script for #1.
+  - build_urban_settlement_mask.log
+  - build_urban_settlement_mask_threshold_sweep.R    Threshold-sweep utility
+                                                     used during parameter
+                                                     selection (#1).
+  - build_urban_settlement_mask_threshold_sweep.log
+  - build_mining_concessions_mask.R          Script for #2.
+  - build_mining_concessions_mask.log
+  - build_protected_areas_masks.R            Script for #3.
+  - build_protected_areas_masks.log
+  - build_indigenous_lands_mask.R            Script for #4.
+  - build_indigenous_lands_mask.log
+  - build_low_es_value_mask.R                Script for #5.
+  - build_low_es_value_mask.log
+  - .tmp_urban_mask/, .tmp_low_es/           Tempdirs for terra during the
+                                              build runs. Empty between runs.
+
+  Note: the build scripts reference input/output paths that were valid when
+  the masks were originally produced (e.g. "spatial_masks/<output>.tif").
+  If you re-run any of them after this reorganisation, update the
+  output_path in the script (and the ref_grid path if it pointed at
+  another mask in this folder) accordingly.
 
 
 ===============================================================================

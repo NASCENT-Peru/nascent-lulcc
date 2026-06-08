@@ -38,14 +38,13 @@ allocation_step_integration_plan.md
 # spatial-interventions working / planning files (local-only)
 spatial_interventions_integration_protocol.md
 
-# spatial_masks/: source data folders (too large for git, kept locally)
-spatial_masks/Results_NASCENT_priorities_protected_areas_deleglise/
-spatial_masks/comunidad-nativa-titulada/
-spatial_masks/comunidades-campesinas-tituladas-cofopri/
+# spatial_masks_misc/: preparation inputs, build scripts, build logs, and
+# temp dirs. Everything here is local-only — needed to (re)build the masks
+# but not at simulation time. Already covered by individual extension
+# rules above (*.tif, *.log, *.R, etc.) but kept as a folder-level rule
+# for clarity.
+spatial_masks_misc/
 
-# spatial_masks/: mask-build R scripts (preparation code, not model code)
-spatial_masks/build_*.R
-spatial_masks/build_*.r
-
-# spatial_masks/: temporary directories
-spatial_masks/.tmp_*/
+# config/old/: legacy SSPx_interventions.yml files kept locally for
+# reference. The active YAMLs are config/{BAU,NAT,CUL,SOC}_interventions.yml.
+config/old/

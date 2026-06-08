@@ -53,6 +53,7 @@ config_files_paths:
   calibration_ctrl_tbl_path: "tools/calibration_control.csv"
   ctrl_tbl_path: "tools/simulation_control.csv"
   ancillary_data_table: "config/ancillary_data.yaml"  # Project root - resolved by R code
+  interventions_dir: "config"                          # directory containing the per-scenario *_interventions.yml files
 
 # Calibration/simulation configurations
 configuration_settings:

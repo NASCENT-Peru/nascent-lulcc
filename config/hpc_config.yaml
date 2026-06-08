@@ -54,16 +54,17 @@ config_files_paths:
   calibration_ctrl_tbl_path: "tools/calibration_control.csv"
   ctrl_tbl_path: "tools/simulation_control.csv"
   ancillary_data_table: "config/ancillary_data.yaml"  # Project root - resolved by R code
+  interventions_dir: "config"                          # directory containing the per-scenario *_interventions.yml files
 
 # Calibration/simulation configurations
 configuration_settings:
   ref_grid_target_cellsize: 100  # in meters
   reference_crs: "epsg:2056"
   step_length: 4
-  data_periods: ["2018_2022"] #"2010_2014", "2014_2018", 
+  data_periods: ["2018_2022"] #"2010_2014", "2014_2018",
   regionalization: true
   scenario_names: ["BAU", "NAT", "CUL", "SOC"]
-    scenario_to_ssp_mapping: 
+  scenario_to_ssp_mapping:
     BAU: "ssp245"
     NAT: "ssp126"
     CUL: "ssp126"
