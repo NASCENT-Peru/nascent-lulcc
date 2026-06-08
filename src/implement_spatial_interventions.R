@@ -1,24 +1,33 @@
-#' @title Implement Spatial Interventions on Raster Probability Values
+#' @title Implement Spatial Interventions on per-transition Probabilities
 #' @description
-#' Implement all specified spatial interventions on raster probability values
+#' Implement all specified spatial interventions on the long-format
+#' data.table of per-transition probabilities.
+#' @param normalized data.table with columns row_idx, from_val, to_val,
+#'   cell_id, x, y, prob. Modified in place.
+#' @param anterior SpatRaster of current LULC (reserved for future use).
+#' @param trans_rates_dt data.table with From*, To*, id_trans, row_idx
+#'   (reserved for future use).
+#' @param class_name_to_value named integer vector mapping
+#'   lulc_schema class_name to raster integer value.
 #' @param interventions_dir Directory containing YAML files with intervention definitions.
-#' @param scenario_ID Identifier for the scenario to apply interventions.
-#' @param raster_prob_values Data frame containing raster probability values with columns for coordinates and probabilities.
+#' @param scenario Identifier for the scenario to apply interventions.
 #' @param simulation_time_step The time step at which to apply the interventions.
-#' @param LULC_rat data frame containing LULC class abbreviations and their aggregated IDs, used for filtering based on LULC classes.
-#' @return A data frame with updated raster probability values after applying interventions.
+#' @param log_file Path to per-region log file used by log_msg(...).
+#' @return The `normalized` data.table with updated probabilities.
 implement_spatial_interventions <- function(
+  normalized,
+  anterior,
+  trans_rates_dt,
+  class_name_to_value,
   interventions_dir,
-  scenario_ID,
-  raster_prob_values,
+  scenario,
   simulation_time_step,
-  LULC_rat,
-  Proj = ProjCH
+  log_file
 ) {
   # Load interventions for scenario from YAML file
-  Interventions <- yaml.load_file(file.path(
+  Interventions <- yaml::yaml.load_file(file.path(
     interventions_dir,
-    paste0(scenario_ID, "_interventions.yml")
+    paste0(scenario, "_interventions.yml")
   ))
 
   # filter to Intervention_stage == Allocation
@@ -32,23 +41,24 @@ implement_spatial_interventions <- function(
     function(x) simulation_time_step %in% x$Time_steps_implemented
   ))]
 
-  # If no interventions are found, return the raster_prob_values unchanged
+  # If no interventions are found, return the normalized DT unchanged
   if (length(Current_interventions) == 0) {
-    warning(
-      "No interventions found for the specified scenario and time step. Returning original raster_prob_values."
+    log_msg(
+      "No interventions found for the specified scenario and time step. Returning original probabilities.",
+      log_file
     )
-    return(raster_prob_values)
+    return(normalized)
   } else {
-    cat(
+    log_msg(
       paste(
         "Found",
         length(Current_interventions),
         "allocation stage interventions for scenario",
-        scenario_ID,
+        scenario,
         "at time step",
         simulation_time_step
       ),
-      "\n"
+      log_file
     )
 
     # order interventions by Intervention_ranking putting NAs last
@@ -63,142 +73,100 @@ implement_spatial_interventions <- function(
       na.last = TRUE
     )]
 
-    #vector names of columns of probability predictions (matching on Prob_)
-    Pred_prob_columns <- grep("Prob_", names(raster_prob_values), value = TRUE)
-
-    #convert probability table to raster stack
-    Prob_raster_stack <- c(lapply(Pred_prob_columns, function(x) {
-      col_rast <- rast(raster_prob_values[, c("x", "y", x)])
-      crs(col_rast) <- Proj # Set the CRS for each raster layer)
-      return(col_rast)
-    }))
-    names(Prob_raster_stack) <- Pred_prob_columns
-    cat("Converted raster_prob_values to RasterStack", "\n")
-
-    # if any of the interventions have a value of From_lulc_filter, that is not
-    #NULL then create a raster of the current LULC
-    if (
-      any(sapply(Current_interventions, function(x) {
-        val <- x[["From_lulc_filter"]]
-        !is.null(val) && length(val) > 0 && any(val != "None")
-      }))
-    ) {
-      # create a raster of the current LULC
-      Current_lulc_raster <- rast(raster_prob_values[, c("x", "y", "LULC")])
-      names(Current_lulc_raster) <- "Current_LULC"
-
-      # add the crs
-      crs(Current_lulc_raster) <- Proj
-    }
-
     # loop over interventions
     for (intervention in Current_interventions) {
       # Print intervention name
-      cat(paste(
-        "Applying intervention:",
-        intervention[["Intervention_ID"]],
-        "\n"
-      ))
-
-      # Adjust format of Transition_target_classes
-      Target_classes <- paste0(
-        "Prob_",
-        intervention[["Transition_target_classes"]]
+      log_msg(
+        paste("Applying intervention:", intervention[["Intervention_ID"]]),
+        log_file
       )
+
+      # Translate Transition_target_classes (class_name strings) to integer
+      # to_val values via lulc_schema.
+      Target_classes <- as.integer(
+        class_name_to_value[unlist(intervention[["Transition_target_classes"]])]
+      )
+      if (any(is.na(Target_classes))) {
+        stop(paste(
+          "Unknown class_name in Transition_target_classes:",
+          paste(intervention[["Transition_target_classes"]], collapse = ", ")
+        ))
+      }
 
       # Prepare the Intervention mask
       if (intervention$Mask_type == "Static") {
         # load mask using the Intervention_masks
-        Intervention_mask <- rast(intervention[["Intervention_mask"]])
+        Intervention_mask <- terra::rast(intervention[["Intervention_mask"]])
       } else if (intervention$Mask_type == "Dynamic") {
         # subset the list of intervention$Intervention_mask to the current simulation_time_step
         # This assumes that the Intervention_mask is a list with keys corresponding to time steps
         intervention_mask_list <- intervention[["Intervention_mask"]]
-        intervention_mask_path <- unlist(intervention_mask_list[
-          names(intervention_mask_list) == simulation_time_step
-        ])
-
+        intervention_mask_path <- intervention_mask_list[[
+          as.character(simulation_time_step)
+        ]]
+        if (is.null(intervention_mask_path)) {
+          log_msg(
+            paste(
+              "Dynamic mask has no entry for year",
+              simulation_time_step,
+              "- skipping intervention."
+            ),
+            log_file
+          )
+          next
+        }
         # load mask using the Intervention_mask_path appending simulation_time_step
-        Intervention_mask <- rast(intervention_mask_path)
+        Intervention_mask <- terra::rast(intervention_mask_path)
       } else {
         stop(paste("Unknown Mask_type:", intervention[["Mask_type"]]))
       }
 
-      # If the Intervention requires filtering by LULC classes then adjust the mask
+      # If the Intervention requires filtering by LULC classes then translate
+      # the From_lulc_filter class names to integer from_val values, to be
+      # passed through to the helpers (which apply the filter on the long DT).
+      From_filter_vals <- NULL
       if (
         !is.null(intervention$From_lulc_filter) &&
           length(intervention$From_lulc_filter) > 0 &&
           all(intervention$From_lulc_filter != "None")
       ) {
-        # Get the raster value of the From_lulc_filter class from LULC_rat
-        LULC_filter_classes <- unlist(LULC_rat[
-          LULC_rat$Class_abbreviation %in% intervention[["From_lulc_filter"]],
-          "Aggregated_ID"
-        ])
-
-        cat(paste(
-          "Filtering to only cells that are currently LULC classes:",
-          paste(LULC_filter_classes, collapse = ", "),
-          "\n"
-        ))
-
-        # Filter the Current_lulc_raster to only include the LULC_filter_classes
-        LULC_mask <- Current_lulc_raster
-
-        # set all values of LULC_mask that are not in LULC_filter_classes to NA
-        LULC_mask[!(values(LULC_mask) %in% LULC_filter_classes)] <- NA
-
-        # Now set all values that are not NA to 1
-        LULC_mask[!is.na(LULC_mask)] <- 1
-
-        # Mask the Intervention_mask with the LULC_mask
-        Intervention_mask <- terra::mask(Intervention_mask, LULC_mask == 1)
-      }
-
-      # if intervention$Intervention_ID is "Agri_maintenance" or "Agri_abandonment"
-      # then we need to subset the mask to the most marginal pixels
-      if (
-        intervention[["Intervention_ID"]] %in%
-          c("Agri_maintenance", "Agri_abandonment")
-      ) {
-        cat(paste(
-          "because the intervention is:",
-          intervention[["Intervention_ID"]],
-          ", subsetting the Intervention mask to pixels 
-                    with values >= the upper quartile ofagricultural marginality",
-          "\n"
-        ))
-        # Get the most marginal pixels by calculating the upper quartile value of the Intervention_mask
-        # and setting all values that are not equal or greater than to the upper quartile value to NA
-        min_value <- quantile(
-          values(Intervention_mask),
-          probs = 0.75,
-          na.rm = TRUE
+        From_filter_vals <- as.integer(
+          class_name_to_value[unlist(intervention[["From_lulc_filter"]])]
         )
-
-        # Set all values that are not equal to min_value to NA
-        Intervention_mask[values(Intervention_mask) >= min_value] <- NA
-
-        # Set all values that are not NA to 1
-        Intervention_mask[!is.na(Intervention_mask)] <- 1
+        if (any(is.na(From_filter_vals))) {
+          stop(paste(
+            "Unknown class_name in From_lulc_filter:",
+            paste(intervention[["From_lulc_filter"]], collapse = ", ")
+          ))
+        }
+        log_msg(
+          paste(
+            "Filtering to only cells that are currently LULC class values:",
+            paste(From_filter_vals, collapse = ", ")
+          ),
+          log_file
+        )
       }
 
       # Apply different functions based on whether the intervention specifies absolute or relative adjustments to probabilities
       # if intervention$Prob_adjust_type == Absolute then apply absolute adjustment function
       if (intervention$Prob_adjust_type == "Absolute") {
-        cat(paste(
-          "Applying absolute probability adjustment to cells:",
-          intervention[["Prob_adjust_zone"]],
-          "the intervention area, adjusting probability values to:",
-          intervention[["Prob_adjust_value"]],
-          "\n"
-        ))
+        log_msg(
+          paste(
+            "Applying absolute probability adjustment to cells:",
+            intervention[["Prob_adjust_zone"]],
+            "the intervention area, adjusting probability values to:",
+            intervention[["Prob_adjust_value"]]
+          ),
+          log_file
+        )
 
-        Prob_raster_stack <- absolute_prob_adjust(
-          Prob_raster_stack = Prob_raster_stack,
+        normalized <- absolute_prob_adjust(
+          normalized = normalized,
           Prob_adjust_zone = intervention$Prob_adjust_zone,
           Prob_adjust_value = intervention$Prob_adjust_value,
           Target_classes = Target_classes,
+          From_filter_vals = From_filter_vals,
           Intervention_mask = Intervention_mask
         )
       } else if (intervention$Prob_adjust_type == "Relative") {
@@ -217,7 +185,7 @@ implement_spatial_interventions <- function(
           100
 
         # Apply relative adjustment function
-        Prob_raster_stack <- relative_prob_adjust(
+        normalized <- relative_prob_adjust(
           Prob_adjust_valency = intervention[["Prob_adjust_valency"]],
           Prob_adjust_intervention_percentile = intervention[[
             "Prob_adjust_intervention_percentile"
@@ -228,8 +196,9 @@ implement_spatial_interventions <- function(
           Prob_adjust_threshold = intervention[["Prob_adjust_threshold"]],
           Prob_adjust_zone = intervention[["Prob_adjust_zone"]],
           Target_classes = Target_classes,
+          From_filter_vals = From_filter_vals,
           Intervention_mask = Intervention_mask,
-          Prob_raster_stack = Prob_raster_stack
+          normalized = normalized
         )
       } else {
         stop(paste(
@@ -240,36 +209,27 @@ implement_spatial_interventions <- function(
     } # end of intervention loop
   }
 
-  #convert raster stack back to dataframe
-  # because terra::as.data.frame() does not handle NA values well,
-  # we will loop over the names and convert each layer to df and replace the corresponding column in raster_prob_values
-  for (i in names(Prob_raster_stack)) {
-    # convert each raster layer to a data frame
-    layer_df <- terra::as.data.frame(Prob_raster_stack[[i]], na.rm = FALSE)
-
-    # replace the corresponding column in raster_prob_values
-    raster_prob_values[, i] <- layer_df[, i] # assuming the third column is the values
-  }
-
-  #return the updated raster_prob_values
-  return(raster_prob_values)
+  # return the updated normalized data.table
+  return(normalized)
 }
 
 #' @title Perform absolute adjustment of probabilities of change in target classes
 #' @description
 #' Perform absolute adjustment of probabiltieis of change in target classes
 #' either inside or outside an intervention mask.
-#' @param Prob_raster_stack A RasterStack containing layers of probability of change to certain land use classes, layers named Prob_*class*.
+#' @param normalized A long-format data.table with columns to_val, from_val, x, y, prob.
 #' @param Prob_adjust_zone A string indicating the zone for adjustment, either "Inside" or "Outside".
 #' @param Prob_adjust_value A numeric value to set the probabilities in the target area.
-#' @param Target_classes A vector of land use classes to be targeted by the intervention.
-#' @param Intervention_mask A RasterLayer or RasterStack representing the intervention mask.
-#' @return A RasterStack with updated probabilities for the target land use classes.
+#' @param Target_classes An integer vector of target to_val class values.
+#' @param From_filter_vals Optional integer vector of from_val classes to restrict to.
+#' @param Intervention_mask A SpatRaster representing the intervention mask.
+#' @return The `normalized` data.table with updated probabilities for the target rows.
 absolute_prob_adjust <- function(
-  Prob_raster_stack,
-  Prob_adjust_zone = Outside,
+  normalized,
+  Prob_adjust_zone = "Outside",
   Prob_adjust_value = 0.1,
   Target_classes,
+  From_filter_vals = NULL,
   Intervention_mask
 ) {
   # loop over the target classes
@@ -284,42 +244,39 @@ absolute_prob_adjust <- function(
       "\n"
     ))
 
-    # Subset to target layer
-    Target_layer <- Prob_raster_stack[[lulc_class]]
-    layer_index <- which(names(Prob_raster_stack) == lulc_class)
+    # Subset to rows of this target class (and from-filter if applicable)
+    hit <- normalized$to_val == lulc_class
+    if (!is.null(From_filter_vals)) {
+      hit <- hit & (normalized$from_val %in% From_filter_vals)
+    }
+    sub_idx <- which(hit)
+    if (length(sub_idx) == 0L) next
 
-    # If Prob_adjust_zone is Inside, then mask the target layer to inside the mask
+    # Sample the intervention mask at the sparse (x, y) points of these rows
+    mask_vals <- terra::extract(
+      Intervention_mask,
+      as.matrix(normalized[sub_idx, .(x, y)])
+    )[, 1]
+
+    # If Prob_adjust_zone is Inside, then target the inside-mask rows
     if (Prob_adjust_zone == "Inside") {
-      Target_area <- terra::mask(Target_layer, Intervention_mask == 1)
+      Target_area_idx <- sub_idx[!is.na(mask_vals) & mask_vals == 1L]
     } else if (Prob_adjust_zone == "Outside") {
       # invert the mask to get the non-intersecting area
-      Target_area <- terra::mask(
-        Target_layer,
-        Intervention_mask,
-        inverse = TRUE
-      )
+      Target_area_idx <- sub_idx[is.na(mask_vals) | mask_vals != 1L]
     }
 
     # Adjust the probabilities in the target area
-    Target_area[values(Target_area) > 0] <- Prob_adjust_value
+    ix <- Target_area_idx[normalized$prob[Target_area_idx] > 0]
+    normalized[ix, prob := Prob_adjust_value]
 
-    # Identify which cells need to have value updated
-    ix <- cells(Target_area > 0)
-
-    # Replace values in target raster
-    Target_layer[ix] <- Target_area[ix]
-
-    # set any values in Target_layer that are greater than 1 to 1
-    Target_layer[Target_layer > 1] <- 1
-
-    # set any values in Target_layer that are less than 0 to 0 excluding NAs
-    Target_layer[Target_layer < 0 & !is.na(Target_layer)] <- 0
-
-    # Update the Prob_raster_stack with the modified Target_layer
-    Prob_raster_stack[[layer_index]] <- Target_layer
+    # set any values that are greater than 1 to 1
+    normalized[prob > 1, prob := 1]
+    # set any values that are less than 0 to 0 excluding NAs
+    normalized[!is.na(prob) & prob < 0, prob := 0]
   }
 
-  return(Prob_raster_stack)
+  return(normalized)
 }
 
 #' @title Perform relative probability adjustment for target land use classes
@@ -332,9 +289,12 @@ absolute_prob_adjust <- function(
 #' @param Prob_adjust_intervention_percentile A numeric value indicating the percentile for the intervention area.
 #' @param Prob_adjust_non_intervention_percentile A numeric value indicating the percentile for the non-intervention area.
 #' @param Prob_adjust_threshold A numeric value indicating the threshold for the percentage difference.
-#'@param Prob_adjust_zone A string indicating the zone for adjustment, either "Inside" or "Outside".
-#' @param Target_classes A vector of land use classes to be targeted by the intervention.
-#' @return Prob_raster_stack A RasterStack with updated probabilities for the target land use classes.
+#' @param Prob_adjust_zone A string indicating the zone for adjustment, either "Inside" or "Outside".
+#' @param Target_classes An integer vector of target to_val class values.
+#' @param From_filter_vals Optional integer vector of from_val classes to restrict to.
+#' @param Intervention_mask A SpatRaster representing the intervention mask.
+#' @param normalized A long-format data.table with columns to_val, from_val, x, y, prob.
+#' @return The `normalized` data.table with updated probabilities for the target rows.
 relative_prob_adjust <- function(
   Prob_adjust_valency,
   Prob_adjust_intervention_percentile,
@@ -342,8 +302,9 @@ relative_prob_adjust <- function(
   Prob_adjust_threshold,
   Prob_adjust_zone,
   Target_classes,
+  From_filter_vals = NULL,
   Intervention_mask,
-  Prob_raster_stack
+  normalized
 ) {
   # check that of Prob_adjust_valency == Increase_inside_decrease_outside that Prob_adjust_zone is "Inside"
   if (
@@ -357,37 +318,38 @@ relative_prob_adjust <- function(
 
   # loop over the target classes
   for (lulc_class in Target_classes) {
-    # Subset to target layer
-    Target_layer <- Prob_raster_stack[[lulc_class]]
+    # Subset to rows of this target class (and from-filter if applicable)
+    hit <- normalized$to_val == lulc_class
+    if (!is.null(From_filter_vals)) {
+      hit <- hit & (normalized$from_val %in% From_filter_vals)
+    }
+    sub_idx <- which(hit)
+    if (length(sub_idx) == 0L) next
 
-    # Identify the layer index in the raster stack
-    layer_index <- which(names(Prob_raster_stack) == lulc_class)
+    # Sample the intervention mask at the sparse (x, y) points of these rows
+    mask_vals <- terra::extract(
+      Intervention_mask,
+      as.matrix(normalized[sub_idx, .(x, y)])
+    )[, 1]
+    inside_flag <- !is.na(mask_vals) & mask_vals == 1L
 
     # If Prob_adjust_zone is Inside, then the intervention area is inside the mask and non-intersecting area is outside the mask
     if (Prob_adjust_zone == "Inside") {
-      Intervention_area <- terra::mask(Target_layer, Intervention_mask == 1)
-      Non_intervention_area <- terra::mask(
-        Target_layer,
-        Intervention_mask == 1,
-        inverse = TRUE
-      )
+      Intervention_idx <- sub_idx[inside_flag]
+      Non_intervention_idx <- sub_idx[!inside_flag]
     } else if (Prob_adjust_zone == "Outside") {
       # if the Prob_adjust_zone is Outside, then the intervention area is outside the mask and the non-intersecting area is inside the mask
-      Intervention_area <- terra::mask(
-        Target_layer,
-        Intervention_mask,
-        inverse = TRUE
-      )
-      Non_intervention_area <- terra::mask(Target_layer, Intervention_mask == 1)
+      Intervention_idx <- sub_idx[!inside_flag]
+      Non_intervention_idx <- sub_idx[inside_flag]
     }
 
-    # calculate percentile values of probability for pixels in the
-    # intervention area vs. non-intervention area (i.e. intervention - non_intervention)
-    #outside the mask
-
     # seperate raster values
-    Intervention_vals <- values(Intervention_area)
-    Non_Intervention_vals <- values(Non_intervention_area)
+    Intervention_vals <- normalized$prob[Intervention_idx]
+    Non_Intervention_vals <- normalized$prob[Non_intervention_idx]
+
+    if (length(Intervention_vals) == 0L || length(Non_Intervention_vals) == 0L) {
+      next
+    }
 
     # get percentile values
     Intervention_ptile_val <- quantile(
@@ -475,22 +437,8 @@ relative_prob_adjust <- function(
         )
 
         # Increase the probability of instances above the specified percentile
-        Intervention_area[
-          values(Intervention_area) > Intervention_ptile_val
-        ] <- Intervention_area[
-          values(Intervention_area) > Intervention_ptile_val
-        ] +
-          (Intervention_area[
-            values(Intervention_area) > Intervention_ptile_val
-          ] /
-            100) *
-            Perc_diff
-
-        # Identify which cells need to have value updated
-        ix <- cells(Intervention_area > Intervention_ptile_val)
-
-        # Replace values in target raster
-        Target_layer[ix] <- Intervention_area[ix]
+        ix <- Intervention_idx[Intervention_vals > Intervention_ptile_val]
+        normalized[ix, prob := prob + (prob / 100) * Perc_diff]
       } else if (Perc_diff < 0) {
         #check that Perc_diff is below the Prob_adjust_threshold
         if (abs(Perc_diff) < Prob_adjust_threshold) {
@@ -516,23 +464,10 @@ relative_prob_adjust <- function(
         )
 
         # Decrease the probability of instances above the specified percentile
-        Non_intervention_area[
-          values(Non_intervention_area) > Non_intervention_ptile_val
-        ] <-
-          Non_intervention_area[
-            values(Non_intervention_area) > Non_intervention_ptile_val
-          ] +
-          (Non_intervention_area[
-            values(Non_intervention_area) > Non_intervention_ptile_val
-          ] /
-            100) *
-            Perc_diff
-
-        # Identify which cells need to have value updated
-        ix <- cells(Non_intervention_area > Non_intervention_ptile_val)
-
-        # Replace values in target raster
-        Target_layer[ix] <- Non_intervention_area[ix]
+        ix <- Non_intervention_idx[
+          Non_Intervention_vals > Non_intervention_ptile_val
+        ]
+        normalized[ix, prob := prob + (prob / 100) * Perc_diff]
       }
     } else if (Prob_adjust_valency == "Decrease") {
       # If Prob_adjust_valency == "Decrease" then the goal of the intervention is
@@ -570,21 +505,8 @@ relative_prob_adjust <- function(
         )
 
         # Decrease the probability of instances above the specified percentile
-        Intervention_area[values(Intervention_area) > Intervention_ptile_val] <-
-          Intervention_area[
-            values(Intervention_area) > Intervention_ptile_val
-          ] +
-          (Intervention_area[
-            values(Intervention_area) > Intervention_ptile_val
-          ] /
-            100) *
-            -(Perc_diff)
-
-        # Identify which cells need to have value updated
-        ix <- cells(Intervention_area > Intervention_ptile_val)
-
-        # Replace values in target raster
-        Target_layer[ix] <- Intervention_area[ix]
+        ix <- Intervention_idx[Intervention_vals > Intervention_ptile_val]
+        normalized[ix, prob := prob + (prob / 100) * -(Perc_diff)]
       } else if (Perc_diff < 0) {
         #check that Perc_diff is below the Prob_adjust_threshold
         if (abs(Perc_diff) < Prob_adjust_threshold) {
@@ -609,23 +531,10 @@ relative_prob_adjust <- function(
         )
 
         # Increase the probability of instances above the specified percentile
-        Non_intervention_area[
-          values(Non_intervention_area) > Non_intervention_ptile_val
-        ] <-
-          Non_intervention_area[
-            values(Non_intervention_area) > Non_intervention_ptile_val
-          ] +
-          (Non_intervention_area[
-            values(Non_intervention_area) > Non_intervention_ptile_val
-          ] /
-            100) *
-            abs(Perc_diff)
-
-        # Identify which cells need to have value updated
-        ix <- cells(Non_intervention_area > Non_intervention_ptile_val)
-
-        # Replace values in target raster
-        Target_layer[ix] <- Non_intervention_area[ix]
+        ix <- Non_intervention_idx[
+          Non_Intervention_vals > Non_intervention_ptile_val
+        ]
+        normalized[ix, prob := prob + (prob / 100) * abs(Perc_diff)]
       }
     } else if (Prob_adjust_valency == "Increase_inside_decrease_outside") {
       # If Prob_adjust_valency == "Increase_inside_decrease_outside" then the goal of the intervention is
@@ -655,45 +564,22 @@ relative_prob_adjust <- function(
       )
 
       # Increase the probability of instances above the specified percentile in the intervention area
-      Intervention_area[Intervention_area > Intervention_ptile_val] <-
-        Intervention_area[Intervention_area > Intervention_ptile_val] +
-        (Intervention_area[Intervention_area > Intervention_ptile_val] / 100) *
-          abs(Perc_diff)
-
-      # Identify which cells need to have value updated
-      ix <- cells(Intervention_area > Intervention_ptile_val)
-      # Replace values in target raster
-      Target_layer[ix] <- Intervention_area[ix]
+      ix <- Intervention_idx[Intervention_vals > Intervention_ptile_val]
+      normalized[ix, prob := prob + (prob / 100) * abs(Perc_diff)]
 
       # Decrease the probability of instances above the specified percentile in the non-intervention area
-      Non_intervention_area[
-        Non_intervention_area > Non_intervention_ptile_val
-      ] <-
-        Non_intervention_area[
-          Non_intervention_area > Non_intervention_ptile_val
-        ] +
-        (Non_intervention_area[
-          Non_intervention_area > Non_intervention_ptile_val
-        ] /
-          100) *
-          -(abs(Perc_diff))
-
-      # Identify which cells need to have value updated
-      ix <- cells(Non_intervention_area > Non_intervention_ptile_val)
-      # Replace values in target raster
-      Target_layer[ix] <- Non_intervention_area[ix]
+      ix <- Non_intervention_idx[
+        Non_Intervention_vals > Non_intervention_ptile_val
+      ]
+      normalized[ix, prob := prob + (prob / 100) * -(abs(Perc_diff))]
     }
 
-    # set any values in Target_layer that are greater than 1 to 1
-    Target_layer[Target_layer > 1] <- 1
-
-    # set any values in Target_layer that are less than 0 to 0 excluding NAs
-    Target_layer[Target_layer < 0 & !is.na(Target_layer)] <- 0
-
-    # Update the Prob_raster_stack with the modified Target_layer
-    Prob_raster_stack[[layer_index]] <- Target_layer
+    # set any values in prob that are greater than 1 to 1
+    normalized[prob > 1, prob := 1]
+    # set any values in prob that are less than 0 to 0 excluding NAs
+    normalized[!is.na(prob) & prob < 0, prob := 0]
   }
 
-  # return the updated Prob_raster_stack
-  return(Prob_raster_stack)
+  # return the updated normalized data.table
+  return(normalized)
 }
