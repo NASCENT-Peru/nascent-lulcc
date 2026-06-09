@@ -794,8 +794,18 @@ generate_probability_maps <- function(
   normalized[tot_prob > 1, prob := prob / tot_prob]
   normalized[, tot_prob := NULL]
 
-  #todo integrate more recent approach to spatial intervention from NCCS project
-  # (placeholder retained from previous implementation)
+  # Apply scenario-specific spatial-policy interventions to the
+  # per-transition probability surface before writing per-transition TIFs.
+  normalized <- implement_spatial_interventions(
+    normalized           = normalized,
+    anterior             = anterior,
+    trans_rates_dt       = trans_rates_dt,
+    class_name_to_value  = class_name_to_value,
+    interventions_dir    = config[["interventions_dir"]],
+    scenario             = scenario,
+    simulation_time_step = year_ant + config[["step_length"]],
+    log_file             = log_file
+  )
 
   # Write one TIF per trans_rates row, preserving the numeric prefix required
   # by Dinamica's CreateCubeOfProbabilityMaps submodel.

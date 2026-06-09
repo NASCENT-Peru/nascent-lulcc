@@ -94,6 +94,7 @@ src_files <- c(
   "src/utils.r",
   "src/dinamica_utils.r",
   "src/allocation.r",
+  "src/implement_spatial_interventions.R",
   "src/lulcc.spatprobmanipulation.r"
 )
 
