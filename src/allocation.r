@@ -508,6 +508,26 @@ get_allocation_worker_rss_budget_mb <- function() {
   suppressWarnings(as.numeric(raw))
 }
 
+# Max rows per prediction batch (Phase 3.4 memory optimisation). When set to a
+# positive integer, predict_saved_transition_prob() predicts large "from"-class
+# transitions in row-batches and accumulates into a preallocated vector, so peak
+# transient memory is bounded by the batch size rather than the full row count.
+# Unset/empty/<=0 (the default) preserves the original single-shot behaviour
+# exactly. Forest-dominated regions (cuenca_del_amazonas, selva_andina) generate
+# transitions with tens of millions of viable cells; a value of e.g. 5000000 keeps
+# the prediction-time copies small enough to avoid OOM on memory-constrained nodes.
+get_allocation_predict_batch_rows <- function() {
+  raw <- Sys.getenv("ALLOCATION_PREDICT_BATCH_ROWS", unset = "")
+  if (!nzchar(raw)) {
+    return(NA_real_)
+  }
+  val <- suppressWarnings(as.numeric(raw))
+  if (is.na(val) || val <= 0) {
+    return(NA_real_)
+  }
+  val
+}
+
 load_allocation_class_map <- function(config) {
   lulc_schema <- jsonlite::fromJSON(
     config[["lulc_aggregation_path"]],
@@ -1008,34 +1028,39 @@ predict_saved_transition_prob <- function(model_obj, new_data, log_file = NULL) 
     if (!is.null(model_obj$model_type) && model_obj$model_type == "mlr3") {
       log_msg("        Path: mlr3 learner; predict_newdata()", log_file)
       new_data_subset <- subset_saved_transition_data(new_data, predictor_names)
-      pred_attempt <- tryCatch(
-        model_obj$learner$predict_newdata(newdata = new_data_subset),
-        error = function(e) e
-      )
 
-      prob_1 <- if (!inherits(pred_attempt, "error")) {
-        # Happy path: mlr3 R6 bindings match installed version
-        # pred$prob is a matrix; columns named by class label ("0","1") — Risk 6
-        log_msg("        Path: mlr3 — prediction complete", log_file)
-        pred_attempt$prob[, "1"]
-      } else {
-        # predict_newdata() clones the stored train_task whose R6 method bindings
-        # may not match the current mlr3 installation (version mismatch). Fall back
-        # to direct prediction on the underlying fitted model, bypassing R6 entirely.
-        log_msg(sprintf(
-          "        mlr3 predict_newdata() failed (%s); falling back to direct model prediction",
-          conditionMessage(pred_attempt)
-        ), log_file)
+      # Predict P(class == "1") for one block of rows. Tries the mlr3 R6 path and
+      # falls back to direct prediction on the underlying fitted model when the
+      # installed mlr3 version's R6 bindings don't match the stored train_task.
+      # `fallback_logged` is mutated in the enclosing scope so the fallback notice
+      # is emitted at most once per transition even when called per-batch.
+      fallback_logged <- FALSE
+      predict_block_prob1 <- function(block) {
+        pred_attempt <- tryCatch(
+          model_obj$learner$predict_newdata(newdata = block),
+          error = function(e) e
+        )
+        if (!inherits(pred_attempt, "error")) {
+          # pred$prob is a matrix; columns named by class label ("0","1") — Risk 6
+          return(pred_attempt$prob[, "1"])
+        }
+        if (!fallback_logged) {
+          log_msg(sprintf(
+            "        mlr3 predict_newdata() failed (%s); falling back to direct model prediction",
+            conditionMessage(pred_attempt)
+          ), log_file)
+          fallback_logged <<- TRUE
+        }
         underlying <- model_obj$learner$model
         lvl_1 <- which(as.character(model_obj$response_levels) == "1")
         if (!length(lvl_1)) lvl_1 <- 2L  # default: second level = positive class
 
-        p1 <- if (inherits(underlying, "ranger")) {
-          raw <- predict(underlying, data = new_data_subset, num.threads = 1L)
+        if (inherits(underlying, "ranger")) {
+          raw <- predict(underlying, data = block, num.threads = 1L)
           # ranger returns probability matrix when probability=TRUE (set by classif.ranger)
           as.numeric(raw$predictions[, lvl_1])
         } else if (inherits(underlying, c("glmnet", "cv.glmnet"))) {
-          x_mat <- as.matrix(new_data_subset[, predictor_names, drop = FALSE])
+          x_mat <- as.matrix(block[, predictor_names, drop = FALSE])
           s_val <- if (inherits(underlying, "cv.glmnet")) "lambda.min" else
             tryCatch(model_obj$learner$param_set$values$s, error = function(e) 0.01)
           # glmnet type="response" returns P(y == second_level) for binomial
@@ -1047,8 +1072,53 @@ predict_saved_transition_prob <- function(model_obj, new_data, log_file = NULL) 
             conditionMessage(pred_attempt)
           ))
         }
-        log_msg("        Path: mlr3 direct fallback — prediction complete", log_file)
-        p1
+      }
+
+      # Memory-bounded prediction (Phase 3.4): when ALLOCATION_PREDICT_BATCH_ROWS
+      # is set, predict in row-batches and accumulate into a preallocated vector so
+      # the prediction-time copies (subset matrix + ranger probability matrix) stay
+      # bounded by the batch size instead of the full row count, which OOMs the
+      # large forest transitions in cuenca_del_amazonas / selva_andina. Unset (the
+      # default) keeps the original single-shot path.
+      n_rows <- NROW(new_data_subset)
+      batch_rows <- get_allocation_predict_batch_rows()
+      use_batches <- !is.na(batch_rows) && n_rows > batch_rows
+
+      if (!use_batches) {
+        prob_1 <- predict_block_prob1(new_data_subset)
+        log_msg(
+          if (fallback_logged) {
+            "        Path: mlr3 direct fallback — prediction complete"
+          } else {
+            "        Path: mlr3 — prediction complete"
+          },
+          log_file
+        )
+      } else {
+        n_batches <- as.integer(ceiling(n_rows / batch_rows))
+        log_msg(sprintf(
+          "        Batched prediction: n_rows=%d batch_rows=%d n_batches=%d",
+          n_rows, as.integer(batch_rows), n_batches
+        ), log_file)
+        # Row-subset helper that works for both data.table (dt[idx] = rows) and
+        # plain data.frame (df[idx, ] = rows; dt[idx, ] would be ambiguous).
+        slice_rows <- if (data.table::is.data.table(new_data_subset)) {
+          function(idx) new_data_subset[idx]
+        } else {
+          function(idx) new_data_subset[idx, , drop = FALSE]
+        }
+        prob_1 <- numeric(n_rows)
+        for (b in seq_len(n_batches)) {
+          lo <- (b - 1L) * as.integer(batch_rows) + 1L
+          hi <- min(b * as.integer(batch_rows), n_rows)
+          idx <- seq.int(lo, hi)
+          prob_1[idx] <- predict_block_prob1(slice_rows(idx))
+        }
+        log_msg(sprintf(
+          "        Path: mlr3 %s — prediction complete (%d batches)",
+          if (fallback_logged) "direct fallback" else "learner",
+          n_batches
+        ), log_file)
       }
 
       result <- data.frame(.pred_0 = 1 - prob_1, .pred_1 = prob_1)

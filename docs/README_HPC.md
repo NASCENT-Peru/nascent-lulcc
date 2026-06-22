@@ -234,94 +234,198 @@ Env install root (local fallback, no HPC signals): /path/to/repo/.envs
 The detection signal that fired is named in the message so operators can
 disambiguate stale env-var pollution from real HPC context.
 
+## Running the allocation stage (Stage 7)
+
+There are two ways to run the allocation: the **smoke test** (one region, one
+scenario, one timestep — proves the wiring) and the **real step** (all regions ×
+all scenarios × all timesteps). Both activate `allocation_env` and call
+`scripts/run_allocation.r`.
+
+On the current ZALF HPC there is no batch scheduler: reserve an exclusive node via
+the Rundeck `allocate_node` job, SSH in, and run the script directly with `bash`.
+The `#SBATCH` directives are inert in that mode, and the scripts derive the project
+root from their own location and tee output to `logs/`. (Under a SLURM controller,
+`sbatch scripts/submit_allocation*.sh` also works unchanged.)
+
+### Resources / node selection
+
+Allocation is **single-threaded per region** and its peak memory is dominated by a
+per-region predictor-preload floor (~80 GB for the largest region) plus a >128 GB
+spike on the large forest→* transitions in `cuenca_del_amazonas` and `selva_andina`.
+See the memory profile and full node table in
+[HPC_PIPELINE_README.md](HPC_PIPELINE_README.md#allocation-stage-memory-profile).
+
+| Workload | Node | Notes |
+|----------|------|-------|
+| Smoke, `cuenca_del_amazonas` / `selva_andina` | `fat-exclusive` (1.5 TB), or `highmem-exclusive` (188 GB) + `ALLOCATION_PREDICT_BATCH_ROWS` | >128 GB peak on the big forest transition |
+| Smoke, `andes` / `costa_peruana` | `highmem-exclusive` (188 GB), `compute-exclusive` (93 GB) usually fits | lower peak |
+| Real step (all regions in parallel) | `fat-exclusive` (1.5 TB) | concurrent region workers × per-region peak |
+| Real step (one region at a time) | `highmem-exclusive` (188 GB) | force sequential; ~130 GB peak |
+
+`compute-exclusive` (93 GB) cannot hold the two big regions — the ~80 GB floor
+alone leaves no headroom.
+
+> Prerequisite: confirm the Dinamica wiring with the dry-run / `--live`
+> `scripts/smoke_test_dinamica.sh` (above) before the first real Stage 7 job.
+
+### Allocation smoke test
+
+`scripts/submit_allocation_smoke.sh` runs the allocation for a **single region**,
+the **BAU** scenario, and the **first** simulation timestep (profile mode,
+`ALLOCATION_PARALLEL_STRATEGY=sequential`). Use it to verify a region completes
+without the `ALLOC-08` hard stop and writes a `posterior.tif`.
+
+```bash
+# On the reserved node, one region per run:
+ALLOCATION_REGION_FILTER=selva_andina \
+ALLOCATION_PROFILE_SCENARIO=BAU \
+  bash scripts/submit_allocation_smoke.sh
+```
+
+For the two big regions, bound prediction-time memory:
+
+```bash
+export ALLOCATION_PREDICT_BATCH_ROWS=5000000
+ALLOCATION_REGION_FILTER=cuenca_del_amazonas bash scripts/submit_allocation_smoke.sh
+```
+
+Relevant environment variables (see the script header for the full list):
+
+| Variable | Effect |
+|----------|--------|
+| `ALLOCATION_REGION_FILTER` | restrict to one region (`andes`, `cuenca_del_amazonas`, `costa_peruana`, `selva_andina`) |
+| `ALLOCATION_PROFILE_SCENARIO` | scenario to run (default `BAU`) |
+| `ALLOCATION_YEAR_POST_FILTER` | posterior year; auto-computed from config if unset |
+| `ALLOCATION_PREDICT_BATCH_ROWS` | batch large-transition prediction to cap peak RSS (unset = single-shot) |
+| `ALLOCATION_WORKER_RSS_BUDGET_MB` | no-op (logged only) |
+
+**Pass criteria:** exit code 0, no `ALLOC-08` line in the log, and a `posterior.tif`
+under `outputs/simulations/<scenario>/<year>/region_<region>/`. Each run tees to
+`logs/lulc-allocation-smoke-<timestamp>-<region>.out`. You can run all four regions
+concurrently on a fat node in separate SSH shells.
+
+### Real allocation step
+
+`scripts/submit_allocation.sh` runs the **full** allocation: every scenario in
+`config[["scenario_names"]]`, every region, every timestep. Scenarios run
+sequentially; within a scenario, regions are processed in parallel via
+`furrr::future_map` (multicore), with the worker count taken from
+`ALLOCATION_NUM_WORKERS` (defaults to `SLURM_CPUS_PER_TASK`, else 4).
+
+**Memory implication:** peak ≈ (number of concurrent region workers) × (per-region
+peak). With the big regions exceeding 128 GB each, running several in parallel only
+fits on `fat-exclusive`. To run on `highmem-exclusive`, serialise the regions.
+
+```bash
+# All regions in parallel — fat-exclusive (1.5 TB):
+export ALLOCATION_NUM_WORKERS=4
+export ALLOCATION_PREDICT_BATCH_ROWS=5000000
+bash scripts/submit_allocation.sh
+
+# One region at a time — highmem-exclusive (188 GB):
+export ALLOCATION_PARALLEL_STRATEGY=sequential
+export ALLOCATION_PREDICT_BATCH_ROWS=5000000
+bash scripts/submit_allocation.sh
+```
+
+Output is tee'd to `logs/lulc-allocation-<timestamp>.out` (direct run) or
+`logs/lulc-allocation-<jobid>.{out,err}` (SLURM). Under SLURM the script requests
+48 h; the real wall time depends on region count, scenario count, and concurrency.
+
+**Monitoring:** watch resident memory with `top`/`htop` on the reserved node. Under
+SLURM, `sacct -j JOBID --format=JobID,State,ExitCode,MaxRSS` gives the authoritative
+peak (it captures the Dinamica child process that R-side RSS logging does not).
+
 ## Files Overview
 
-### Environment Files (`../envs/`)
-- `feat_select_env.yaml` - Environment for feature selection (includes RRF, arrow, etc.)
-- `transition_model_env.yml` - Environment for transition modelling (includes tidymodels, ranger, xgboost, etc.)
-- `dist_calc_env.yml` - Environment for distance calculations (if needed)
-- `clim_data_env.yml` - Environment for climate data processing (if needed)
+### Environment files (`environments/`)
 
-### Pipeline Scripts
-- `setup_environments.sh` - Creates all conda environments
-- `submit_feature_selection.sh` - Slurm job for feature selection
-- `submit_transition_modelling.sh` - Slurm job for transition modelling  
-- `master_pipeline.sh` - Runs the complete pipeline sequentially
-- `run_feature_selection.r` - R script for feature selection pipeline
-- `run_transition_modelling.r` - R script for transition modelling pipeline
+Conda/micromamba specs; on HPC they install under `$HPC_SCRATCH_ROOT/micromamba/envs`.
+
+- `data_prep_env.yml` — data preparation stages
+- `dist_calc_env.yml` — distance calculations
+- `clim_data_env.yml` — climate data processing
+- `feat_select_env.yaml` — feature selection (RRF, arrow, etc.)
+- `transition_model_env.yml` — transition modelling (tidymodels, ranger, xgboost, etc.)
+- `trans_rate_estimation_env.yml` — simulation transition-rate estimation
+- `allocation_params_env.yml` — allocation parameter calibration
+- `allocation_env.yml` — allocation / Dinamica simulations (Stage 7)
+
+### Pipeline scripts (`scripts/`)
+
+Each stage has a `submit_<stage>.sh` SLURM wrapper that activates its environment and
+runs the matching `run_<stage>.r`. The wrappers also run directly with `bash` on a
+Rundeck-reserved node (the `#SBATCH` lines are inert there).
+
+- `setup_environments.sh` — create/update conda environments
+- `hpc_common.sh` — shared helpers + the Stage 7 path-contract check
+- `master_pipeline.sh` — submit the **full** pipeline as a SLURM `sbatch` dependency chain
+- `submit_allocation_smoke.sh` / `submit_allocation.sh` — allocation smoke / real step (see above)
+- `submit_<stage>.sh`, `run_<stage>.r` — individual pipeline stages
+
+For the full ordered stage list see
+[HPC_PIPELINE_README.md](HPC_PIPELINE_README.md#pipeline-stages).
 
 ## Usage
 
-### 1. First Time Setup
+> On the current ZALF HPC, reserve an exclusive node via Rundeck and SSH in, then run
+> scripts directly with `bash` (the `#SBATCH` directives are inert). Under a SLURM
+> controller, `sbatch` the same scripts. See
+> [HPC_PIPELINE_README.md](HPC_PIPELINE_README.md#execution-models).
 
-Create the conda environments:
+### 1. First-time setup — build environments
+
+Source the project `.env` (sets `HPC_SCRATCH_ROOT` etc.), then build the env(s) you
+need. They install under `$HPC_SCRATCH_ROOT/micromamba/envs` on HPC (or `<repo>/.envs`
+locally when no HPC signal is present):
+
 ```bash
-cd inst/
-./setup_environments.sh
+source .env
+bash scripts/setup_environments.sh --env allocation_env --non-interactive
+# omit --env to build all environments
 ```
 
-This will create environments at `/beegfs/black/micromamba/envs/` (adjust paths as needed).
+### 2. Running the full pipeline (SLURM only)
 
-### 2. Running the Complete Pipeline
+`master_pipeline.sh` submits **every** stage as an `sbatch` dependency chain and
+monitors with `squeue`/`sacct`. It needs a SLURM controller, so it does **not** apply
+to the Rundeck direct-run model — there, run stages one at a time on the reserved node.
 
-To run both feature selection and transition modelling sequentially:
 ```bash
-cd inst/
-./master_pipeline.sh
+bash scripts/master_pipeline.sh
 ```
 
-This will:
-- Submit feature selection job
-- Wait for it to complete
-- Submit transition modelling job (depends on feature selection)
-- Wait for it to complete
-- Generate a summary report
+### 3. Running individual stages
 
-### 3. Running Individual Steps
-
-#### Feature Selection Only
 ```bash
-cd inst/
-sbatch submit_feature_selection.sh
+# Direct on a reserved node (or prefix with `sbatch` under SLURM):
+bash scripts/submit_feature_selection.sh
+bash scripts/submit_transition_modelling.sh
 ```
 
-#### Transition modelling Only
-```bash
-cd inst/
-sbatch submit_transition_modelling.sh
-```
+For the allocation stage (smoke + real step) see
+[Running the allocation stage](#running-the-allocation-stage-stage-7) above.
 
-### 4. Monitoring Jobs
+### 4. Monitoring
 
-Check job status:
-```bash
-squeue -u $USER
-```
+- **Direct (Rundeck) runs:** output is tee'd to `logs/`; watch memory with `top`/`htop`.
+- **SLURM runs:** `squeue -u $USER`, `sacct -j JOBID --format=JobID,State,ExitCode,MaxRSS`,
+  `scancel JOBID`. Logs land in `logs/<stage>-<jobid>.{out,err}`.
 
-Check job details:
-```bash
-scontrol show job JOBID
-```
+## Resource allocation
 
-View logs:
-```bash
-tail -f logs/feat-select-JOBID.out
-tail -f logs/trans-model-JOBID.out
-```
+Default SLURM requests baked into the submit scripts (inert on a Rundeck exclusive
+node, where you get the whole node). Both modelling stages route to the highmem
+partition; on Rundeck use `highmem-exclusive` (188 GB).
 
-## Resource Allocation
+| Stage | Partition | CPUs × mem | Total | Time | Environment |
+|-------|-----------|------------|-------|------|-------------|
+| Feature selection | highmem | 4 × 32 GB | 128 GB | 72 h | `feat_select_env` |
+| Transition modelling | highmem | 3 × 42 GB | 126 GB | 72 h | `transition_model_env` |
 
-### Feature Selection
-- **CPUs**: 4 cores
-- **Memory**: 32GB per CPU (128GB total)
-- **Time**: 72 hours
-- **Environment**: `feat_select_env`
-
-### Transition modelling  
-- **CPUs**: 8 cores
-- **Memory**: 16GB per CPU (128GB total)
-- **Time**: 72 hours
-- **Environment**: `transition_model_env`
+For the allocation stage's (larger) memory profile and node mapping see
+[Running the allocation stage](#running-the-allocation-stage-stage-7) above and
+[HPC_PIPELINE_README.md](HPC_PIPELINE_README.md#allocation-stage-memory-profile).
 
 ## Customization
 
@@ -332,18 +436,19 @@ Edit the `#SBATCH` directives in the submission scripts:
 - `--mem-per-cpu`: Memory per CPU core
 - `--time`: Maximum runtime (HH:MM:SS)
 
-### Adjusting Environment Paths
+### Adjusting environment paths
 
-Update these variables in the scripts:
-- `MAMBA_EXE`: Path to micromamba executable
-- `ENV_PATH`: Base path for conda environments
+Environment paths derive from the contract in `scripts/hpc_common.sh`:
+- `MAMBA_EXE_CUSTOM`: override the micromamba executable location (else auto-probed)
+- `ENV_BASE_PATH`: env install root, derived as `$HPC_SCRATCH_ROOT/micromamba/envs`
 
-### Adding Dependencies
+### Adding dependencies
 
-Add packages to the appropriate `.yml` file in `envs/` directory, then recreate the environment:
+Add packages to the appropriate spec in `environments/`, then recreate the env:
 ```bash
-micromamba env remove -p /path/to/env
-micromamba env create -f envs/environment_file.yml -p /path/to/env
+micromamba env remove -p "$HPC_SCRATCH_ROOT/micromamba/envs/<name>"
+micromamba env create -f environments/<name>.yml -p "$HPC_SCRATCH_ROOT/micromamba/envs/<name>"
+# or simply re-run: bash scripts/setup_environments.sh --env <name> --non-interactive
 ```
 
 ## Troubleshooting

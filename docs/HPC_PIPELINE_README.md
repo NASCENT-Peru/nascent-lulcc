@@ -1,235 +1,210 @@
-# LULCC modelling Pipeline - HPC Environment
+# LULCC Modelling Pipeline — HPC Environment
 
-This document describes the complete LULCC (Land Use Land Cover Change) modelling pipeline that has been updated for HPC (High Performance Computing) environments.
+This document describes how to run the LULCC (Land Use Land Cover Change) modelling
+pipeline on HPC. It covers the two execution models the repository supports, the
+pipeline stages and their environments, and the memory characteristics of the
+allocation stage (the most memory-intensive part of the pipeline).
 
-## Overview
+For the Dinamica-EGO-on-HPC container contract (Apptainer/Singularity launch,
+`DINAMICA_EGO_8_HOME`, smoke tests) see [README_HPC.md](README_HPC.md). For
+building the conda/micromamba environments see [MICROMAMBA_SETUP.md](MICROMAMBA_SETUP.md).
 
-The pipeline consists of 7 main stages that process land use data, build statistical models, and run spatially-explicit simulations using Dinamica EGO. All stages are designed to run on SLURM-based HPC systems.
+## Execution models
 
-## Pipeline Stages
+The submit scripts in `scripts/` carry `#SBATCH` directives, but how you actually
+launch a job depends on the cluster:
 
-### 1. Data Preparation (`submit_data_preparation.sh`)
-**Runtime:** ~2-4 hours  
-**Purpose:** Prepares all input data for modelling
-**Steps:**
-- LULC data preparation (`lulc_data_prep()`)
-- Region preparation (`region_prep()`)
-- Ancillary spatial data preparation (`ancillary_data_prep()`)
-- Suitability and accessibility predictors (`calibration_predictor_prep()`)
-- Parquet files of predictor data (`create_predictor_parquets()`)
-- LULC transition identification (`transition_identification()`)
-- Transition dataset preparation (`transition_dataset_prep()`)
+### A. Rundeck node reservation (current ZALF HPC)
 
-### 2. Feature Selection (`submit_feature_selection.sh`)
-**Runtime:** ~6-12 hours  
-**Purpose:** Selects optimal predictor variables using GRRF
-**Steps:**
-- Collinearity filtering
-- Guided Regularized Random Forest (GRRF) feature selection
-- Results saved for each transition type
+There is **no batch scheduler you submit to**. You reserve an exclusive node and
+run the job on it yourself:
 
-### 3. Transition modelling (`submit_transition_modelling.sh`)
-**Runtime:** ~12-24 hours  
-**Purpose:** Builds statistical models for land use transitions
-**Steps:**
-- Model training using tidymodels framework
-- Cross-validation and hyperparameter tuning
-- Model performance evaluation
+1. In the web-based **Rundeck** system, run the `allocate_node` job and choose the
+   node type (see the node table below).
+2. SSH into the reserved node.
+3. Run the stage script **directly** — e.g. `bash scripts/submit_allocation_smoke.sh`.
+   The `#SBATCH` lines are inert in this mode; `SLURM_SUBMIT_DIR`, `SLURM_JOB_ID`,
+   and `SLURM_CPUS_PER_TASK` are unset, and scripts fall back to sensible defaults
+   (project root derived from the script location, output tee'd to `logs/`).
 
-### 4. Model Finalization (`submit_model_finalization.sh`)
-**Runtime:** ~2-4 hours  
-**Purpose:** Evaluates models and prepares final specifications
-**Steps:**
-- Model evaluation (`transition_model_evaluation()`)
-- Finalize model specifications (`lulcc.finalisemodelspecifications()`)
-- Final model training (`trans_model_finalization()`)
-- Deterministic transition preparation (`deterministic_trans_prep()`)
+Because the node is exclusive, you get **all of its RAM and cores** regardless of
+the `--cpus-per-task` / `--mem-per-cpu` directives. Pick the node by the stage's
+memory needs, and run one stage at a time (the `sbatch` dependency chain in
+`master_pipeline.sh` is **not** available without a SLURM controller).
 
-### 5. Scenario Preparation (`submit_scenario_preparation.sh`)
-**Runtime:** ~4-8 hours  
-**Purpose:** Prepares data for scenario simulations
-**Steps:**
-- Transition rate tables (`simulation_trans_rates_prep()`)
-- Predictor data for scenarios (`simulation_predictor_prep()`)
+**Available Rundeck node types:**
 
-### 6. Simulation Setup (`submit_simulation_setup.sh`)
-**Runtime:** ~2-4 hours  
-**Purpose:** Calibrates parameters and prepares interventions
-**Steps:**
-- Allocation parameter calibration (`calibrate_allocation_parameters()`)
-- Spatial interventions preparation (`spatial_interventions_prep()`)
+| Node type | RAM | Cores | Notes |
+|-----------|-----|-------|-------|
+| `compute-exclusive` | ~93 GB | 80 vCores | General compute |
+| `highmem-exclusive` | ~188 GB | 80 vCores | Memory-heavy stages |
+| `fat-exclusive` | ~1.5 TB | 160 vCores | Largest allocation regions |
+| `gpu-Nvidia-Tesla-V100` | ~93 GB | 48 vCores | 2× V100 |
+| `gpu-Nvidia-Tensor-Core-H100` | ~756 GB | 128 vCores | 4× H100 |
+| `2vCPU-2GB-Ram` / `4vCPU-16GB-Ram` / `16vCPU-32GB-Ram` / `40vCPU-40GB-Ram` | small | shared | non-exclusive |
 
-### 7. Dinamica Simulations (`submit_dinamica_simulations.sh`)
-**Runtime:** ~12-48 hours  
-**Purpose:** Runs final land use change simulations
-**Steps:**
-- Dinamica EGO simulations (`run_evoland_dinamica_sim()`)
+### B. SLURM scheduler (where a controller is available)
 
-## Usage
+On a traditional SLURM cluster you submit with `sbatch` and the `#SBATCH`
+directives apply. `master_pipeline.sh` orchestrates the whole pipeline this way,
+submitting each stage with an `--dependency=afterok:<jobid>` chain and monitoring
+with `squeue`/`sacct`. The submit scripts work unchanged under either model.
 
-### Complete Pipeline
+## Pipeline stages
 
-To run the entire pipeline from start to finish:
+The full ordered dependency graph is defined authoritatively in
+[`scripts/master_pipeline.sh`](../scripts/master_pipeline.sh). Each stage has a
+`scripts/submit_<stage>.sh` launcher (SLURM wrapper) that activates the right
+environment and runs the corresponding `scripts/run_<stage>.r` entrypoint.
 
-```bash
-cd /path/to/nascent-lulcc/scripts
-./master_pipeline.sh
-```
+The stages, in dependency order:
 
-This will submit all jobs with appropriate dependencies and monitor their progress.
+1. **Reference grid prep** → **LULC data prep** → **region prep** → **ancillary
+   data prep** — prepare the spatial base layers and study regions.
+2. **Calibration predictor prep** → **predictor parquets** — build the suitability/
+   accessibility predictors and write them as partitioned Parquet datasets.
+3. **Transition identification** → **transition dataset prep** — identify observed
+   LULC transitions and assemble per-transition modelling datasets.
+4. **Feature selection** — collinearity filtering + Guided Regularized Random
+   Forest (GRRF) per transition.
+5. **Transition modelling** — train per-transition classifiers (mlr3 / ranger,
+   glmnet, xgboost) with cross-validation.
+6. **Allocation parameterisation** — calibrate allocation parameters
+   (`calibrate_allocation_parameters()`).
+7. **Scenario preparation** → **simulation setup** — build simulation transition
+   rate tables (`simulation_trans_rates_prep()`) and per-scenario inputs.
+8. **Dinamica simulations / allocation** — run the spatially-explicit allocation
+   through Dinamica EGO 8 (`run_allocation.r`; see [README_HPC.md](README_HPC.md)).
 
-### Partial Pipeline
+> Note: the old `submit_data_preparation.sh`, `submit_model_finalization.sh`, and
+> `partial_pipeline.sh` referenced in earlier versions of this document **no longer
+> exist**. Use the per-stage `submit_*.sh` scripts and `master_pipeline.sh`.
 
-To run specific stages only:
+## Conda / micromamba environments
 
-```bash
-cd /path/to/nascent-lulcc/scripts
-./partial_pipeline.sh [stage1] [stage2] ... [stageN]
-```
+Environment specs live in `environments/` (not `envs/`). On HPC they install under
+`$HPC_SCRATCH_ROOT/micromamba/envs` (see `scripts/hpc_common.sh`), built by
+`scripts/setup_environments.sh`. See [MICROMAMBA_SETUP.md](MICROMAMBA_SETUP.md) for
+the full setup flow.
 
-Available stages:
-- `data-prep`
-- `feature-selection`
-- `transition-modelling`
-- `model-finalization`
-- `scenario-prep`
-- `simulation-setup`
-- `dinamica-sims`
+| Env file | Used by |
+|----------|---------|
+| `data_prep_env.yml` | data prep stages |
+| `dist_calc_env.yml` | distance calculations |
+| `clim_data_env.yml` | climate data processing |
+| `feat_select_env.yaml` | feature selection |
+| `transition_model_env.yml` | transition modelling |
+| `trans_rate_estimation_env.yml` | simulation transition-rate estimation |
+| `allocation_params_env.yml` | allocation parameter calibration |
+| `allocation_env.yml` | allocation / Dinamica simulations |
 
-Examples:
-```bash
-# Run only data preparation and feature selection
-./partial_pipeline.sh data-prep feature-selection
-
-# Run final stages only
-./partial_pipeline.sh simulation-setup dinamica-sims
-```
-
-### Individual Jobs
-
-You can also submit individual jobs manually:
+Build one (HPC context requires `HPC_SCRATCH_ROOT` to be set first):
 
 ```bash
-# Submit data preparation
-sbatch submit_data_preparation.sh
-
-# Submit with dependency (wait for job 12345 to complete)
-sbatch --dependency=afterok:12345 submit_feature_selection.sh
+source .env   # sets HPC_SCRATCH_ROOT, HPC_TMP_ROOT, TERRA_TEMP, etc.
+bash scripts/setup_environments.sh --env allocation_env --non-interactive
 ```
 
-## Environment Requirements
+## Required environment variables (Stage 7 path contract)
 
-### Conda/Micromamba Environments
+`scripts/hpc_common.sh` enforces a path contract — jobs refuse to run with any of
+these unset rather than constructing hidden defaults:
 
-The pipeline uses different conda environments for different stages:
+| Variable | Purpose |
+|----------|---------|
+| `HPC_SCRATCH_ROOT` | data + env install root on scratch (e.g. `/beegfs/$USER/nascent-lulcc`) |
+| `HPC_TMP_ROOT` | per-job tmp root (backs `$TMPDIR`) |
+| `TERRA_TEMP` | `terra` tempdir; defaults to `$HPC_SCRATCH_ROOT/terra_temp` if unset |
 
-1. **feat_select_env** - Used for data preparation, feature selection, scenario prep
-   - File: `environments/feat_select_env.yml`
-   - Contains: R, arrow, terra, tidyverse, RRF, etc.
+Plus, for the allocation/Dinamica stage: `DINAMICA_EGO_8_HOME` (and optional
+`DINAMICA_BACKEND`) — see [README_HPC.md](README_HPC.md). Source `.env` (from
+`.env.template`) to populate all of these.
 
-2. **transition_model_env** - Used for modelling, finalization, simulation setup
-   - File: `environments/transition_model_env.yml`
-   - Contains: R, tidymodels, ranger, xgboost, glmnet, etc.
+Validate the contract any time:
 
-### File Structure Requirements
-
-The pipeline assumes the following directory structure:
-
-```
-project_root/
-├── src/                    # R source files
-│   ├── setup.r
-│   ├── utils.r
-│   ├── lulc_data_prep.r
-│   └── ...
-├── scripts/                # HPC job scripts
-│   ├── master_pipeline.sh
-│   ├── partial_pipeline.sh
-│   ├── submit_*.sh
-│   └── run_*.r
-├── config/                 # Configuration files
-│   ├── model_specs.yaml
-│   ├── pred_data.yaml
-│   └── ancillary_data.yaml
-├── environments/           # Conda environment specs
-└── logs/                   # Job logs (created automatically)
-```
-
-## Key Changes from Original QMD
-
-### What Was Added:
-- Complete data preparation pipeline
-- Model evaluation and finalization steps  
-- Scenario preparation workflow
-- Calibration and spatial interventions
-- Dinamica simulation orchestration
-- Dependency management between stages
-- Comprehensive logging and monitoring
-
-### What Was Excluded:
-- `fetch_zenodo_predictors()` calls (assumed data already available)
-- Package installation steps (handled by conda environments)
-- `devtools::load_all()` calls (using source() instead)
-
-### Path Fixes:
-- All R scripts now source from `../src/` relative paths
-- Working directory management for HPC environment
-- Proper handling of command-line execution vs interactive sessions
-
-## Monitoring and Logs
-
-### Job Status
-Monitor jobs using standard SLURM commands:
 ```bash
-squeue -u $USER                    # Check job queue
-sacct -j JOB_ID                   # Check job details
-scancel JOB_ID                    # Cancel a job
+bash scripts/hpc_common.sh --check-stage7-contract
 ```
 
-### Log Files
-Each stage produces detailed logs:
-- `logs/data-prep-JOBID.{out,err}`
-- `logs/feat-select-JOBID.{out,err}`  
-- `logs/trans-model-JOBID.{out,err}`
-- `logs/model-final-JOBID.{out,err}`
-- `logs/scenario-prep-JOBID.{out,err}`
-- `logs/sim-setup-JOBID.{out,err}`
-- `logs/dinamica-sim-JOBID.{out,err}`
+## Allocation stage memory profile
 
-### Pipeline Summaries
-The master pipeline creates summary files:
-- `logs/complete_pipeline_summary_TIMESTAMP.txt`
-- `logs/partial_pipeline_summary_TIMESTAMP.txt`
-- Individual stage summaries in respective logs directories
+The allocation stage (`scripts/run_allocation.r` via `src/allocation.r`) is the
+most memory-intensive part of the pipeline, and it is **single-threaded per region**
+(default `ALLOCATION_PARALLEL_STRATEGY=sequential`, with native BLAS/data.table
+threads pinned to 1). Its peak memory is dominated by two things:
+
+- **Predictor preload floor.** Each region loads its full predictor table into
+  memory once. For the largest region (cuenca_del_amazonas: ~68M cells × ~38 cols)
+  this is **~80 GB resident** and stays resident for the whole region run.
+- **Large "from"-class transitions.** Forest-dominated regions
+  (`cuenca_del_amazonas`, `selva_andina`) have transitions *from* forest that are
+  viable across tens of millions of cells. Predicting one of those (e.g. ~62M rows)
+  pushes peak RSS **above 128 GB** and OOM-kills the job on smaller nodes.
+
+### Node mapping for allocation
+
+| Region(s) | Recommended node | Why |
+|-----------|------------------|-----|
+| `cuenca_del_amazonas`, `selva_andina` | `fat-exclusive` (1.5 TB), or `highmem-exclusive` (188 GB) with batching on | ~80 GB floor + a >128 GB peak on the big forest transition |
+| `andes`, `costa_peruana` | `highmem-exclusive` (188 GB); `compute-exclusive` (93 GB) usually fits | far fewer forest cells, lower peak |
+
+`compute-exclusive` (93 GB) is **not** viable for the two big regions — the ~80 GB
+preload floor alone leaves no headroom. Because each region run is single-threaded,
+on the fat node you can run **all four regions concurrently** in separate SSH shells
+(scope each with `ALLOCATION_REGION_FILTER`) to use the cores.
+
+### Allocation tuning knobs (environment variables)
+
+Read by `src/allocation.r` / `scripts/submit_allocation_smoke.sh`:
+
+| Variable | Effect |
+|----------|--------|
+| `ALLOCATION_REGION_FILTER` | restrict the run to one region (e.g. `selva_andina`) |
+| `ALLOCATION_PROFILE_SCENARIO` | restrict to one scenario (e.g. `BAU`) |
+| `ALLOCATION_PARALLEL_STRATEGY` | `sequential` (default for smoke), `multicore`, or `multisession` |
+| `ALLOCATION_NUM_WORKERS` | worker count for non-sequential strategies |
+| `ALLOCATION_PREDICT_BATCH_ROWS` | **memory fix**: predict large transitions in row-batches to bound prediction-time peak RSS. Unset = original single-shot. Try `5000000` for the big regions. Note: this caps prediction *transients*, not the ~80 GB preload floor. |
+| `ALLOCATION_WORKER_RSS_BUDGET_MB` | **no-op** — only logged as a breadcrumb; it does not bound or chunk anything. |
+
+Example (big region on a reserved fat/highmem node):
+
+```bash
+export ALLOCATION_PREDICT_BATCH_ROWS=5000000
+ALLOCATION_REGION_FILTER=cuenca_del_amazonas \
+ALLOCATION_PROFILE_SCENARIO=BAU \
+  bash scripts/submit_allocation_smoke.sh
+```
+
+## Monitoring and logs
+
+**Direct (Rundeck) runs:** stage scripts tee combined stdout/stderr to
+`logs/<stage>-<timestamp>.out`, and the allocation worker writes a per-region log.
+Watch live memory with `top`/`htop` (resident size `RES`) on the reserved node.
+
+**SLURM runs:** standard commands apply —
+
+```bash
+squeue -u $USER                 # queued/running jobs
+sacct -j JOBID --format=JobID,State,ExitCode,MaxRSS   # exit code + peak memory
+scancel JOBID                   # cancel
+```
+
+`sacct … MaxRSS` is the authoritative per-job peak (it captures child processes
+like Dinamica that R-side RSS logging does not). On a Rundeck node use it only if a
+SLURM accounting daemon is present; otherwise rely on `top`/`htop`.
 
 ## Troubleshooting
 
-### Common Issues:
-
-1. **Environment not found**: Check that conda environments are created and paths are correct in submit scripts
-
-2. **Source file errors**: Verify that all required R files exist in `src/` directory
-
-3. **Memory/time limits**: Adjust SLURM parameters in submit scripts based on your data size
-
-4. **Path issues**: Ensure all file paths in configuration files are correct for your HPC system
-
-5. **Dependencies**: Make sure each stage completes successfully before the next stage starts
-
-### Resource Requirements:
-
-Adjust these based on your dataset size and HPC system:
-- **Memory**: 16-32GB per CPU for most stages  
-- **CPUs**: 4-8 cores recommended
-- **Time**: See runtime estimates above
-- **Storage**: Ensure adequate scratch space for intermediate files
-
-## Configuration
-
-The pipeline reads configuration from YAML files in the `config/` directory. Key settings include:
-- Data paths and directories
-- modelling parameters  
-- Scenario specifications
-- Output locations
-
-Make sure to update these files to match your HPC environment and data locations.
+- **OOM on `cuenca_del_amazonas` / `selva_andina`** — move to `fat-exclusive` (or
+  `highmem-exclusive` with `ALLOCATION_PREDICT_BATCH_ROWS=5000000`). See the
+  allocation memory section above.
+- **`HPC context detected … but HPC_SCRATCH_ROOT is unset`** — source `.env` before
+  running env setup or any stage; the path contract is mandatory.
+- **Environment not found** — confirm the env exists at
+  `$HPC_SCRATCH_ROOT/micromamba/envs/<name>` and rebuild with
+  `scripts/setup_environments.sh` if missing.
+- **Dinamica `std::exception` / silent failure** — see the Dinamica launch contract
+  and smoke tests in [README_HPC.md](README_HPC.md).
+- **Stage script can't find `run_*.r`** — when running directly (no SLURM), launch
+  from the repo root or via `bash scripts/submit_<stage>.sh`; scripts derive the
+  project root from their own location when `SLURM_SUBMIT_DIR` is unset.

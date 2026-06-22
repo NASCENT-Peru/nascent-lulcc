@@ -17,6 +17,16 @@ else
 fi
 source "$SCRIPT_DIR/hpc_common.sh"
 
+# Project root: prefer SLURM_SUBMIT_DIR (sbatch), else the parent of scripts/
+# (direct run on a Rundeck-allocated node, where SLURM_* vars are unset).
+if [ -n "$SLURM_SUBMIT_DIR" ]; then
+    PROJECT_ROOT="$SLURM_SUBMIT_DIR"
+else
+    PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
+export PROJECT_ROOT
+cd "$PROJECT_ROOT" || { echo "ERROR: cannot cd to PROJECT_ROOT: $PROJECT_ROOT"; exit 1; }
+
 # ----------------------------------------------------------
 # Setup environment
 # ----------------------------------------------------------
@@ -55,7 +65,7 @@ echo "Parallel workers: $ALLOCATION_NUM_WORKERS"
 # ----------------------------------------------------------
 # Run allocation simulations
 # ----------------------------------------------------------
-R_SCRIPT="$SLURM_SUBMIT_DIR/scripts/run_allocation.r"
+R_SCRIPT="$PROJECT_ROOT/scripts/run_allocation.r"
 
 if [ ! -f "$R_SCRIPT" ]; then
     echo "ERROR: run_allocation.r not found at: $R_SCRIPT"
@@ -63,8 +73,19 @@ if [ ! -f "$R_SCRIPT" ]; then
 fi
 
 echo "✓ Running allocation simulations: $R_SCRIPT"
-"$RSCRIPT_BIN" --vanilla "$R_SCRIPT"
-EXIT_CODE=$?
+if [ -z "${SLURM_JOB_ID:-}" ]; then
+    # Direct run on a Rundeck-allocated node: no scheduler captures stdout, so
+    # tee the run to a log (the #SBATCH --output directive is inert here).
+    mkdir -p logs
+    NODE_LOG="logs/lulc-allocation-$(date +%Y%m%d-%H%M%S).out"
+    echo "Direct run (no SLURM): teeing stdout+stderr to $NODE_LOG"
+    set -o pipefail
+    "$RSCRIPT_BIN" --vanilla "$R_SCRIPT" 2>&1 | tee "$NODE_LOG"
+    EXIT_CODE=${PIPESTATUS[0]}
+else
+    "$RSCRIPT_BIN" --vanilla "$R_SCRIPT"
+    EXIT_CODE=$?
+fi
 
 echo
 echo "Rscript exit code: $EXIT_CODE"

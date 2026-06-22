@@ -133,6 +133,80 @@ test_that("mlr3 dispatch returns .pred_0 and .pred_1 with mock model object (int
 })
 
 # --------------------------------------------------------------------------
+# Test 4b: ALLOCATION_PREDICT_BATCH_ROWS batched prediction equals single-shot
+# (Phase 3.4 memory optimisation — batching must not change results)
+# --------------------------------------------------------------------------
+
+test_that("batched prediction equals single-shot for data.frame and data.table", {
+  skip_if_not_installed("mlr3")
+  skip_if_not_installed("mlr3learners")
+  skip_if_not_installed("data.table")
+
+  library(mlr3)
+  library(mlr3learners)
+
+  set.seed(7L)
+  n <- 60L
+  synth <- data.frame(
+    p1       = rnorm(n),
+    p2       = rnorm(n),
+    p3       = rnorm(n),
+    response = factor(sample(c("0", "1"), n, replace = TRUE))
+  )
+  task <- mlr3::as_task_classif(synth, target = "response", positive = "1")
+  lrn_rf <- mlr3::lrn(
+    "classif.ranger",
+    predict_type = "prob",
+    num.trees    = 25L,
+    importance   = "none",
+    num.threads  = 1L
+  )
+  lrn_rf$train(task)
+
+  mock_model_obj <- list(
+    model_type      = "mlr3",
+    predictor_names = c("p1", "p2", "p3"),
+    response_levels = c("0", "1"),
+    learner         = lrn_rf
+  )
+
+  tryCatch(
+    source(file.path(.repo_root, "src/allocation.r")),
+    error = function(e) skip(e$message)
+  )
+
+  new_df <- data.frame(p1 = rnorm(23L), p2 = rnorm(23L), p3 = rnorm(23L))
+  new_dt <- data.table::as.data.table(new_df)
+
+  prev <- Sys.getenv("ALLOCATION_PREDICT_BATCH_ROWS", unset = NA_character_)
+  on.exit(
+    if (is.na(prev)) {
+      Sys.unsetenv("ALLOCATION_PREDICT_BATCH_ROWS")
+    } else {
+      Sys.setenv(ALLOCATION_PREDICT_BATCH_ROWS = prev)
+    },
+    add = TRUE
+  )
+
+  # Single-shot reference (knob unset)
+  Sys.unsetenv("ALLOCATION_PREDICT_BATCH_ROWS")
+  ref_df <- predict_saved_transition_prob(mock_model_obj, new_df)
+  ref_dt <- predict_saved_transition_prob(mock_model_obj, new_dt)
+
+  # Batched: batch size 7 forces multiple batches over 23 rows
+  Sys.setenv(ALLOCATION_PREDICT_BATCH_ROWS = "7")
+  batched_df <- predict_saved_transition_prob(mock_model_obj, new_df)
+  batched_dt <- predict_saved_transition_prob(mock_model_obj, new_dt)
+
+  expect_equal(batched_df, ref_df,
+    info = "batched data.frame prediction must equal single-shot"
+  )
+  expect_equal(batched_dt, ref_dt,
+    info = "batched data.table prediction must equal single-shot"
+  )
+})
+
+# --------------------------------------------------------------------------
 # Test 5: allocation.r model loader detects .qs extension and calls qs::qread()
 # --------------------------------------------------------------------------
 
