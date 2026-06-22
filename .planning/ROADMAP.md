@@ -12,15 +12,16 @@ Hardening the 7-stage Peruvian LULCC pipeline so that `src/allocation.r` runs re
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [x] **Phase 1: Repair & Visibility** - Fix broken profiling, structured logs, env/path repairs, pre-flight validation, post-mortem tooling, Singularity container for Dinamica EGO 8 *(completed 2026-05-05; INFRA-01 / SC6 reopened by 2026-05-15 live verification — see Phase 1.1)*
-- [ ] **Phase 1.1: Fix Dinamica Launch Contract** *(INSERTED 2026-05-15; 4/4 mainline plans landed 2026-05-17; gap-closure plans 01.1-05 + 01.1-06 added 2026-05-17 to close Open Issue 1 — DinamicaConsole std::exception under rebuilt .sif blocking INFRA-01 SC2 + MEM-06 SC5)* - Repaired the seven structural defects in the Dinamica-on-HPC launch path. Launch-contract mechanics (D-101–D-108, D-112, D-114) all landed and the cross-language drift safety net is in place. Live `--live` smoke does not yet exit 0 against the rebuilt `.sif` — DinamicaConsole crashes with `std::exception` regardless of `.ego` content; the 2026-05-17 ldd diagnostic FALSIFIED the library-compat hypothesis. Gap-closure Plan 01.1-05 captures diagnostic evidence on Euler; Plan 01.1-06 applies the resulting targeted fix to the `.def` and re-verifies the live smoke exits 0.
-- [x] **Phase 2: Model Size Reduction** - Replace tidymodels with mlr3 in transition_modelling.r; save models as .qs via qs::qsave() with ranger save.memory=TRUE; all artefacts <200 MB *(completed 2026-05-07)*
+- [x] **Phase 1: Repair & Visibility** - Fix broken profiling, structured logs, env/path repairs, pre-flight validation, post-mortem tooling, Singularity container for Dinamica EGO 8 *(completed 2005-05-05; INFRA-01 / SC6 reopened by 2005-05-15 live verification — see Phase 1.1)*
+- [ ] **Phase 1.1: Fix Dinamica Launch Contract** *(INSERTED 2005-05-15; 4/4 mainline plans landed 2005-05-17; gap-closure plans 01.1-05 + 01.1-06 added 2005-05-17 to close Open Issue 1 — DinamicaConsole std::exception under rebuilt .sif blocking INFRA-01 SC2 + MEM-06 SC5)* - Repaired the seven structural defects in the Dinamica-on-HPC launch path. Launch-contract mechanics (D-101–D-108, D-112, D-114) all landed and the cross-language drift safety net is in place. Live `--live` smoke does not yet exit 0 against the rebuilt `.sif` — DinamicaConsole crashes with `std::exception` regardless of `.ego` content; the 2005-05-17 ldd diagnostic FALSIFIED the library-compat hypothesis. Gap-closure Plan 01.1-05 captures diagnostic evidence on Euler; Plan 01.1-06 applies the resulting targeted fix to the `.def` and re-verifies the live smoke exits 0.
+- [x] **Phase 2: Model Size Reduction** - Replace tidymodels with mlr3 in transition_modelling.r; save models as .qs via qs::qsave() with ranger save.memory=TRUE; all artefacts <200 MB *(completed 2005-05-07)*
 - [ ] **Phase 3: Parallelism & Memory Architecture** - Switch to fork-based multicore on Linux, share nhood rasters, eliminate OOM
-- [x] **Phase 3.1: Allocation Correctness & Dinamica Integration** *(INSERTED 2026-05-22; completed 2026-05-25)* - Fix model over-loading (filter to active transitions), eliminate phantom NA TIFs (nomatch=NULL), fix Dinamica HPC fallback guard, re-export demand CSV from XLSX (`clean_numeric` couldn't parse Excel-introduced thousand-separator format), and verify end-to-end allocation including the Dinamica CA step via dedicated smoke test
-- [ ] **Phase 3.2: Transition Pipeline Consistency** *(INSERTED 2026-05-22)* - Harden the end-to-end flow of viable transitions from identification through feature selection, modelling, rate preparation, and allocation so each stage operates on exactly the same transition set with no silent additions, drops, or mismatches.
-- [ ] **Phase 3.3: Probability Map Saturation & Allocation Throughput** *(INSERTED 2026-05-26)* - Address Dinamica's low allocation throughput: probability maps don't contain sufficient non-zero values, causing Expander/Patcher to place only a small fraction of the change matrix demand (e.g., 4,477 of hundreds of thousands of requested transitions in Phase 3.1 BAU costa_peruana smoke).
-- [ ] **Phase 3.4: Stale Pipeline Artifact Re-run** *(INSERTED 2026-05-29)* - Regenerate simulation trans_rates CSVs and alloc_params on HPC with Phase 3.2-corrected code; unblocks Phase 3.3 operator gate. Root cause: rate CSVs were generated before `forbidden_from_classes` config key and `load_unmodelled_transitions()` were active, so id_trans=34 (mining→high_intensity_agricultural) survived into the active set and triggered the ALLOC-08 hard stop.
-- [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port
+- [x] **Phase 3.1: Allocation Correctness & Dinamica Integration** *(INSERTED 2005-05-22; completed 2005-05-25)* - Fix model over-loading (filter to active transitions), eliminate phantom NA TIFs (nomatch=NULL), fix Dinamica HPC fallback guard, re-export demand CSV from XLSX (`clean_numeric` couldn't parse Excel-introduced thousand-separator format), and verify end-to-end allocation including the Dinamica CA step via dedicated smoke test
+- [ ] **Phase 3.2: Transition Pipeline Consistency** *(INSERTED 2005-05-22)* - Harden the end-to-end flow of viable transitions from identification through feature selection, modelling, rate preparation, and allocation so each stage operates on exactly the same transition set with no silent additions, drops, or mismatches.
+- [ ] **Phase 3.3: Probability Map Saturation & Allocation Throughput** *(INSERTED 2005-05-26)* - Address Dinamica's low allocation throughput: probability maps don't contain sufficient non-zero values, causing Expander/Patcher to place only a small fraction of the change matrix demand (e.g., 4,477 of hundreds of thousands of requested transitions in Phase 3.1 BAU costa_peruana smoke).
+- [ ] **Phase 3.4: Stale Pipeline Artifact Re-run** *(INSERTED 2005-05-29)* - Regenerate simulation trans_rates CSVs and alloc_params on HPC with Phase 3.2-corrected code; unblocks Phase 3.3 operator gate. Root cause: rate CSVs were generated before `forbidden_from_classes` config key and `load_unmodelled_transitions()` were active, so id_trans=34 (mining→high_intensity_agricultural) survived into the active set and triggered the ALLOC-08 hard stop.
+- [ ] **Phase 3.5: Reduce Allocation Memory Floor** *(INSERTED 2026-06-22)* - Cut the ~80GB per-region predictor-preload floor via lazy per-transition Parquet reads (target ~10–20GB) and let large-transition ranger prediction use spare cores (`num.threads>1`); flips allocation from memory-bound to core-bound so cheaper/more nodes can each run a region. (Split from the removed Phase 5; multi-scenario node packing merged into Phase 4.)
+- [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port; parallelise the full scenario sweep across Rundeck nodes (S2 multi-scenario packing)
 
 ## Phase Details
 
@@ -43,7 +44,7 @@ Plans:
 - [x] 01-03-PLAN.md - Add consolidated Stage 7 pre-flight, portable RSS profiling, crash sentinels, and one-command diagnosis.
 - [x] 01-04-PLAN.md - Unify Dinamica local/HPC backends, centralize Dinamica logs, and add the Euler smoke-test contract.
 
-### Phase 1.1: Fix Dinamica Launch Contract *(INSERTED 2026-05-15)*
+### Phase 1.1: Fix Dinamica Launch Contract *(INSERTED 2005-05-15)*
 **Goal**: A fresh operator on Euler can run `bash scripts/setup_environments.sh --env allocation_env --non-interactive` and `bash scripts/smoke_test_dinamica.sh --live ...` to a green light, against a `.sif` rebuildable from this repo with no manual workstation transfer; production allocation workers invoke Dinamica via the supported `bin/DinamicaEGO.sh` launcher and any Dinamica error (including silent `std::exception`) returns a non-zero exit so operators see failures within minutes.
 **Depends on**: Phase 1
 **Requirements**: INFRA-01 (reopened), OBS-02 (fix detection contract), PIPE-04 (env install root), MEM-06 (smoke-test fixture sanity)
@@ -67,7 +68,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 - [x] 01.1-04-PLAN.md — Cross-language mirror assertion test (RESEARCH Target 7) + dinamica/container/README.md and docs/README_HPC.md updates (D-114).
 
-**Gap-closure Wave 1** *(added 2026-05-17 to close Open Issue 1 from 01.1-03-SUMMARY.md; closes INFRA-01 SC2 + MEM-06 SC5)*
+**Gap-closure Wave 1** *(added 2005-05-17 to close Open Issue 1 from 01.1-03-SUMMARY.md; closes INFRA-01 SC2 + MEM-06 SC5)*
 - [ ] 01.1-05-PLAN.md — Diagnose Open Issue 1: operator runs the four-step diagnostic ladder inside the rebuilt `.sif` on Euler (ls Data/ tree, strings DINAMICA_EGO_8_* env vars, strace openat() before std::exception, diff fresh AppImage extract vs in-.sif tree); commits six evidence files under `.planning/phases/01.1-fix-dinamica-launch-contract/diagnostics/`; synthesises into FINDINGS.md with a hypothesis ranking + Proposed Fix for Plan 06.
 
 **Gap-closure Wave 2** *(blocked on 01.1-05 completion)*
@@ -124,7 +125,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 03-03-PLAN.md - Add the reproducible HPC smoke-run wrapper and automated verifier proving no OOM, bounded worker RSS, and readable output.
 
-### Phase 3.1: Allocation Correctness & Dinamica Integration *(INSERTED 2026-05-22)*
+### Phase 3.1: Allocation Correctness & Dinamica Integration *(INSERTED 2005-05-22)*
 **Goal**: The first end-to-end allocation that includes Dinamica running under apptainer produces a real posterior.tif (not an anterior copy), model loading is bounded to only the transitions active in the current scenario/year, and the probability map save writes exactly the TIFs that were predicted (no phantom NA-prob placeholders).
 **Depends on**: Phase 3 (smoke run infrastructure and probability map generation confirmed working)
 **Requirements**: MEM-01 (model memory), INFRA-01 (Dinamica HPC launch)
@@ -138,7 +139,7 @@ Plans:
 Plans:
 - [x] 03.1-01-PLAN.md - Apply smoke_test_dinamica.sh bind-mount fix (Fix 4b), verify all four src/ fixes, commit, and run Dinamica-only smoke on HPC to confirm posterior.tif ≠ anterior.tif.
 
-### Phase 3.2: Transition Pipeline Consistency *(INSERTED 2026-05-22)*
+### Phase 3.2: Transition Pipeline Consistency *(INSERTED 2005-05-22)*
 **Goal**: Each stage of the LULCC pipeline operates on exactly the same set of viable transitions — `transition_identification.r` deduces theoretical candidates per region from historic maps, `transition_feature_selection.r` confirms statistical viability and writes the definitive viable set, `transition_modelling.r` produces a fitted model for every viable transition, `simulation_trans_rates_prep.r` computes future rates over the viable set with scenario narrative exclusions applied as an explicit logged filter, and `allocation.r` loads only the models whose transitions appear in the active rate table — eliminating information loss and silent mismatches between stages.
 **Depends on**: Phase 3.1
 **Requirements**: PIPE-01, PIPE-02
@@ -161,7 +162,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 03.2-03-PLAN.md — Create `scripts/audit_transition_pipeline.r` cross-stage consistency checker covering all four pipeline stages (id_trans set-difference via Stages 1, 2, 3, 4 artifacts).
 
-### Phase 3.3: Probability Map Saturation & Allocation Throughput *(INSERTED 2026-05-26)*
+### Phase 3.3: Probability Map Saturation & Allocation Throughput *(INSERTED 2005-05-26)*
 **Goal**: Dinamica's Expander + Patcher allocate substantially all of the requested change matrix cells (target: ≥90% of demanded transitions placed) for a reference scenario × region × timestep, rather than the ~1% throughput observed in Phase 3.1 (4,477 of hundreds of thousands of requested cells in BAU × costa_peruana × 2022→2026). The root cause — probability maps not containing enough non-zero high-probability cells to support the demanded volume of transitions — is identified and remediated through one or more of: model calibration adjustments, prediction post-processing (e.g., probability map smoothing or floor), Patcher parameter tuning (`Mean_Patch_Size`, `Patch_Size_Variance`, `Patch_Isometry`), Expander `Perc_expander` rebalancing, or probability map generation improvements.
 **Depends on**: Phase 3.2 (clean transition pipeline required so allocation throughput is the only variable being studied)
 **Requirements**: ALLOC-06, ALLOC-07, ALLOC-08, ALLOC-09, ALLOC-10
@@ -187,7 +188,7 @@ Plans:
 **Wave 4** *(blocked on Wave 2, Wave 3 completion; has operator-gate checkpoint)*
 - [ ] 03.3-05-PLAN.md — Add ALLOC-06..10 to REQUIREMENTS.md; update ROADMAP.md; operator-gate live HPC verification (BAU x all Peruvian regions x 2022->2026); write 03.3-SUMMARY.md.
 
-### Phase 3.4: Stale Pipeline Artifact Re-run *(INSERTED 2026-05-29)*
+### Phase 3.4: Stale Pipeline Artifact Re-run *(INSERTED 2005-05-29)*
 **Goal**: Simulation trans_rates CSVs and alloc_params.csv on Euler are regenerated with Phase 3.2-corrected code so id_trans=34 (and any other no-model transition) is excluded from the active set before allocation runs — removing the ALLOC-08 blocker for Phase 3.3's operator gate.
 **Depends on**: Phase 3.2 (code fixes landed), Phase 3.3 Plans 01–04 (ALLOC-08 hard stop in place)
 **Requirements**: PIPE-08, PIPE-09
@@ -202,8 +203,23 @@ Plans:
 Plans:
 - [ ] 03.4-01-PLAN.md — Operator pre-flight, trans_rates re-run, alloc_params calibration, and allocation smoke for all 4 regions
 
+### Phase 3.5: Reduce Allocation Memory Floor *(INSERTED 2026-06-22)*
+**Goal:** Shrink per-region allocation memory and prediction wall time so the sweep scales — two changes to `src/allocation.r`'s prediction path:
+
+1. **Cut the ~80 GB predictor-preload floor (highest leverage).** Make per-transition prediction read predictors lazily from the Parquet dataset per chunk (`arrow::open_dataset()` + column projection on the cell-id keys) instead of preloading the full ~68M × 38 region table into `region_pred_dt`. Target floor ~10–20 GB, flipping the job from memory-bound to core-bound so a highmem node holds 4+ regions and the cheap `40vCPU-40GB` flavors can each run a region.
+2. **Threaded prediction.** The run is memory-bound with idle cores; let the large-transition ranger prediction use `num.threads > 1` (currently pinned to 1 via `pin_native_threads_to_one`) when few workers run on a node, bounded by `threads × workers ≤ cores`, to cut the 61M-row prediction time (τ).
+
+Multi-scenario node packing (the original Phase 5 "Goal 1" / S2) is merged into Phase 4 — not in scope here.
+
+**Depends on:** Phase 3
+**Requirements**: TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 03.5 to break down)
+
 ### Phase 4: End-to-End Correctness & Performance
-**Goal**: All four scenarios run to completion across all regions and timesteps, with `predict` no longer dominating wall time, restarts skipping completed work atomically, and the latent correctness gaps (raster/terra split, missing CVXR loop, drifted intervention paths) closed.
+**Goal**: All four scenarios run to completion across all regions and timesteps, with `predict` no longer dominating wall time, restarts skipping completed work atomically, the latent correctness gaps (raster/terra split, missing CVXR loop, drifted intervention paths) closed, and the full sweep parallelised efficiently across Rundeck nodes rather than run as a single serial process.
 **Depends on**: Phase 3
 **Requirements**: PERF-01, PERF-02, PERF-03, PIPE-02, PIPE-05, PIPE-06
 **Success Criteria** (what must be TRUE):
@@ -213,6 +229,7 @@ Plans:
   4. Predictor reads inside workers use `arrow::open_dataset()` with column projection — no `read_parquet()` of full datasets in the parent.
   5. `simulation_trans_rates_prep.r` section G runs the ported CVXR convex optimisation and emits valid transition rate tables that allocation consumes without manual fixup.
   6. No active source file outside `src/old/` calls `raster::` (verifiable via grep returning zero hits in `lulcc.spatprobmanipulation.r`, `spatial_interventions_prep.r`, `landscape_pattern_analysis.r`); intervention YAMLs reference `inputs/spat_prob_perturb/` paths matching the config schema.
+  7. The full sweep can be launched as independent per-scenario jobs (scoped via `ALLOCATION_PROFILE_SCENARIO`) that either pack 2–3 onto one shared node (explicit `--mem`, non-`--exclusive`) or run one-per-node, collapsing the 4× scenario-serial wall time toward a single scenario's chain; a documented launcher / submission pattern exists (S2, merged from the removed Phase 5).
 **Plans**: TBD
 
 ## Progress
@@ -222,12 +239,14 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Repair & Visibility | 4/4 | Complete | 2026-05-05 |
-| 1.1. Fix Dinamica Launch Contract | 4/6 | Mainline contract complete; gap-closure 01.1-05 + 01.1-06 pending (closes INFRA-01 SC2 / MEM-06 SC5 on Open Issue 1) | partial — mainline 2026-05-17 |
-| 2. Model Size Reduction | 4/4 | Complete | 2026-05-07 |
+| 1. Repair & Visibility | 4/4 | Complete | 2005-05-05 |
+| 1.1. Fix Dinamica Launch Contract | 4/6 | Mainline contract complete; gap-closure 01.1-05 + 01.1-06 pending (closes INFRA-01 SC2 / MEM-06 SC5 on Open Issue 1) | partial — mainline 2005-05-17 |
+| 2. Model Size Reduction | 4/4 | Complete | 2005-05-07 |
 | 3. Parallelism & Memory Architecture | 0/TBD | Not started | - |
-| 3.1. Allocation Correctness & Dinamica Integration | 1/1 | Complete — 4,477 cells changed (103→105); demand CSV fix unblocked optimizer | 2026-05-25 |
-| 3.2. Transition Pipeline Consistency | 0/3 | Not started (INSERTED 2026-05-22) | - |
-| 3.3. Probability Map Saturation & Allocation Throughput | 4/5 | Wave 1-3 plans complete; operator gate pending (03.3-05) | partial — Wave 1-3 2026-05-26 |
-| 3.4. Stale Pipeline Artifact Re-run | 0/TBD | Not started (INSERTED 2026-05-29) | - |
+| 3.1. Allocation Correctness & Dinamica Integration | 1/1 | Complete — 4,477 cells changed (103→105); demand CSV fix unblocked optimizer | 2005-05-25 |
+| 3.2. Transition Pipeline Consistency | 0/3 | Not started (INSERTED 2005-05-22) | - |
+| 3.3. Probability Map Saturation & Allocation Throughput | 4/5 | Wave 1-3 plans complete; operator gate pending (03.3-05) | partial — Wave 1-3 2005-05-26 |
+| 3.4. Stale Pipeline Artifact Re-run | 0/TBD | Not started (INSERTED 2005-05-29) | - |
+| 3.5. Reduce Allocation Memory Floor | 0/TBD | Not started (INSERTED 2026-06-22) | - |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
+

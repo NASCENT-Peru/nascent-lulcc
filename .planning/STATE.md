@@ -7,7 +7,7 @@ stopped_at: Phase 3.4 planned (1 plan); Phase 3.3 operator gate blocked on Phase
 last_updated: "2026-05-29T00:00:00.000Z"
 last_activity: 2026-05-29
 progress:
-  total_phases: 9
+  total_phases: 8
   completed_phases: 6
   total_plans: 28
   completed_plans: 24
@@ -35,6 +35,7 @@ Last activity: 2026-05-28
 - Phase 3.1 inserted after Phase 3 (2026-05-22, URGENT): Job 364249 confirmed R pipeline; Dinamica never ran (fallback guard fired on HPC); model preload wasteful (38 vs 26 active); phantom TIFs from nomatch=NA; fixes applied, Dinamica-only smoke test ready
 - Phase 3.2 inserted after Phase 3.1 (2026-05-22, URGENT): Viable transition set found to drift silently across pipeline stages (identification → feature selection → modelling → rate prep → allocation); phase hardens end-to-end consistency so each stage operates on exactly the same transition set
 - Phase 3.3 inserted after Phase 3.2 (2026-05-26, URGENT): Dinamica allocation throughput observed at ~1% in Phase 3.1 (4,477 of hundreds of thousands of requested cells placed); root cause likely probability maps with too few non-zero values to support the demanded volume; phase diagnoses and remediates
+- Phase 3.5 inserted after Phase 3 (2026-06-22): Reduce the allocation memory floor — (a) lazy per-transition Parquet predictor reads to cut the ~80GB preload floor to ~10–20GB (memory-bound → core-bound), and (b) threaded ranger prediction using spare cores. Multi-scenario node packing (S2) folded into Phase 4's goal + success criteria. (Replaces the briefly-added Phase 5, which was split: Goals 2+3 → Phase 3.5, Goal 1 → Phase 4.)
 
 Progress: [████████░░] 81%
 
