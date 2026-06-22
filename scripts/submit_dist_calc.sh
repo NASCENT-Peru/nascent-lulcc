@@ -1,10 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=dist-calc
-# Routed to highmem: 48 x 2700M = 127G exceeds the 95000 MB compute cap.
-#SBATCH --partition=highmem
+# Reserve the whole Rundeck node: --exclusive + --mem=0 give the job all cores and
+# all RAM on the reserved node. No --partition: the Rundeck reservation places the job.
 #SBATCH --time=24:00:00
+#SBATCH --exclusive
+#SBATCH --mem=0
 #SBATCH --cpus-per-task=48
-#SBATCH --mem-per-cpu=2700M
 #SBATCH --tmp=50G
 #SBATCH --output=logs/dist-calc-%j.out
 #SBATCH --error=logs/dist-calc-%j.err

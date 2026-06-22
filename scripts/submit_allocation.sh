@@ -1,8 +1,15 @@
 #!/bin/bash
 #SBATCH --job-name=lulc-allocation
+# Reserve the whole Rundeck node. --exclusive + --mem=0 give the job all cores and
+# all RAM. The real step processes regions in parallel (multicore), so peak memory
+# is roughly (concurrent regions) x (per-region peak; >128GB for the big forest
+# regions). Reserve fat-exclusive (1.5TB) to run all regions at once, or set
+# ALLOCATION_PARALLEL_STRATEGY=sequential and reserve highmem-exclusive (188GB).
+# No --partition: the Rundeck reservation places the job on the reserved node.
 #SBATCH --time=48:00:00
+#SBATCH --exclusive
+#SBATCH --mem=0
 #SBATCH --cpus-per-task=8
-#SBATCH --mem-per-cpu=8G
 #SBATCH --output=logs/lulc-allocation-%j.out
 #SBATCH --error=logs/lulc-allocation-%j.err
 #SBATCH --profile=task

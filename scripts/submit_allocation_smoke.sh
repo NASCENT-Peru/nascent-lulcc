@@ -1,23 +1,28 @@
 #!/bin/bash
 #SBATCH --job-name=lulc-allocation-smoke
-# Routed to highmem: 4 x 32G = 128G exceeds the 95000 MB compute cap.
-#SBATCH --partition=highmem
+# Reserve the whole Rundeck node. --exclusive + --mem=0 give the job all cores and
+# all RAM on the reserved node, so the per-region predictor preload (~80GB) and the
+# large forest-transition prediction (>128GB peak for cuenca_del_amazonas /
+# selva_andina) fit. Choose the node size in Rundeck: highmem-exclusive (188GB) or
+# fat-exclusive (1.5TB). No --partition: the Rundeck reservation places the job.
 #SBATCH --time=12:00:00
+#SBATCH --exclusive
+#SBATCH --mem=0
 #SBATCH --cpus-per-task=4
-#SBATCH --mem-per-cpu=32G
 #SBATCH --output=logs/lulc-allocation-smoke-%j.out
 #SBATCH --error=logs/lulc-allocation-smoke-%j.err
 #SBATCH --profile=task
 
-# NOTE: The #SBATCH directives above apply ONLY when this script is launched via
-# `sbatch`. On the Rundeck-allocated HPC, you reserve an exclusive node, SSH in,
-# and run this script directly (`bash scripts/submit_allocation_smoke.sh`); the
-# #SBATCH lines are then inert. The allocation run is effectively single-threaded
-# (ALLOCATION_PARALLEL_STRATEGY=sequential + native threads pinned to 1), so on an
-# exclusive node you get the whole node's RAM regardless of the cpu/mem directives.
-# Pick the node by region size: forest-dominated regions (cuenca_del_amazonas,
-# selva_andina) preload a ~80GB predictor table and peak >128GB on the big
-# forest->* transition — run those on a fat/highmem node, not a ~93GB compute node.
+# Standard launch: reserve an exclusive node via Rundeck, SSH in, and submit with
+#   sbatch scripts/submit_allocation_smoke.sh
+# so SLURM writes the log files (#SBATCH --output/--error) and enforces the
+# whole-node --exclusive/--mem=0 request. The run is effectively single-threaded
+# (ALLOCATION_PARALLEL_STRATEGY=sequential + native threads pinned to 1). Pick the
+# node by region size: forest-dominated regions (cuenca_del_amazonas, selva_andina)
+# preload a ~80GB predictor table and peak >128GB on the big forest->* transition —
+# reserve a highmem (188GB) or fat (1.5TB) node, not a ~93GB compute node. Running
+# directly with `bash` still works as a fallback (output is tee'd to logs/), but
+# `sbatch` is preferred so the standard log files are written.
 
 if [ -n "$SLURM_SUBMIT_DIR" ]; then
     SCRIPT_DIR="$SLURM_SUBMIT_DIR/scripts"

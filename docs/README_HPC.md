@@ -241,11 +241,18 @@ scenario, one timestep — proves the wiring) and the **real step** (all regions
 all scenarios × all timesteps). Both activate `allocation_env` and call
 `scripts/run_allocation.r`.
 
-On the current ZALF HPC there is no batch scheduler: reserve an exclusive node via
-the Rundeck `allocate_node` job, SSH in, and run the script directly with `bash`.
-The `#SBATCH` directives are inert in that mode, and the scripts derive the project
-root from their own location and tee output to `logs/`. (Under a SLURM controller,
-`sbatch scripts/submit_allocation*.sh` also works unchanged.)
+On the current ZALF HPC, reserve an exclusive node via the Rundeck `allocate_node`
+job, SSH in, and **submit with `sbatch`** — SLURM is available on the node, and
+`sbatch` is what writes the log files and applies the resource directives. Both
+scripts request the **whole reserved node** (`#SBATCH --exclusive --mem=0`) and carry
+**no `--partition`**, so the Rundeck node size you pick is the memory limit. Pass the
+per-run knobs with `sbatch --export=ALL,VAR=value,...`. (Running directly with `bash`
+still works as a fallback and tees output to `logs/`, but `sbatch` is preferred so the
+standard logs are written.)
+
+Note: because each job is `--exclusive`, only one runs on the reserved node at a time
+— per-region smoke jobs queue and run sequentially. For all regions in parallel, use
+the real step (multicore within a single job) on a fat node.
 
 ### Resources / node selection
 
@@ -276,17 +283,17 @@ the **BAU** scenario, and the **first** simulation timestep (profile mode,
 without the `ALLOC-08` hard stop and writes a `posterior.tif`.
 
 ```bash
-# On the reserved node, one region per run:
-ALLOCATION_REGION_FILTER=selva_andina \
-ALLOCATION_PROFILE_SCENARIO=BAU \
-  bash scripts/submit_allocation_smoke.sh
+# From the repo root on the reserved node, one region per job:
+sbatch --export=ALL,ALLOCATION_REGION_FILTER=selva_andina,ALLOCATION_PROFILE_SCENARIO=BAU \
+  scripts/submit_allocation_smoke.sh
 ```
 
 For the two big regions, bound prediction-time memory:
 
 ```bash
-export ALLOCATION_PREDICT_BATCH_ROWS=5000000
-ALLOCATION_REGION_FILTER=cuenca_del_amazonas bash scripts/submit_allocation_smoke.sh
+sbatch --export=ALL,ALLOCATION_REGION_FILTER=cuenca_del_amazonas,\
+ALLOCATION_PROFILE_SCENARIO=BAU,ALLOCATION_PREDICT_BATCH_ROWS=5000000 \
+  scripts/submit_allocation_smoke.sh
 ```
 
 Relevant environment variables (see the script header for the full list):
@@ -300,9 +307,9 @@ Relevant environment variables (see the script header for the full list):
 | `ALLOCATION_WORKER_RSS_BUDGET_MB` | no-op (logged only) |
 
 **Pass criteria:** exit code 0, no `ALLOC-08` line in the log, and a `posterior.tif`
-under `outputs/simulations/<scenario>/<year>/region_<region>/`. Each run tees to
-`logs/lulc-allocation-smoke-<timestamp>-<region>.out`. You can run all four regions
-concurrently on a fat node in separate SSH shells.
+under `outputs/simulations/<scenario>/<year>/region_<region>/`. `sbatch` writes
+`logs/lulc-allocation-smoke-<jobid>.{out,err}`. To cover all four regions, submit one
+job per region (they run one at a time under `--exclusive`), or run the real step.
 
 ### Real allocation step
 
@@ -314,23 +321,24 @@ sequentially; within a scenario, regions are processed in parallel via
 
 **Memory implication:** peak ≈ (number of concurrent region workers) × (per-region
 peak). With the big regions exceeding 128 GB each, running several in parallel only
-fits on `fat-exclusive`. To run on `highmem-exclusive`, serialise the regions.
+fits on `fat-exclusive`. To run on `highmem-exclusive`, serialise the regions with
+`ALLOCATION_PARALLEL_STRATEGY=sequential`.
 
 ```bash
-# All regions in parallel — fat-exclusive (1.5 TB):
-export ALLOCATION_NUM_WORKERS=4
-export ALLOCATION_PREDICT_BATCH_ROWS=5000000
-bash scripts/submit_allocation.sh
+# All regions in parallel (default multicore) — reserve fat-exclusive (1.5 TB):
+sbatch --export=ALL,ALLOCATION_PREDICT_BATCH_ROWS=5000000 scripts/submit_allocation.sh
 
-# One region at a time — highmem-exclusive (188 GB):
-export ALLOCATION_PARALLEL_STRATEGY=sequential
-export ALLOCATION_PREDICT_BATCH_ROWS=5000000
-bash scripts/submit_allocation.sh
+# One region at a time — reserve highmem-exclusive (188 GB):
+sbatch --export=ALL,ALLOCATION_PARALLEL_STRATEGY=sequential,ALLOCATION_PREDICT_BATCH_ROWS=5000000 \
+  scripts/submit_allocation.sh
 ```
 
-Output is tee'd to `logs/lulc-allocation-<timestamp>.out` (direct run) or
-`logs/lulc-allocation-<jobid>.{out,err}` (SLURM). Under SLURM the script requests
-48 h; the real wall time depends on region count, scenario count, and concurrency.
+(The worker count comes from `ALLOCATION_NUM_WORKERS`, which the script sets from
+`SLURM_CPUS_PER_TASK`; with only four regions the default already runs them all in
+parallel. Use `ALLOCATION_PARALLEL_STRATEGY=sequential` to force one at a time.)
+
+`sbatch` writes `logs/lulc-allocation-<jobid>.{out,err}` and requests 48 h; the real
+wall time depends on region count, scenario count, and concurrency.
 
 **Monitoring:** watch resident memory with `top`/`htop` on the reserved node. Under
 SLURM, `sacct -j JOBID --format=JobID,State,ExitCode,MaxRSS` gives the authoritative
@@ -354,8 +362,8 @@ Conda/micromamba specs; on HPC they install under `$HPC_SCRATCH_ROOT/micromamba/
 ### Pipeline scripts (`scripts/`)
 
 Each stage has a `submit_<stage>.sh` SLURM wrapper that activates its environment and
-runs the matching `run_<stage>.r`. The wrappers also run directly with `bash` on a
-Rundeck-reserved node (the `#SBATCH` lines are inert there).
+runs the matching `run_<stage>.r`. Submit them with `sbatch` on a Rundeck-reserved
+node (they can also run directly with `bash` as a fallback).
 
 - `setup_environments.sh` — create/update conda environments
 - `hpc_common.sh` — shared helpers + the Stage 7 path-contract check
@@ -368,9 +376,9 @@ For the full ordered stage list see
 
 ## Usage
 
-> On the current ZALF HPC, reserve an exclusive node via Rundeck and SSH in, then run
-> scripts directly with `bash` (the `#SBATCH` directives are inert). Under a SLURM
-> controller, `sbatch` the same scripts. See
+> On the current ZALF HPC, reserve an exclusive node via Rundeck, SSH in, and submit
+> stage scripts with `sbatch` (so SLURM writes the logs and applies the whole-node
+> `--exclusive`/`--mem=0` request). `bash` works as a fallback. See
 > [HPC_PIPELINE_README.md](HPC_PIPELINE_README.md#execution-models).
 
 ### 1. First-time setup — build environments
@@ -387,20 +395,20 @@ bash scripts/setup_environments.sh --env allocation_env --non-interactive
 
 ### 2. Running the full pipeline (SLURM only)
 
-`master_pipeline.sh` submits **every** stage as an `sbatch` dependency chain and
-monitors with `squeue`/`sacct`. It needs a SLURM controller, so it does **not** apply
-to the Rundeck direct-run model — there, run stages one at a time on the reserved node.
+`master_pipeline.sh` submits **every** stage as an `sbatch --dependency` chain and
+monitors with `squeue`/`sacct`. It needs a multi-node SLURM controller, so it does
+**not** apply to the single reserved-node model — there, submit stages one at a time.
 
 ```bash
-bash scripts/master_pipeline.sh
+bash scripts/master_pipeline.sh   # the orchestrator itself calls sbatch per stage
 ```
 
 ### 3. Running individual stages
 
 ```bash
-# Direct on a reserved node (or prefix with `sbatch` under SLURM):
-bash scripts/submit_feature_selection.sh
-bash scripts/submit_transition_modelling.sh
+# sbatch on the reserved node (writes logs/<stage>-<jobid>.{out,err}):
+sbatch scripts/submit_feature_selection.sh
+sbatch scripts/submit_transition_modelling.sh
 ```
 
 For the allocation stage (smoke + real step) see
@@ -408,20 +416,22 @@ For the allocation stage (smoke + real step) see
 
 ### 4. Monitoring
 
-- **Direct (Rundeck) runs:** output is tee'd to `logs/`; watch memory with `top`/`htop`.
-- **SLURM runs:** `squeue -u $USER`, `sacct -j JOBID --format=JobID,State,ExitCode,MaxRSS`,
+- **SLURM:** `squeue -u $USER`, `sacct -j JOBID --format=JobID,State,ExitCode,MaxRSS`,
   `scancel JOBID`. Logs land in `logs/<stage>-<jobid>.{out,err}`.
+- **Live memory:** `top`/`htop` (resident size `RES`) on the reserved node.
 
 ## Resource allocation
 
-Default SLURM requests baked into the submit scripts (inert on a Rundeck exclusive
-node, where you get the whole node). Both modelling stages route to the highmem
-partition; on Rundeck use `highmem-exclusive` (188 GB).
+The submit scripts request the **whole reserved node** (`#SBATCH --exclusive --mem=0`,
+no `--partition`), so the Rundeck node type you reserve sets the real RAM/core limit.
+The `--cpus-per-task` value still controls each stage's worker pool (`SLURM_CPUS_PER_TASK`).
+Reserve a node sized for the stage:
 
-| Stage | Partition | CPUs × mem | Total | Time | Environment |
-|-------|-----------|------------|-------|------|-------------|
-| Feature selection | highmem | 4 × 32 GB | 128 GB | 72 h | `feat_select_env` |
-| Transition modelling | highmem | 3 × 42 GB | 126 GB | 72 h | `transition_model_env` |
+| Stage | `--cpus-per-task` | Time | Suggested node | Environment |
+|-------|-------------------|------|----------------|-------------|
+| Feature selection | 4 | 72 h | `highmem-exclusive` (188 GB) | `feat_select_env` |
+| Transition modelling | 3 | 72 h | `highmem-exclusive` (188 GB) | `transition_model_env` |
+| Distance calc | 48 | 24 h | `highmem-exclusive` (188 GB) | `dist_calc_env` |
 
 For the allocation stage's (larger) memory profile and node mapping see
 [Running the allocation stage](#running-the-allocation-stage-stage-7) above and

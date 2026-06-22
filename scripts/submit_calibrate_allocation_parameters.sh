@@ -1,10 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=calibrate-allocation-params
-# Routed to highmem: 4 x 28G = 112G exceeds the 95000 MB compute cap.
-#SBATCH --partition=highmem
+# Reserve the whole Rundeck node: --exclusive + --mem=0 give the job all cores and
+# all RAM on the reserved node. No --partition: the Rundeck reservation places the
+# job. Reserve highmem-exclusive (188GB) or larger.
 #SBATCH --time=06:00:00
+#SBATCH --exclusive
+#SBATCH --mem=0
 #SBATCH --cpus-per-task=4
-#SBATCH --mem-per-cpu=28G
 #SBATCH --output=logs/calibrate-allocation-params-%j.out
 #SBATCH --error=logs/calibrate-allocation-params-%j.err
 #SBATCH --profile=task

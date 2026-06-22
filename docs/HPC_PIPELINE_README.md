@@ -11,26 +11,22 @@ building the conda/micromamba environments see [MICROMAMBA_SETUP.md](MICROMAMBA_
 
 ## Execution models
 
-The submit scripts in `scripts/` carry `#SBATCH` directives, but how you actually
-launch a job depends on the cluster:
-
-### A. Rundeck node reservation (current ZALF HPC)
-
-There is **no batch scheduler you submit to**. You reserve an exclusive node and
-run the job on it yourself:
+The standard workflow on the current ZALF HPC:
 
 1. In the web-based **Rundeck** system, run the `allocate_node` job and choose the
-   node type (see the node table below).
+   node type sized for the stage (see the node table below).
 2. SSH into the reserved node.
-3. Run the stage script **directly** — e.g. `bash scripts/submit_allocation_smoke.sh`.
-   The `#SBATCH` lines are inert in this mode; `SLURM_SUBMIT_DIR`, `SLURM_JOB_ID`,
-   and `SLURM_CPUS_PER_TASK` are unset, and scripts fall back to sensible defaults
-   (project root derived from the script location, output tee'd to `logs/`).
+3. **Submit the stage with `sbatch`** — e.g. `sbatch scripts/submit_allocation_smoke.sh`.
 
-Because the node is exclusive, you get **all of its RAM and cores** regardless of
-the `--cpus-per-task` / `--mem-per-cpu` directives. Pick the node by the stage's
-memory needs, and run one stage at a time (the `sbatch` dependency chain in
-`master_pipeline.sh` is **not** available without a SLURM controller).
+**Always use `sbatch`, not `bash`.** SLURM is available on the reserved node, and
+submitting with `sbatch` is what writes the per-job log files (`#SBATCH --output` /
+`--error`) and applies the resource directives. The submit scripts request the
+**whole reserved node** via `#SBATCH --exclusive` + `#SBATCH --mem=0` (all cores,
+all RAM) and carry **no `--partition`** — the Rundeck reservation already places the
+job on the node you picked. So the node type you reserve in Rundeck *is* the memory
+limit. (Running a script directly with `bash` still works as a fallback — it derives
+paths from its own location and tees output to `logs/` — but the standard log files
+are only written under `sbatch`.)
 
 **Available Rundeck node types:**
 
@@ -43,12 +39,9 @@ memory needs, and run one stage at a time (the `sbatch` dependency chain in
 | `gpu-Nvidia-Tensor-Core-H100` | ~756 GB | 128 vCores | 4× H100 |
 | `2vCPU-2GB-Ram` / `4vCPU-16GB-Ram` / `16vCPU-32GB-Ram` / `40vCPU-40GB-Ram` | small | shared | non-exclusive |
 
-### B. SLURM scheduler (where a controller is available)
-
-On a traditional SLURM cluster you submit with `sbatch` and the `#SBATCH`
-directives apply. `master_pipeline.sh` orchestrates the whole pipeline this way,
-submitting each stage with an `--dependency=afterok:<jobid>` chain and monitoring
-with `squeue`/`sacct`. The submit scripts work unchanged under either model.
+> `master_pipeline.sh` chains the full pipeline with `sbatch --dependency=afterok`,
+> which needs a multi-node SLURM controller. Under the single reserved-node model you
+> run **one stage at a time** on the node instead.
 
 ## Pipeline stages
 
@@ -166,22 +159,20 @@ Read by `src/allocation.r` / `scripts/submit_allocation_smoke.sh`:
 | `ALLOCATION_PREDICT_BATCH_ROWS` | **memory fix**: predict large transitions in row-batches to bound prediction-time peak RSS. Unset = original single-shot. Try `5000000` for the big regions. Note: this caps prediction *transients*, not the ~80 GB preload floor. |
 | `ALLOCATION_WORKER_RSS_BUDGET_MB` | **no-op** — only logged as a breadcrumb; it does not bound or chunk anything. |
 
-Example (big region on a reserved fat/highmem node):
+Example (big region on a reserved fat/highmem node — pass env vars through to the
+job with `sbatch --export`):
 
 ```bash
-export ALLOCATION_PREDICT_BATCH_ROWS=5000000
-ALLOCATION_REGION_FILTER=cuenca_del_amazonas \
-ALLOCATION_PROFILE_SCENARIO=BAU \
-  bash scripts/submit_allocation_smoke.sh
+sbatch --export=ALL,ALLOCATION_REGION_FILTER=cuenca_del_amazonas,\
+ALLOCATION_PROFILE_SCENARIO=BAU,ALLOCATION_PREDICT_BATCH_ROWS=5000000 \
+  scripts/submit_allocation_smoke.sh
 ```
 
 ## Monitoring and logs
 
-**Direct (Rundeck) runs:** stage scripts tee combined stdout/stderr to
-`logs/<stage>-<timestamp>.out`, and the allocation worker writes a per-region log.
-Watch live memory with `top`/`htop` (resident size `RES`) on the reserved node.
-
-**SLURM runs:** standard commands apply —
+Jobs submitted with `sbatch` write `logs/<stage>-<jobid>.{out,err}` (via the
+`#SBATCH --output`/`--error` directives), and the allocation worker also writes a
+per-region log. Standard SLURM commands:
 
 ```bash
 squeue -u $USER                 # queued/running jobs
@@ -189,9 +180,9 @@ sacct -j JOBID --format=JobID,State,ExitCode,MaxRSS   # exit code + peak memory
 scancel JOBID                   # cancel
 ```
 
-`sacct … MaxRSS` is the authoritative per-job peak (it captures child processes
-like Dinamica that R-side RSS logging does not). On a Rundeck node use it only if a
-SLURM accounting daemon is present; otherwise rely on `top`/`htop`.
+`sacct … MaxRSS` is the authoritative per-job peak — it captures child processes
+like Dinamica that R-side RSS logging does not. You can also watch live memory with
+`top`/`htop` (resident size `RES`) on the reserved node.
 
 ## Troubleshooting
 
@@ -205,6 +196,6 @@ SLURM accounting daemon is present; otherwise rely on `top`/`htop`.
   `scripts/setup_environments.sh` if missing.
 - **Dinamica `std::exception` / silent failure** — see the Dinamica launch contract
   and smoke tests in [README_HPC.md](README_HPC.md).
-- **Stage script can't find `run_*.r`** — when running directly (no SLURM), launch
-  from the repo root or via `bash scripts/submit_<stage>.sh`; scripts derive the
-  project root from their own location when `SLURM_SUBMIT_DIR` is unset.
+- **Stage script can't find `run_*.r`** — submit with `sbatch scripts/submit_<stage>.sh`
+  from the repo root. (When run directly with `bash`, scripts derive the project root
+  from their own location, so that works too.)

@@ -1,10 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=trans-model
-# Routed to highmem: 3 x 42G = 126G exceeds the 95000 MB compute cap.
-#SBATCH --partition=highmem
+# Reserve the whole Rundeck node: --exclusive + --mem=0 give the job all cores and
+# all RAM on the reserved node. No --partition: the Rundeck reservation places the
+# job. Reserve highmem-exclusive (188GB) or larger.
 #SBATCH --time=72:00:00
+#SBATCH --exclusive
+#SBATCH --mem=0
 #SBATCH --cpus-per-task=3
-#SBATCH --mem-per-cpu=42G
 #SBATCH --output=logs/trans-model-%j.out
 #SBATCH --error=logs/trans-model-%j.err
 #SBATCH --profile=task
