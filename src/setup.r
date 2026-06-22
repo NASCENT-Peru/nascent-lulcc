@@ -162,7 +162,7 @@ find_project_root <- function() {
 detect_environment <- function() {
   # Check for HPC-specific indicators
   hpc_indicators <- c(
-    file.exists("/cluster"), # Common HPC mount point
+    file.exists(""), # Common HPC mount point
     Sys.getenv("SLURM_JOB_ID") != "", # SLURM job environment
     Sys.getenv("PBS_JOBID") != "", # PBS job environment
     grepl("euler", Sys.getenv("HOSTNAME"), ignore.case = TRUE), # Euler hostname

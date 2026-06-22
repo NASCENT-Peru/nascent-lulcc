@@ -6,7 +6,7 @@
 # Stage 7 contract (Phase 1 plans 01-01 + 01-02, decisions D-12..D-15, PIPE-04):
 #   - All host-specific paths come from `$USER` or one of the contract env
 #     vars below. There must be NO active hardcoded user-specific literals
-#     (e.g., `/cluster/home/<someone>/...`) here.
+#     (e.g., `/home/<someone>/...`) here.
 #   - Required HPC variables (validated by --check-stage7-contract):
 #       HPC_SCRATCH_ROOT  (data + env install root on scratch)
 #       HPC_TMP_ROOT      (per-job tmp root; backs $TMPDIR)
@@ -63,7 +63,7 @@ find_micromamba() {
     local POSSIBLE_LOCATIONS=(
         "${MAMBA_EXE_CUSTOM:-}"                      # explicit override wins
         "$HOME/.local/bin/micromamba"                # default install layout
-        "/cluster/home/$USER/.local/bin/micromamba"  # Euler layout when $HOME differs
+        "/home/$USER/.local/bin/micromamba"  # Euler layout when $HOME differs
     )
 
     for loc in "${POSSIBLE_LOCATIONS[@]}"; do

@@ -898,6 +898,16 @@ optimize_region_scenario <- function(
           check.names = FALSE
         )
 
+        # Drop hard-forbidden transitions (forbidden_from_classes + unmodelled
+        # region pairs). The optimiser drives their flow to ~0 via the x_t == 0
+        # constraint, but the row must be physically ABSENT from Stage 4 output
+        # (see scripts/audit_transition_pipeline.r: forbidden transitions appear
+        # in Stage 1 but not Stage 4). Without this, the row survives the
+        # !is.na(id_trans) filter carrying a solver residual (~1e-11) into the
+        # rate table. hard_forbid is L x L; as.vector(t(.)) is row-major, matching
+        # the from_ids = rep(lulc_ids, each = L) row order of rate_df at this point.
+        rate_df <- rate_df[!as.vector(t(mats$hard_forbid)), , drop = FALSE]
+
         # Left-join id_trans
         rate_df <- rate_df %>%
           dplyr::left_join(

@@ -306,7 +306,7 @@ For the LULCC pipeline with ~10–20 transitions per region, **outer-parallel-ov
 
 terra writes intermediate files. On HPC, `/tmp` is typically a small ramdisk. Set:
 ```r
-terra::terraOptions(tempdir = Sys.getenv("TMPDIR", "/cluster/scratch/.../terra_tmp"))
+terra::terraOptions(tempdir = Sys.getenv("TMPDIR", "/beegfs/.../terra_tmp"))
 ```
 The codebase already does this (PIPE-03) but should verify the env var is set in the SLURM script.
 
@@ -538,7 +538,7 @@ if (.Platform$OS.type == "unix" && !interactive()) {
 
 # terra
 terra::terraOptions(
-  tempdir = Sys.getenv("TMPDIR", "/cluster/scratch/${USER}/terra_tmp"),
+  tempdir = Sys.getenv("TMPDIR", "/beegfs/${USER}/terra_tmp"),
   memfrac = 0.4,                                  # leave 60% for other processes
   todisk = TRUE                                   # write intermediates rather than holding in RAM
 )
@@ -619,11 +619,11 @@ This research was conducted **without access to web tools** (WebSearch, WebFetch
 (Web research blocked in this session — see Verification Gaps above.)
 
 Internal sources read:
-- `c:/Users/bblack/switchdrive/git/nascent-lulcc/.planning/PROJECT.md`
-- `c:/Users/bblack/switchdrive/git/nascent-lulcc/.planning/codebase/STACK.md`
-- `c:/Users/bblack/switchdrive/git/nascent-lulcc/environments/allocation_env.yml`
-- `c:/Users/bblack/switchdrive/git/nascent-lulcc/src/allocation.r` (lines 680–740 + greps)
-- `c:/Users/bblack/switchdrive/git/nascent-lulcc/src/transition_modelling.r` (greps for butcher/tidypredict/workflow)
+- `c:/Users/black/switchdrive/git/nascent-lulcc/.planning/PROJECT.md`
+- `c:/Users/black/switchdrive/git/nascent-lulcc/.planning/codebase/STACK.md`
+- `c:/Users/black/switchdrive/git/nascent-lulcc/environments/allocation_env.yml`
+- `c:/Users/black/switchdrive/git/nascent-lulcc/src/allocation.r` (lines 680–740 + greps)
+- `c:/Users/black/switchdrive/git/nascent-lulcc/src/transition_modelling.r` (greps for butcher/tidypredict/workflow)
 
 External knowledge baseline (R 4.3–4.4 ecosystem, package authors and maintained docs as of training cutoff):
 - `future` (Henrik Bengtsson) — multicore vs multisession semantics; COW behaviour

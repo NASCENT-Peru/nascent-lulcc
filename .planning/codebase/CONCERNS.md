@@ -37,11 +37,11 @@ The codebase is an active research pipeline for land use/land cover change (LULC
 - **Impact:** Silent coercion failures or hard errors when running allocation or spatial interventions in envs that lack `r-raster`. Double memory usage when objects are coerced between types on large rasters.
 - **Fix approach:** Port `lulcc.spatprobmanipulation.r` and `spatial_interventions_prep.r` from `raster::stack/mask/overlay/rasterFromXYZ` to `terra::rast/mask/app/rasterize`. `landscape_pattern_analysis.r` is lower-priority as it is not part of the core pipeline.
 
-### HPC shell scripts hardcode username `bblack` in paths
-- **Issue:** `scripts/hpc_common.sh` (lines 13, 89, 114) and `scripts/setup_environments.sh` (lines 20, 47) use paths like `/cluster/home/bblack/`, `/cluster/scratch/bblack/`. The `.env.template` (lines 5–19) also hardcodes these paths. This prevents other researchers from running the pipeline.
+### HPC shell scripts hardcode username `black` in paths
+- **Issue:** `scripts/hpc_common.sh` (lines 13, 89, 114) and `scripts/setup_environments.sh` (lines 20, 47) use paths like `/home/black/`, `/beegfs/black/`. The `.env.template` (lines 5–19) also hardcodes these paths. This prevents other researchers from running the pipeline.
 - **Files:** `scripts/hpc_common.sh`, `scripts/setup_environments.sh`, `.env.template`
-- **Impact:** Any collaborator or new user must manually find and replace all `bblack` references before the HPC scripts work. Easy to miss a reference.
-- **Fix approach:** Replace hardcoded username segments with `$USER` shell variable (e.g., `/cluster/scratch/$USER/nascent-lulcc`). The `$HOME` variable already handles the home directory case in line 80 of `hpc_common.sh`.
+- **Impact:** Any collaborator or new user must manually find and replace all `black` references before the HPC scripts work. Easy to miss a reference.
+- **Fix approach:** Replace hardcoded username segments with `$USER` shell variable (e.g., `/beegfs/$USER/nascent-lulcc`). The `$HOME` variable already handles the home directory case in line 80 of `hpc_common.sh`.
 
 ### `spatial_interventions_prep.r` FIXME: hardcoded protected area coverage percentage
 - **Issue:** `src/spatial_interventions_prep.r` line 575 contains `cover_poly_raw <- 0.178` immediately after a comment saying `# FIXME this is now 16.9%`, overwriting a computed value with a hardcoded one. This was intentionally inserted to work around a solver infeasibility, but the FIXME acknowledges the root cause is unresolved.

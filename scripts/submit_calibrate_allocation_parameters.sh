@@ -1,5 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=calibrate-allocation-params
+# Routed to highmem: 4 x 28G = 112G exceeds the 95000 MB compute cap.
+#SBATCH --partition=highmem
 #SBATCH --time=06:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem-per-cpu=28G

@@ -72,8 +72,8 @@ This task ran TDD: `tests/testthat/test-allocation-env-canonical.R` was committe
 - **`scripts/hpc_common.sh`**:
   - Added `check_stage7_contract()` which inspects `HPC_STAGE7_REQUIRED_VARS=(HPC_SCRATCH_ROOT HPC_TMP_ROOT TERRA_TEMP)` and exits non-zero with each missing variable named when any are unset/empty (D-15, T-01-04). The error message points operators at `.env.template`.
   - Exposed a noninteractive CLI entrypoint: `bash scripts/hpc_common.sh --check-stage7-contract` exits 0 when the contract is complete and exits 1 otherwise. This is the same gate that later Phase 1 pre-flight will call from R.
-  - `setup_common_env()` now refuses to proceed without a complete contract; the previous `TERRA_TEMP="/cluster/scratch/bblack/terra_temp"` line is gone. `TMPDIR` derives from `HPC_TMP_ROOT`.
-  - `find_micromamba()` derives the Euler fallback from `$USER` (`/cluster/home/$USER/.local/bin/micromamba`); the previous `bblack` literal is removed. `MAMBA_EXE_CUSTOM` remains the explicit override.
+  - `setup_common_env()` now refuses to proceed without a complete contract; the previous `TERRA_TEMP="/beegfs/black/terra_temp"` line is gone. `TMPDIR` derives from `HPC_TMP_ROOT`.
+  - `find_micromamba()` derives the Euler fallback from `$USER` (`/home/$USER/.local/bin/micromamba`); the previous `black` literal is removed. `MAMBA_EXE_CUSTOM` remains the explicit override.
   - `ENV_BASE_PATH` is now `${HPC_SCRATCH_ROOT:+$HPC_SCRATCH_ROOT/micromamba/envs}` — empty when the contract var is unset, so any caller that uses it before passing the contract gate fails-fast through the same error path rather than silently writing to the wrong directory.
 - **`scripts/setup_environments.sh`**: rewritten as a single-env-capable bootstrap that:
   - Adopts `set -euo pipefail`.
@@ -93,7 +93,7 @@ The plan's automated `<verify>` blocks were honored where the host had the under
 | Task 2 syntax | `bash -n scripts/hpc_common.sh scripts/setup_environments.sh` | exit 0 on both | exit 0 on both |
 | Task 2 contract negative | `env -u HPC_SCRATCH_ROOT -u HPC_TMP_ROOT -u TERRA_TEMP bash scripts/hpc_common.sh --check-stage7-contract` | exit 1, names HPC_SCRATCH_ROOT and HPC_TMP_ROOT in stderr | exit 1; stderr contains all three required vars |
 | Task 2 contract positive | `HPC_SCRATCH_ROOT=/x HPC_TMP_ROOT=/x/y TERRA_TEMP=/x/z bash scripts/hpc_common.sh --check-stage7-contract` | exit 0, prints "Stage 7 path contract OK." | exit 0, message printed |
-| PIPE-04 negative | `rg -n "bblack" scripts/hpc_common.sh scripts/setup_environments.sh environments/allocation_env.yml scripts/submit_allocation.sh scripts/submit_allocation_profile.sh` | 0 hits | 0 hits |
+| PIPE-04 negative | `rg -n "black" scripts/hpc_common.sh scripts/setup_environments.sh environments/allocation_env.yml scripts/submit_allocation.sh scripts/submit_allocation_profile.sh` | 0 hits | 0 hits |
 
 `tests/testthat/test-allocation-env-canonical.R` was committed in RED (assertions failed against the pre-fix files) and the implementation moved them all to GREEN; the testthat suite was not executed in-session because Rscript is not on the executor host (matching the Plan 01-01 precedent), and the grep gates above are the authoritative pass condition for this plan.
 
@@ -119,7 +119,7 @@ The `bash scripts/setup_environments.sh --env allocation_env --non-interactive` 
 **1. [Rule 3 — blocking] Task 2 verify gate cannot run end-to-end on the executor host**
 - **Found during:** Task 2 verification preparation.
 - **Issue:** The plan's `<automated>` verify command for Task 2 ends with `bash scripts/setup_environments.sh --env allocation_env --non-interactive` and `micromamba run -n allocation_env Rscript --version`. Neither `micromamba` nor `Rscript` is available on this Windows executor, so the runtime portion of the gate cannot be executed in-session.
-- **Fix:** Verified the contract surface (the only part the plan can control without micromamba): `bash -n` syntax check, the new `--check-stage7-contract` exit-code behaviour with and without the contract vars set, and a grep gate that confirms all `bblack` literals are gone from the touched files. The runtime portion is documented as the operator-side smoke test that closes the loop on an HPC checkout.
+- **Fix:** Verified the contract surface (the only part the plan can control without micromamba): `bash -n` syntax check, the new `--check-stage7-contract` exit-code behaviour with and without the contract vars set, and a grep gate that confirms all `black` literals are gone from the touched files. The runtime portion is documented as the operator-side smoke test that closes the loop on an HPC checkout.
 - **Files modified:** None. This is a verification-host limitation, not a code issue. Same precedent as Plan 01-01 ("Rscript is not on the executor host… the grep gates above are the authoritative pass condition").
 - **Commit:** N/A (no code change required).
 
@@ -166,6 +166,6 @@ Gates:
 - `bash -n scripts/hpc_common.sh scripts/setup_environments.sh` → exit 0 on both.
 - `env -u HPC_SCRATCH_ROOT -u HPC_TMP_ROOT -u TERRA_TEMP bash scripts/hpc_common.sh --check-stage7-contract` → exit 1; stderr names HPC_SCRATCH_ROOT, HPC_TMP_ROOT, TERRA_TEMP.
 - `HPC_SCRATCH_ROOT=/x HPC_TMP_ROOT=/x/y TERRA_TEMP=/x/z bash scripts/hpc_common.sh --check-stage7-contract` → exit 0.
-- `rg -n "bblack" scripts/hpc_common.sh scripts/setup_environments.sh environments/allocation_env.yml scripts/submit_allocation.sh scripts/submit_allocation_profile.sh` → 0 hits.
+- `rg -n "black" scripts/hpc_common.sh scripts/setup_environments.sh environments/allocation_env.yml scripts/submit_allocation.sh scripts/submit_allocation_profile.sh` → 0 hits.
 
 ## Self-Check: PASSED

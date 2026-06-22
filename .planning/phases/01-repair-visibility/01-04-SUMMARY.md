@@ -40,7 +40,7 @@ tech-stack:
   patterns:
     - "Single Dinamica adapter with internal backend selection (D-09); callers never see container details"
     - "Non-executing launch resolver (resolve_dinamica_launch) so dry-run callers can verify HPC command resolution on hosts without apptainer/singularity (runtime_override + probe_runtime=FALSE)"
-    - "External SIF artifact pattern (D-10) — repo ships only the .def + build instructions; built .sif stays under /cluster/project/.../containers/"
+    - "External SIF artifact pattern (D-10) — repo ships only the .def + build instructions; built .sif stays under /project/.../containers/"
     - "Operator-facing smoke test (D-11) with dry-run AND live modes sharing the same launch contract as exec_dinamica()"
     - "Live smoke test fails non-zero unless Dinamica returns 0 AND a timestamped logs/dinamica-smoke-*.log lands under the requested log root"
 key-files:
@@ -216,9 +216,9 @@ Operator-facing build instructions:
 
   Plus a `--fakeroot` variant for clusters that require it.
 - "Where to put the built image" section: recommends
-  `/cluster/project/<project>/containers/dinamica-ego-8.sif` with a
-  `/cluster/scratch/$USER/...` fallback, then sets the contract
-  `export DINAMICA_EGO_8_HOME=/cluster/project/<project>/containers/dinamica-ego-8.sif`.
+  `/project/<project>/containers/dinamica-ego-8.sif` with a
+  `/beegfs/$USER/...` fallback, then sets the contract
+  `export DINAMICA_EGO_8_HOME=/project/<project>/containers/dinamica-ego-8.sif`.
 - "How the repo consumes the image" section: documents that
   `resolve_dinamica_launch()` and the smoke-test script share the same
   apptainer-first, singularity-second probe order.
@@ -332,7 +332,7 @@ Plan-defined automated gates (from `01-04-PLAN.md` Task 2):
 
 4. **Live Euler gate** — DEFERRED to Euler. The plan's live gate is:
    ```bash
-   export DINAMICA_EGO_8_HOME=/cluster/project/<project>/containers/dinamica-ego-8.sif
+   export DINAMICA_EGO_8_HOME=/project/<project>/containers/dinamica-ego-8.sif
    bash scripts/smoke_test_dinamica.sh \
      --runtime auto --artifact "$DINAMICA_EGO_8_HOME" \
      --ego dinamica/dinamica_model/allocation.ego-decoded \
@@ -395,8 +395,8 @@ operator-side gate, not a fix.
    ```
 2. Publish it to the external path (D-10):
    ```bash
-   mv dinamica-ego-8.sif /cluster/project/<project>/containers/dinamica-ego-8.sif
-   export DINAMICA_EGO_8_HOME=/cluster/project/<project>/containers/dinamica-ego-8.sif
+   mv dinamica-ego-8.sif /project/<project>/containers/dinamica-ego-8.sif
+   export DINAMICA_EGO_8_HOME=/project/<project>/containers/dinamica-ego-8.sif
    ```
 3. Run the live smoke test:
    ```bash

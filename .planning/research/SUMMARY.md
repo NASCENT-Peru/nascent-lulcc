@@ -57,7 +57,7 @@
 - Add missing packages to `allocation_env.yml`
 - Propagate `log_msg()` into inner allocation functions (ALLOC-05 TODO in code)
 - Centralise Dinamica EGO logs (PIPE-07 TODO in code)
-- Fix hardcoded paths (PIPE-01/03/04: xlsx→CSV, E:/terra_temp, bblack→$USER)
+- Fix hardcoded paths (PIPE-01/03/04: xlsx→CSV, E:/terra_temp, black→$USER)
 - Document `DINAMICA_EGO_8_HOME` in `.env.template`
 - Set `set.seed()` for nhood matrix generation
 - Pre-flight env validation at allocation entry

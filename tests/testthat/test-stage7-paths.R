@@ -83,8 +83,8 @@ test_that("touched config/template files no longer hardcode user-specific paths"
     txt <- readLines(file.path(.repo_root, rel), warn = FALSE)
     joined <- paste(txt, collapse = "\n")
     expect_false(
-      grepl("/cluster/[^[:space:]]*/bblack", joined),
-      info = sprintf("%s must not hardcode /cluster/.../bblack/...", rel)
+      grepl("/[^[:space:]]*/black", joined),
+      info = sprintf("%s must not hardcode /.../black/...", rel)
     )
     expect_false(
       grepl("E:/terra_temp", joined, fixed = TRUE),

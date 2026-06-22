@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   1. Every per-region log shows real numeric `rss_before/after/delta/peak` values (no "NAMB") on both Windows local and Linux HPC.
   2. When an allocation worker is SIGKILLed, `diagnose_alloc_crash.sh` surfaces OOM evidence from `sacct`/`seff`/cgroup memory and a sentinel trace exists in the region log.
   3. Running `allocation.r` with a missing env var, missing R package, missing model file, or missing Dinamica binary aborts before any work with one consolidated list of all gaps.
-  4. `simulation_trans_rates_prep.r` and `calibration_predictor_prep.r` execute on a fresh HPC checkout with no manual path edits; HPC shell scripts contain no hardcoded `bblack` references; Dinamica EGO logs land in `logs/`.
+  4. `simulation_trans_rates_prep.r` and `calibration_predictor_prep.r` execute on a fresh HPC checkout with no manual path edits; HPC shell scripts contain no hardcoded `black` references; Dinamica EGO logs land in `logs/`.
   5. Activating `allocation_env.yml` resolves on HPC with all prediction-time packages (`r-parsnip`, `r-recipes`, `r-ranger`, `r-xgboost`, `r-tidypredict`, `r-butcher`, `r-ps`, `r-lobstr`, `r-bundle`, `r-qs`, `r-rhpcblasctl`) loadable via `library()`.
   6. Dinamica EGO 8 executes successfully inside a Singularity container on Euler — a minimal allocation model completes and `exec_dinamica()` can invoke it via `DINAMICA_EGO_8_HOME`; container definition and build instructions are committed to the repository.
 **Plans**: 4 plans

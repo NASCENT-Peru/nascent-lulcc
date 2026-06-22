@@ -34,7 +34,7 @@ This phase hardens the Stage 7 allocation runtime so operators can diagnose fail
 - **D-12:** Centralize environment/path resolution behind shared helpers and config lookups instead of ad hoc fixes in each script.
 - **D-13:** Treat YAML config as authoritative, with a small set of env vars for machine-specific overrides such as temp dirs and Dinamica location.
 - **D-14:** Remove hardcoded user-specific HPC paths from active code, touched docs, and operational helpers modified in this phase.
-- **D-15:** Require explicit HPC temp/scratch env vars and fail pre-flight clearly if they are missing.
+- **D-15:** Require explicit HPC temp/beegfs env vars and fail pre-flight clearly if they are missing.
 
 ### the agent's Discretion
 No discretionary areas were delegated to the agent during discussion.

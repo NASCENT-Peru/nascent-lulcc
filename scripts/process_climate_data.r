@@ -24,7 +24,7 @@ suppressPackageStartupMessages({
 scratch <- Sys.getenv("TMPDIR")
 if (!nzchar(scratch)) {
   scratch <- file.path(
-    "/scratch",
+    "/beegfs",
     Sys.getenv("USER", "user"),
     Sys.getenv("SLURM_JOB_ID", as.character(Sys.getpid()))
   )

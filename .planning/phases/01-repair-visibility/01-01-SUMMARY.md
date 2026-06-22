@@ -61,8 +61,8 @@ One-liner: Establish a single resolver (`get_stage7_runtime_paths()`) plus named
 
 - Added `get_stage7_runtime_paths(config = NULL)` to `src/setup.r`. Returns a named list with five contract keys (`terra_temp`, `hpc_scratch_root`, `hpc_tmp_root`, `dinamica_ego_8_home`, `dinamica_backend`) sourced from explicit env-var overrides (`TERRA_TEMP`, `HPC_SCRATCH_ROOT`, `HPC_TMP_ROOT`, `DINAMICA_EGO_8_HOME`, `DINAMICA_BACKEND`). Defaults are intentionally minimal — `terra_temp` falls back to `tempdir()` (or a config-provided value), the three HPC-required paths fall back to `""` so callers can fail-fast in pre-flight, and `dinamica_backend` defaults to `"auto"`.
 - Added `expand_env_placeholders()` and wired it into `build_full_config()` so YAML can carry `${VAR}` references for genuinely machine-specific roots while remaining authoritative for repository-relative paths. Unset placeholders now raise a clear error rather than silently producing a broken path (D-15, T-01-01).
-- Replaced the hardcoded `/cluster/scratch/bblack/nascent-lulcc` `data_basepath` in `config/hpc_config.yaml` with `${HPC_SCRATCH_ROOT}`. Same checked-in YAML now works for any operator on Euler (PIPE-04, D-14).
-- Rewrote `.env.template`: removed every hardcoded `bblack` literal in favour of `$USER` expansions, and added a single documented block describing the five Stage 7 override names — what they control, when they are required, and which decisions/requirements they implement. This is now the operator-facing surface that later pre-flight, shell wrappers, and Dinamica launch logic will consume unchanged.
+- Replaced the hardcoded `/beegfs/black/nascent-lulcc` `data_basepath` in `config/hpc_config.yaml` with `${HPC_SCRATCH_ROOT}`. Same checked-in YAML now works for any operator on Euler (PIPE-04, D-14).
+- Rewrote `.env.template`: removed every hardcoded `black` literal in favour of `$USER` expansions, and added a single documented block describing the five Stage 7 override names — what they control, when they are required, and which decisions/requirements they implement. This is now the operator-facing surface that later pre-flight, shell wrappers, and Dinamica launch logic will consume unchanged.
 
 ### Task 2 — Repair active prep-script path breakpoints (`calibration_predictor_prep.r`, `simulation_trans_rates_prep.r`)
 
@@ -76,7 +76,7 @@ Plan-level grep gates (the plan's `<verify><automated>` blocks) — both pass on
 | Gate | Files | Expected | Actual |
 |------|-------|----------|--------|
 | Task 1 positive | `src/setup.r`, `config/local_config.yaml`, `config/hpc_config.yaml`, `.env.template` | All five contract keywords appear | 28 hits |
-| Task 1 negative | same | No `/cluster/.*/bblack` or `E:/terra_temp` literal | 0 hits |
+| Task 1 negative | same | No `/.*/black` or `E:/terra_temp` literal | 0 hits |
 | Task 2 negative | `src/calibration_predictor_prep.r`, `src/simulation_trans_rates_prep.r` | No `E:/terra_temp` or `LULC_demand_results.xlsx` literal | 0 hits |
 | Task 2 positive | same | `TERRA_TEMP` and `lulc_demand_path` references present | 4 hits |
 
@@ -133,7 +133,7 @@ Files asserted present:
 - `src/calibration_predictor_prep.r` — modified (terra_temp via resolver).
 - `src/simulation_trans_rates_prep.r` — modified (CSV demand path).
 - `config/hpc_config.yaml` — modified (`${HPC_SCRATCH_ROOT}`).
-- `.env.template` — modified (Stage 7 contract documented; `bblack` removed).
+- `.env.template` — modified (Stage 7 contract documented; `black` removed).
 - `tests/testthat.R`, `tests/testthat/test-stage7-paths.R`, `tests/testthat/test-prep-paths.R` — new.
 
 ## Self-Check: PASSED

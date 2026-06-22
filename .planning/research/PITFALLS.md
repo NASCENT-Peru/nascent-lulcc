@@ -453,10 +453,10 @@ This makes "the allocation crashed" → "here's the post-mortem in 30 seconds" i
 
 ## Sources
 
-- `c:/Users/bblack/switchdrive/git/nascent-lulcc/.planning/PROJECT.md` (crash profile, blockers, decision log)
-- `c:/Users/bblack/switchdrive/git/nascent-lulcc/.planning/codebase/CONCERNS.md` (raster/terra coexistence, hardcoded paths, xgboost pinning)
-- `c:/Users/bblack/switchdrive/git/nascent-lulcc/.planning/codebase/STACK.md` (package versions, R version split, conda env layout)
-- `c:/Users/bblack/switchdrive/git/nascent-lulcc/src/allocation.r` (closure structure, `prof_tic`/`prof_toc`, `nhood_raster_cache`, `predict_saved_*` paths, `furrr::future_map` invocation)
+- `c:/Users/black/switchdrive/git/nascent-lulcc/.planning/PROJECT.md` (crash profile, blockers, decision log)
+- `c:/Users/black/switchdrive/git/nascent-lulcc/.planning/codebase/CONCERNS.md` (raster/terra coexistence, hardcoded paths, xgboost pinning)
+- `c:/Users/black/switchdrive/git/nascent-lulcc/.planning/codebase/STACK.md` (package versions, R version split, conda env layout)
+- `c:/Users/black/switchdrive/git/nascent-lulcc/src/allocation.r` (closure structure, `prof_tic`/`prof_toc`, `nhood_raster_cache`, `predict_saved_*` paths, `furrr::future_map` invocation)
 
 **Live web search and Context7 MCP were unavailable during this research session** (WebSearch permission denied; gsd-sdk Bash blocked). Findings are derived from training-data knowledge of these specific R packages combined with the project-specific evidence above. Items marked LOW or MEDIUM confidence (notably the exact xgboost-tidypredict compatibility version, the precise cgroup version on Euler, and the dominant native-heap leak source) should be verified empirically before being treated as load-bearing.
 

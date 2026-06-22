@@ -72,8 +72,8 @@ Raw LULC rasters + predictor layers (external data filesystem)
 ## Configuration System
 
 Environment detection is automatic (`src/setup.r → detect_environment()`):
-- Checks for SLURM env vars (`SLURM_JOB_ID`), `/cluster` mountpoint, Euler hostname patterns.
-- Selects `config/local_config.yaml` (local, `data_basepath: E:/nascent-lulcc-agg`) or `config/hpc_config.yaml` (HPC, `data_basepath: /cluster/scratch/bblack/nascent-lulcc`).
+- Checks for SLURM env vars (`SLURM_JOB_ID`), `` mountpoint, Euler hostname patterns.
+- Selects `config/local_config.yaml` (local, `data_basepath: E:/nascent-lulcc-agg`) or `config/hpc_config.yaml` (HPC, `data_basepath: /beegfs/black/nascent-lulcc`).
 
 `build_full_config()` expands all relative paths in the YAML against `data_basepath` and flattens the nested map into a single named list. All downstream functions accept `config = get_config()` as a default argument — they can be called with no arguments in an interactive session and will auto-configure.
 

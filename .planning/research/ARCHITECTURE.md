@@ -83,7 +83,7 @@ SLURM job (1 node, 1 task, N CPUs, ~M GB)
 │  │   • mosaic posteriors                                           │ │
 │  └────────────────────────────────────────────────────────────────┘ │
 │                                                                      │
-│  Scratch FS (/cluster/scratch):                                      │
+│  Scratch FS (/beegfs):                                      │
 │    inputs/predictors/parquet_data/...     (read-only, lazy via arrow)│
 │    outputs/transition_models/.rds         (read-only, butchered)     │
 │    outputs/simulations/<scen>/<yr>/region_<r>/                       │
@@ -473,14 +473,14 @@ For Peru at 100 m, regions are well within the "50 M cell" column; the design co
 ## Sources
 
 - **Codebase (HIGH confidence):**
-  - `c:/Users/bblack/switchdrive/git/nascent-lulcc/.planning/PROJECT.md` — crash profile, known blockers, decisions log
-  - `c:/Users/bblack/switchdrive/git/nascent-lulcc/.planning/codebase/ARCHITECTURE.md` — pipeline topology, parallelism model statement
-  - `c:/Users/bblack/switchdrive/git/nascent-lulcc/src/allocation.r` — current allocation orchestration, `generate_probability_maps`, profiling helpers, butchered/tidypredict prediction paths
-  - `c:/Users/bblack/switchdrive/git/nascent-lulcc/src/transition_modelling.r:2138–2546` — `save_minimal_model`, ranger surgery, xgboost raw serialisation, butcher invocation
-  - `c:/Users/bblack/switchdrive/git/nascent-lulcc/src/calibrate_allocation_parameters.r:780–820` — current (incorrect) rationale for choosing multisession on HPC
-  - `c:/Users/bblack/switchdrive/git/nascent-lulcc/src/dinamica_utils.r` — `exec_dinamica`, `processx::run` blocking semantics, `-disable-parallel-steps` flag
-  - `c:/Users/bblack/switchdrive/git/nascent-lulcc/scripts/run_allocation.r:165–168` — current `future::plan(future::multisession, workers = num_workers)`
-  - `c:/Users/bblack/switchdrive/git/nascent-lulcc/environments/allocation_env.yml` — current allocation env (missing parsnip/recipes/ranger/xgboost)
+  - `c:/Users/black/switchdrive/git/nascent-lulcc/.planning/PROJECT.md` — crash profile, known blockers, decisions log
+  - `c:/Users/black/switchdrive/git/nascent-lulcc/.planning/codebase/ARCHITECTURE.md` — pipeline topology, parallelism model statement
+  - `c:/Users/black/switchdrive/git/nascent-lulcc/src/allocation.r` — current allocation orchestration, `generate_probability_maps`, profiling helpers, butchered/tidypredict prediction paths
+  - `c:/Users/black/switchdrive/git/nascent-lulcc/src/transition_modelling.r:2138–2546` — `save_minimal_model`, ranger surgery, xgboost raw serialisation, butcher invocation
+  - `c:/Users/black/switchdrive/git/nascent-lulcc/src/calibrate_allocation_parameters.r:780–820` — current (incorrect) rationale for choosing multisession on HPC
+  - `c:/Users/black/switchdrive/git/nascent-lulcc/src/dinamica_utils.r` — `exec_dinamica`, `processx::run` blocking semantics, `-disable-parallel-steps` flag
+  - `c:/Users/black/switchdrive/git/nascent-lulcc/scripts/run_allocation.r:165–168` — current `future::plan(future::multisession, workers = num_workers)`
+  - `c:/Users/black/switchdrive/git/nascent-lulcc/environments/allocation_env.yml` — current allocation env (missing parsnip/recipes/ranger/xgboost)
 
 - **Authoritative external references to verify before implementation (NOT consulted in this session due to tool unavailability):**
   - https://future.futureverse.org/ — `future::multicore` vs `multisession` semantics

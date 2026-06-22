@@ -25,7 +25,7 @@ on the ETH Euler HPC cluster (the primary target) or a local Windows workstation
 |---|---|
 | **SLURM** | ETH Euler cluster; stages can be run manually for local development |
 | **Apptainer / Singularity** | Required for running Dinamica EGO 8 on HPC via the `.sif` container |
-| **Access to scratch filesystem** | `/cluster/scratch/$USER` — conda environments and data live here |
+| **Access to scratch filesystem** | `/beegfs/$USER` — conda environments and data live here |
 
 ### Local development
 
@@ -45,7 +45,7 @@ Transfer the project to your Euler home directory:
 
 ```bash
 # Target path on ETH Euler
-/cluster/home/$USER/nascent-lulcc
+/home/$USER/nascent-lulcc
 ```
 
 #### 2. Configure environment variables
@@ -53,7 +53,7 @@ Transfer the project to your Euler home directory:
 Copy `.env.template` to `.env` and set the machine-specific values:
 
 ```bash
-cd /cluster/home/$USER/nascent-lulcc
+cd /home/$USER/nascent-lulcc
 cp .env.template .env
 ```
 
@@ -61,7 +61,7 @@ Open `.env` and fill in the required values:
 
 | Variable | Required | Description |
 |---|---|---|
-| `HPC_SCRATCH_ROOT` | Required on HPC | Scratch filesystem root, e.g. `/cluster/scratch/$USER/nascent-lulcc` |
+| `HPC_SCRATCH_ROOT` | Required on HPC | Scratch filesystem root, e.g. `/beegfs/$USER/nascent-lulcc` |
 | `HPC_TMP_ROOT` | Required on HPC | Per-job temp root, e.g. `$HPC_SCRATCH_ROOT/temp` |
 | `TERRA_TEMP` | Required on HPC | terra temp directory, e.g. `$HPC_SCRATCH_ROOT/terra_temp` |
 | `DINAMICA_EGO_8_HOME` | Required (both) | HPC: absolute path to the built `.sif` image; local: Dinamica install directory |
@@ -109,7 +109,7 @@ bash scripts/setup_environments.sh
 ```
 
 This reads all `.yml` files under `environments/` and creates one conda environment per pipeline
-stage under `/cluster/scratch/$USER/micromamba/envs/`. If `HPC_SCRATCH_ROOT` is unset when HPC
+stage under `/beegfs/$USER/micromamba/envs/`. If `HPC_SCRATCH_ROOT` is unset when HPC
 context is detected, the script exits with a named-signal error rather than silently installing
 under `$HOME`.
 
@@ -209,7 +209,7 @@ bash scripts/smoke_test_dinamica.sh \
 Submit all 7 stages as a dependency-chained SLURM sequence:
 
 ```bash
-cd /cluster/home/$USER/nascent-lulcc/scripts
+cd /home/$USER/nascent-lulcc/scripts
 bash master_pipeline.sh
 ```
 
@@ -250,7 +250,7 @@ a `refresh_cache` flag to skip recomputation of existing outputs.
 
 **`HPC_SCRATCH_ROOT` not set on HPC**
 
-`setup_environments.sh` detects HPC context (via SLURM env vars or `/cluster/scratch` presence)
+`setup_environments.sh` detects HPC context (via SLURM env vars or `/beegfs` presence)
 and refuses to install environments under `$HOME` when `HPC_SCRATCH_ROOT` is unset. Source `.env`
 first:
 

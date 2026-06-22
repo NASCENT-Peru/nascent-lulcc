@@ -7,17 +7,17 @@ This guide helps you set up micromamba in your HPC workspace and migrate existin
 ## Problem
 
 The previous micromamba location is no longer available:
-- **Old location**: `/cluster/project/eawag/p01002/.local/bin/micromamba` (deleted)
+- **Old location**: `/project/eawag/p01002/.local/bin/micromamba` (deleted)
 - **Solution**: Install micromamba in your home directory
 
 ## Storage Locations
 
-### Home Directory (`/cluster/home/bblack`)
+### Home Directory (`/home/black`)
 - **Size**: Limited (a few GB)
 - **Persistence**: Permanent
 - **Use for**: Micromamba executable (~20 MB), scripts, small configs
 
-### Scratch Directory (`/cluster/scratch/bblack`)
+### Scratch Directory (`/beegfs/black`)
 - **Size**: Large (TBs)
 - **Persistence**: Wiped regularly (every 60-90 days)
 - **Use for**: Conda environments, temporary files, large datasets
@@ -29,7 +29,7 @@ The previous micromamba location is no longer available:
 **Option A: Simple Installation (Recommended)**
 
 ```bash
-cd /cluster/home/bblack/nascent-lulcc
+cd /home/black/nascent-lulcc
 bash scripts/install_micromamba_simple.sh
 ```
 
@@ -38,7 +38,7 @@ This uses a direct binary download which is more reliable.
 **Option B: Standard Installation**
 
 ```bash
-cd /cluster/home/bblack/nascent-lulcc
+cd /home/black/nascent-lulcc
 bash scripts/install_micromamba.sh
 ```
 
@@ -75,7 +75,7 @@ chmod +x micromamba
 
 Expected output:
 ```
-✓ Micromamba installed successfully to: /cluster/home/bblack/.local/bin/micromamba
+✓ Micromamba installed successfully to: /home/black/.local/bin/micromamba
 Version: 1.x.x
 ```
 
@@ -95,11 +95,11 @@ source ~/.bashrc
 Create all required environments:
 
 ```bash
-cd /cluster/home/bblack/nascent-lulcc
+cd /home/black/nascent-lulcc
 bash scripts/setup_environments.sh
 ```
 
-This will create environments in `/cluster/scratch/bblack/micromamba/envs/`:
+This will create environments in `/beegfs/black/micromamba/envs/`:
 - `feat_select_env`
 - `transition_model_env`
 - `allocation_params_env`
@@ -116,9 +116,9 @@ $HOME/.local/bin/micromamba env list
 
 Expected output:
 ```
-  feat_select_env           /cluster/scratch/bblack/micromamba/envs/feat_select_env
-  transition_model_env      /cluster/scratch/bblack/micromamba/envs/transition_model_env
-  allocation_params_env     /cluster/scratch/bblack/micromamba/envs/allocation_params_env
+  feat_select_env           /beegfs/black/micromamba/envs/feat_select_env
+  transition_model_env      /beegfs/black/micromamba/envs/transition_model_env
+  allocation_params_env     /beegfs/black/micromamba/envs/allocation_params_env
 ```
 
 ## Script Updates
@@ -142,7 +142,7 @@ All HPC submit scripts now use shared functions from `scripts/hpc_common.sh`:
 To update remaining submit scripts:
 
 ```bash
-cd /cluster/home/bblack/nascent-lulcc
+cd /home/black/nascent-lulcc
 bash scripts/update_all_submit_scripts.sh
 ```
 
@@ -157,7 +157,7 @@ For each `submit_*.sh` script, replace the old pattern:
 
 **OLD:**
 ```bash
-export MAMBA_EXE="/cluster/project/eawag/p01002/.local/bin/micromamba"
+export MAMBA_EXE="/project/eawag/p01002/.local/bin/micromamba"
 eval "$($MAMBA_EXE shell hook -s bash)"
 micromamba activate "$ENV_PATH"
 export R_LIBS_USER="$HOME/R_libs"
@@ -181,14 +181,14 @@ Since environments are in scratch (wiped regularly), you may need to recreate th
 
 ```bash
 # Check if environments exist
-ls -la /cluster/scratch/bblack/micromamba/envs/
+ls -la /beegfs/black/micromamba/envs/
 
 # If missing, recreate all
 bash scripts/setup_environments.sh
 
 # Or create specific environment
 $HOME/.local/bin/micromamba env create -f environments/allocation_params_env.yml \
-  -p /cluster/scratch/bblack/micromamba/envs/allocation_params_env
+  -p /beegfs/black/micromamba/envs/allocation_params_env
 ```
 
 ## Troubleshooting
@@ -238,9 +238,9 @@ If home directory is full:
 |-----------|----------|------|-------------|
 | Micromamba binary | `$HOME/.local/bin/micromamba` | ~20 MB | Permanent |
 | Project code | `$HOME/nascent-lulcc` or on switchdrive | ~100 MB | Permanent |
-| Conda environments | `/cluster/scratch/bblack/micromamba/envs/` | ~2-5 GB | Temporary* |
-| Temporary raster files | `/cluster/scratch/bblack/terra_temp/` | Variable | Temporary* |
-| Results/outputs | `/cluster/scratch/bblack/nascent-lulcc/` | Large | Temporary* |
+| Conda environments | `/beegfs/black/micromamba/envs/` | ~2-5 GB | Temporary* |
+| Temporary raster files | `/beegfs/black/terra_temp/` | Variable | Temporary* |
+| Results/outputs | `/beegfs/black/nascent-lulcc/` | Large | Temporary* |
 
 *Can be recreated from scripts when needed
 
@@ -250,5 +250,5 @@ If home directory is full:
 2. ✅ Create environments: `bash scripts/setup_environments.sh`
 3. ✅ Update remaining submit scripts (if needed)
 4. ✅ Test a job: `sbatch scripts/submit_calibrate_allocation_parameters.sh`
-5. ✅ Monitor job: `squeue -u bblack`
+5. ✅ Monitor job: `squeue -u black`
 6. ✅ Check output: `cat logs/calibrate-allocation-params-*.out`

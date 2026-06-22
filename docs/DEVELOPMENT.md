@@ -48,7 +48,7 @@ On local machines the environments are installed to `<repo>/.envs/` by default. 
 
 ### Configuration auto-detection
 
-`src/setup.r:get_config()` auto-detects whether it is running locally or on HPC by checking SLURM job variables, PBS job variables, presence of `/cluster`, and Euler hostname patterns. It then loads the appropriate config file:
+`src/setup.r:get_config()` auto-detects whether it is running locally or on HPC by checking SLURM job variables, PBS job variables, presence of ``, and Euler hostname patterns. It then loads the appropriate config file:
 
 - **Local**: `config/local_config.yaml` (`data_basepath: E:/nascent-lulcc-agg`)
 - **HPC**: `config/hpc_config.yaml` (`data_basepath: ${HPC_SCRATCH_ROOT}`)

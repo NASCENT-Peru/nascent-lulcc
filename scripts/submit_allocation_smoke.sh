@@ -1,5 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=lulc-allocation-smoke
+# Routed to highmem: 4 x 32G = 128G exceeds the 95000 MB compute cap.
+#SBATCH --partition=highmem
 #SBATCH --time=12:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem-per-cpu=32G

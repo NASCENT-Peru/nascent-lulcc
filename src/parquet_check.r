@@ -125,7 +125,7 @@
 # region_summary_df <- dplyr::bind_rows(region_summary)
 
 # dynamic_summary <- readRDS(
-#   "C:/Users/bblack/switchdrive/git/evoland-with-baggage/region_summary_dynamic_static.rds"
+#   "C:/Users/black/switchdrive/git/evoland-with-baggage/region_summary_dynamic_static.rds"
 # )
 
 # # (Optional) write to disk to avoid holding large object in memory

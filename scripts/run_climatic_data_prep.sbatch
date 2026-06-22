@@ -18,7 +18,7 @@ source "$HOME/miniconda3/etc/profile.d/conda.sh"
 conda activate clim_data_env
 
 # --- 2) Fast node-local scratch; point GDAL/R temps there
-export TMPDIR="${TMPDIR:-/scratch/$USER/$SLURM_JOB_ID}"
+export TMPDIR="${TMPDIR:-/beegfs/$USER/$SLURM_JOB_ID}"
 mkdir -p "$TMPDIR"
 export CPL_TMPDIR="$TMPDIR"
 

@@ -31,7 +31,7 @@ allocation.r completes reliably for all scenarios × regions × timesteps, produ
 - [ ] **PIPE-01**: `simulation_trans_rates_prep.r` uses the config-driven CSV path, not the hardcoded Windows xlsx path — runs on HPC without modification
 - [ ] **PIPE-02**: CVXR optimisation loop is ported from `src/old/` into `simulation_trans_rates_prep.r` section G and produces transition rate tables
 - [ ] **PIPE-03**: `calibration_predictor_prep.r` reads terra temp dir from env var, not hardcoded `E:/terra_temp`
-- [ ] **PIPE-04**: HPC shell scripts use `$USER` instead of hardcoded `bblack` in all paths
+- [ ] **PIPE-04**: HPC shell scripts use `$USER` instead of hardcoded `black` in all paths
 - [ ] **PIPE-05**: All active source files (`lulcc.spatprobmanipulation.r`, `spatial_interventions_prep.r`) migrated from legacy `raster` to `terra` — no double memory usage or type coercion at runtime
 - [ ] **PIPE-06**: Intervention YAML files (`config/SSP*_interventions.yml`) use paths matching the config schema (`inputs/spat_prob_perturb/`) rather than legacy Swiss-context `Data/Spat_prob_perturb_layers/` paths
 - [ ] **PIPE-07**: Dinamica EGO log files are written to the central `logs/` directory, not scattered across region work directories
@@ -79,7 +79,7 @@ Stages 1–6 (data prep through spatial interventions) are functional. Stage 7 (
 
 - **Tech stack**: R + Dinamica EGO 8 — pipeline is tightly coupled to Dinamica's model format and CLI interface; no swap-out possible
 - **Compatibility**: tidymodels model objects must remain usable for prediction even if training artifacts are stripped — `butcher` and `tidypredict` transformations must preserve `predict()` compatibility
-- **Data locality**: All raster and Parquet data lives on the HPC scratch filesystem (`/cluster/scratch/bblack/nascent-lulcc`) or local E:/ — not in the repository; pipeline assumes data is pre-staged
+- **Data locality**: All raster and Parquet data lives on the HPC scratch filesystem (`/beegfs/black/nascent-lulcc`) or local E:/ — not in the repository; pipeline assumes data is pre-staged
 - **Parallelism**: `future::multisession` is the parallelism model for allocation — any memory reduction strategy must be compatible with R's multiprocess/multisession worker model
 - **mlr3 migration**: Secondary priority — evaluate feasibility before committing; must produce prediction outputs compatible with the allocation probability map generation step
 

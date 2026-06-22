@@ -61,7 +61,7 @@ Usage: bash scripts/setup_environments.sh [--env NAME] [--non-interactive] [--hp
                       exists it is removed and recreated.
   --hpc               Force HPC-detection on (overrides automatic signals).
                       Use when running setup on a node that does not have
-                      /cluster/scratch and is not under SLURM, but you want
+                      /scratch and is not under SLURM, but you want
                       HPC-style installation.
 EOF
             exit 0
@@ -98,7 +98,7 @@ eval "$($MAMBA_EXE shell hook -s bash)"
 #
 # Probe signals (any one => "on HPC"):
 #   1. SLURM_JOB_ID or SLURM_CLUSTER_NAME set
-#   2. a known scratch filesystem root exists (/beegfs, /cluster/scratch)
+#   2. a known scratch filesystem root exists (/beegfs, /beegfs)
 #   3. --hpc flag or FORCE_HPC=true environment variable
 # NOTE: probe 2 is unreliable on login nodes where the parallel filesystem is
 # auto-mounted (a bare `[ -d /beegfs ]` can be false there) — which is exactly
@@ -107,7 +107,7 @@ on_hpc=false
 hpc_signal=""
 if [ -n "${SLURM_JOB_ID:-}" ] || [ -n "${SLURM_CLUSTER_NAME:-}" ]; then
     on_hpc=true; hpc_signal="SLURM env var"
-elif [ -d /beegfs ] || [ -d /cluster/scratch ]; then
+elif [ -d /beegfs ] || [ -d /beegfs ]; then
     on_hpc=true; hpc_signal="scratch filesystem present"
 elif [ "${FORCE_HPC:-false}" = "true" ]; then
     on_hpc=true; hpc_signal="--hpc flag"

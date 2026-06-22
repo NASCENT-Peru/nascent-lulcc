@@ -160,9 +160,9 @@
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| Explicit env vars | Require HPC temp/scratch env vars and fail clearly if missing. | x |
+| Explicit env vars | Require HPC temp/beegfs env vars and fail clearly if missing. | x |
 | Defaults plus overrides | Derive standard scratch/temp locations automatically. | |
-| Config-only | Force all temp/scratch paths through YAML. | |
+| Config-only | Force all temp/beegfs paths through YAML. | |
 
 **User's choice:** Explicit env vars
 **Notes:** User preferred explicit HPC runtime requirements over inferred defaults.

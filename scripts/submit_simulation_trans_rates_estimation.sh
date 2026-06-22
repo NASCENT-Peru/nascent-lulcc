@@ -2,7 +2,8 @@
 #SBATCH --job-name=sim-trans-rates-prep
 #SBATCH --time=04:00:00
 #SBATCH --cpus-per-task=6
-#SBATCH --mem-per-cpu=16G
+# Compute nodes cap at 95000 MB; 6 x 15G = 90G fits (16G/cpu overshot to 96G).
+#SBATCH --mem-per-cpu=15G
 #SBATCH --output=logs/sim-trans-rates-prep-%j.out
 #SBATCH --error=logs/sim-trans-rates-prep-%j.err
 #SBATCH --profile=task

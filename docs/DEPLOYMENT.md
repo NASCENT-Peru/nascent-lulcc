@@ -21,8 +21,8 @@ deployment target.
 
 The HPC deployment requires:
 - Access to the ETH Euler cluster <!-- VERIFY: cluster access is managed via ETH IT -->
-- A home directory under `/cluster/home/$USER/`
-- A scratch directory under `/cluster/scratch/$USER/` (wiped every 60–90 days)
+- A home directory under `/home/$USER/`
+- A scratch directory under `/beegfs/$USER/` (wiped every 60–90 days)
 - SLURM module system with `apptainer` (or `singularity`) available
 
 There are no Docker files, Vercel configs, Netlify configs, or other cloud platform manifests in the
@@ -52,7 +52,7 @@ steps are run manually by the operator on the Euler login node. The deployment s
 
 ```bash
 # Target path on ETH Euler
-/cluster/home/$USER/nascent-lulcc
+/home/$USER/nascent-lulcc
 ```
 
 Copy or clone the repository to the above path. All SLURM scripts derive the project root
@@ -74,7 +74,7 @@ Key variables to set before proceeding:
 
 | Variable | What to set |
 |---|---|
-| `HPC_SCRATCH_ROOT` | `/cluster/scratch/$USER/nascent-lulcc` |
+| `HPC_SCRATCH_ROOT` | `/beegfs/$USER/nascent-lulcc` |
 | `HPC_TMP_ROOT` | `$HPC_SCRATCH_ROOT/temp` |
 | `TERRA_TEMP` | `$HPC_SCRATCH_ROOT/terra_temp` |
 | `DINAMICA_EGO_8_HOME` | Absolute path to the built `.sif` image (see container build below) |
@@ -100,7 +100,7 @@ bash scripts/setup_environments.sh --env allocation_env --non-interactive
 ```
 
 On HPC, environments are installed under `$HPC_SCRATCH_ROOT/micromamba/envs/` (scratch — recreate
-if wiped). The script detects HPC context via SLURM environment variables or `/cluster/scratch`
+if wiped). The script detects HPC context via SLURM environment variables or `/beegfs`
 presence and refuses to install under `$HOME` if `HPC_SCRATCH_ROOT` is unset.
 
 Environments provisioned:
@@ -170,10 +170,10 @@ The `.sif` must live outside the repository clone. Recommended paths on Euler:
 
 ```text
 # Shared across cluster project users (preferred)
-/cluster/project/<project>/containers/dinamica-ego-8.sif   <!-- VERIFY: project filesystem path -->
+/project/<project>/containers/dinamica-ego-8.sif   <!-- VERIFY: project filesystem path -->
 
 # Per-user staging (acceptable if no project filesystem)
-/cluster/scratch/$USER/nascent-lulcc/containers/dinamica-ego-8.sif
+/beegfs/$USER/nascent-lulcc/containers/dinamica-ego-8.sif
 ```
 
 Set `DINAMICA_EGO_8_HOME` in `.env` to the absolute path of the built image.
@@ -224,7 +224,7 @@ bash scripts/smoke_test_dinamica.sh \
 ### Complete Pipeline (recommended)
 
 ```bash
-cd /cluster/home/$USER/nascent-lulcc/scripts
+cd /home/$USER/nascent-lulcc/scripts
 bash master_pipeline.sh
 ```
 
@@ -437,7 +437,7 @@ mkdir -p "$HPC_SCRATCH_ROOT"/{data,results,logs,terra_temp,temp,micromamba/envs}
 ### Micromamba not found at job start time
 
 `hpc_common.sh:find_micromamba()` searches `$MAMBA_EXE_CUSTOM`, `$HOME/.local/bin/micromamba`,
-and `/cluster/home/$USER/.local/bin/micromamba` in order. If none are found, reinstall:
+and `/home/$USER/.local/bin/micromamba` in order. If none are found, reinstall:
 
 ```bash
 bash scripts/install_micromamba_simple.sh
@@ -451,7 +451,7 @@ Or set `MAMBA_EXE_CUSTOM` to the actual binary path before submitting jobs.
 
 | Location | Persistence | Contents |
 |---|---|---|
-| `/cluster/home/$USER/nascent-lulcc` | Permanent | Repository code, configs, scripts |
+| `/home/$USER/nascent-lulcc` | Permanent | Repository code, configs, scripts |
 | `$HOME/.local/bin/micromamba` | Permanent | Micromamba binary (~20 MB) |
 | `$HPC_SCRATCH_ROOT/micromamba/envs/` | Temporary* | All conda environments (~2–5 GB) |
 | `$HPC_SCRATCH_ROOT/data/` | Temporary* | Input rasters and prepared predictor data |

@@ -28,7 +28,7 @@
 - **D-12:** Centralize environment/path resolution behind shared helpers and config lookups instead of ad hoc fixes in each script.
 - **D-13:** Treat YAML config as authoritative, with a small set of env vars for machine-specific overrides such as temp dirs and Dinamica location.
 - **D-14:** Remove hardcoded user-specific HPC paths from active code, touched docs, and operational helpers modified in this phase.
-- **D-15:** Require explicit HPC temp/scratch env vars and fail pre-flight clearly if they are missing.
+- **D-15:** Require explicit HPC temp/beegfs env vars and fail pre-flight clearly if they are missing.
 
 ### the agent's Discretion
 No discretionary areas were delegated to the agent during discussion.
@@ -48,7 +48,7 @@ None - discussion stayed within phase scope.
 | OBS-04 | Allocation entry runs pre-flight validation and fails fast with one actionable list of all gaps | `run_allocation()` is the correct top-level insertion point for a consolidated operator gate. [VERIFIED: repo grep src/allocation.r] |
 | PIPE-01 | `simulation_trans_rates_prep.r` reads LULC demand from config-driven CSV path | The active code still reads a hardcoded Windows XLSX path while the CSV path remains commented out. [VERIFIED: repo grep src/simulation_trans_rates_prep.r] |
 | PIPE-03 | `calibration_predictor_prep.r` reads terra temp directory from env var | The active code still hardcodes `E:/terra_temp`. [VERIFIED: repo grep src/calibration_predictor_prep.r] |
-| PIPE-04 | HPC shell scripts use `$USER` in all paths | `.env.template`, `hpc_common.sh`, `setup_environments.sh`, and `config/hpc_config.yaml` still contain `bblack` paths. [VERIFIED: repo grep scripts .env.template config/hpc_config.yaml] |
+| PIPE-04 | HPC shell scripts use `$USER` in all paths | `.env.template`, `hpc_common.sh`, `setup_environments.sh`, and `config/hpc_config.yaml` still contain `black` paths. [VERIFIED: repo grep scripts .env.template config/hpc_config.yaml] |
 | PIPE-07 | Dinamica EGO log files are written to the central `logs/` directory | `exec_dinamica()` still writes logs beside the `.ego` model path. [VERIFIED: repo grep src/dinamica_utils.r] |
 | MEM-06 | `allocation_env.yml` includes all prediction-time packages | `allocation_env.yml` currently contains only a minimal subset and omits the required prediction stack. [VERIFIED: repo grep environments/allocation_env.yml] |
 | INFRA-01 | Dinamica EGO 8 runs inside a Singularity container on Euler and is invocable from `exec_dinamica()` | Apptainer/Singularity `exec` with bind mounts is the standard HPC container invocation pattern; the referenced ETH image repo could not be verified in-session. [CITED: https://apptainer.org/docs/user/main/cli/apptainer_exec.html] [CITED: https://apptainer.org/docs/user/1.3/bind_paths_and_mounts.html] [ASSUMED] |
@@ -242,7 +242,7 @@ log_msg(sprintf("STATE stage=%s scenario=%s region=%s timestep=%s", state$stage,
 **What goes wrong:** HPC checkouts still require manual edits because shell helpers, `.env.template`, and YAML disagree about scratch/temp/base paths. [VERIFIED: repo grep scripts/hpc_common.sh scripts/setup_environments.sh .env.template config/hpc_config.yaml]  
 **Why it happens:** The project currently has user-specific paths in multiple layers. [VERIFIED: repo grep scripts/hpc_common.sh scripts/setup_environments.sh .env.template config/hpc_config.yaml]  
 **How to avoid:** Define one shared contract: YAML is authoritative, env vars are only machine-specific overrides, and shell helpers derive from `$USER` plus explicit scratch vars. [VERIFIED: CONTEXT D-12 D-13 D-15]  
-**Warning signs:** Any touched Phase 1 file still containing `/cluster/.../bblack/...` after the repair. [VERIFIED: requirements PIPE-04]
+**Warning signs:** Any touched Phase 1 file still containing `/.../black/...` after the repair. [VERIFIED: requirements PIPE-04]
 
 ### Pitfall 5: Treating Dinamica container support as “just a path”
 **What goes wrong:** `DINAMICA_EGO_8_HOME` semantics become ambiguous between local install directories and HPC container images/wrappers. [VERIFIED: repo grep src/dinamica_utils.r requirements INFRA-01]  
@@ -265,7 +265,7 @@ rss_mb <- unname(ps::ps_memory_info()[["rss"]]) / (1024 * 1024)
 # Source: https://apptainer.org/docs/user/main/cli/apptainer_exec.html
 # Source: https://apptainer.org/docs/user/1.3/bind_paths_and_mounts.html
 apptainer exec \
-  --bind /cluster/scratch/$USER/nascent-lulcc:/workspace \
+  --bind /beegfs/$USER/nascent-lulcc:/workspace \
   /path/to/dinamica.sif \
   DinamicaConsole /workspace/allocation.ego
 ```
@@ -288,7 +288,7 @@ sacct -j "$SLURM_JOB_ID" \
 
 **Deprecated/outdated:**
 - Parsing `/proc/self/status` as the only RSS source is outdated for this phase because the requirement explicitly spans local Windows and HPC Linux. [VERIFIED: repo grep src/allocation.r] [CITED: https://ps.r-lib.org/reference/ps_memory_info.html]
-- Hardcoded `E:/...` and `/cluster/.../bblack/...` paths are outdated relative to the config-driven environment model already present in `src/setup.r`. [VERIFIED: repo grep src/calibration_predictor_prep.r src/simulation_trans_rates_prep.r scripts/hpc_common.sh scripts/setup_environments.sh .env.template config/hpc_config.yaml src/setup.r]
+- Hardcoded `E:/...` and `/.../black/...` paths are outdated relative to the config-driven environment model already present in `src/setup.r`. [VERIFIED: repo grep src/calibration_predictor_prep.r src/simulation_trans_rates_prep.r scripts/hpc_common.sh scripts/setup_environments.sh .env.template config/hpc_config.yaml src/setup.r]
 
 ## Assumptions Log
 

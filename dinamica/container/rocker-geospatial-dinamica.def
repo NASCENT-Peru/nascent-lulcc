@@ -48,7 +48,7 @@ From: rocker/r-ver:4.5.3
 #       dinamica/container/rocker-geospatial-dinamica.def
 #
 # $DINAMICA_EGO_8_HOME should point to the external artifact path, e.g.:
-#   /cluster/project/<project>/containers/dinamica-ego-8.sif
+#   /project/<project>/containers/dinamica-ego-8.sif
 # or, if project filesystem is unavailable:
 #   $HPC_SCRATCH_ROOT/containers/dinamica-ego-8.sif
 #

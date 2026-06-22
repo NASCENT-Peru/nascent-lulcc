@@ -10,8 +10,8 @@ nascent-lulcc integrates with a range of external climate, geospatial, and socio
 
 **HPC Cluster:**
 - Platform: ETH Euler (SLURM)
-- Code location: `/cluster/home/bblack/nascent-lulcc`
-- Data/scratch location: `/cluster/scratch/bblack/nascent-lulcc`
+- Code location: `/home/black/nascent-lulcc`
+- Data/beegfs location: `/beegfs/black/nascent-lulcc`
 - Job scripts: `scripts/submit_*.sh`, `scripts/master_pipeline.sh`
 - Environment management: micromamba (`scripts/install_micromamba.sh`)
 

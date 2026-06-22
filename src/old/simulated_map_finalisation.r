@@ -110,8 +110,8 @@ simulated_map_finalisation <- function() {
 
   Final_map_dir <- "outputs/Finalised_LULC_maps"
   dir.create(Final_map_dir)
-  Web_table_dir <- "C:/Users/bblack/polybox/LULC_validation_data/LULC_tables/Switzerland"
-  Web_maps_dir <- "C:/Users/bblack/polybox/LULC_validation_data/LULC_maps/Switzerland"
+  Web_table_dir <- "C:/Users/black/polybox/LULC_validation_data/LULC_tables/Switzerland"
+  Web_maps_dir <- "C:/Users/black/polybox/LULC_validation_data/LULC_maps/Switzerland"
 
   # load aggregation scheme
   Aggregation_scheme <- read_excel(lulc_aggregation_path)
@@ -361,8 +361,8 @@ simulated_map_finalisation <- function() {
   #                 Mountain = Mount_rast)
   #
   # #list files from Final dir
-  # Validation_maps_dir <- "C:/Users/bblack/polybox/LULC_validation_data/LULC_maps"
-  # Validation_tbl_dir <- "C:/Users/bblack/polybox/LULC_validation_data/LULC_tables"
+  # Validation_maps_dir <- "C:/Users/black/polybox/LULC_validation_data/LULC_maps"
+  # Validation_tbl_dir <- "C:/Users/black/polybox/LULC_validation_data/LULC_tables"
   #
   # #create directories for each region in both base dirs
   # lapply(names(Regions), function(x){

@@ -43,10 +43,10 @@ Before running the ladder, verify all of the following on Euler:
    allocation with Internet access (Step 4 downloads a fresh AppImage).
 2. **Apptainer:** `apptainer --version` shows ≥ 1.4.
 3. **DINAMICA_EGO_8_HOME:** `echo $DINAMICA_EGO_8_HOME` resolves to the absolute path of the
-   rebuilt `dinamica-ego-8.sif` (e.g. `/cluster/project/<project>/containers/dinamica-ego-8.sif`).
+   rebuilt `dinamica-ego-8.sif` (e.g. `/project/<project>/containers/dinamica-ego-8.sif`).
    The `.sif` must exist: `test -f "$DINAMICA_EGO_8_HOME" && echo OK`.
 4. **HPC_SCRATCH_ROOT:** `echo $HPC_SCRATCH_ROOT` is set to your scratch root
-   (e.g. `/cluster/scratch/$USER/nascent-lulcc`).
+   (e.g. `/beegfs/$USER/nascent-lulcc`).
 5. **Scratch subdirs:** Created: `mkdir -p "$HPC_SCRATCH_ROOT/dinamica-home" "$HPC_SCRATCH_ROOT/dinamica-tmp"`.
 6. **REPO_ROOT:** `cd "$REPO_ROOT"` — your `nascent-lulcc` working tree on Euler
    (e.g. `export REPO_ROOT="$HPC_SCRATCH_ROOT/repo/nascent-lulcc"` or wherever you checked it out).

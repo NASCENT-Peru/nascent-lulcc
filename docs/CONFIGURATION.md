@@ -27,7 +27,7 @@ These three variables are validated at job submission time by `scripts/hpc_commo
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `HPC_SCRATCH_ROOT` | **Required on HPC** | _(none)_ | Root of the scratch filesystem data tree, used as `data_basepath` in `hpc_config.yaml`. Example: `/cluster/scratch/$USER/nascent-lulcc`. |
+| `HPC_SCRATCH_ROOT` | **Required on HPC** | _(none)_ | Root of the scratch filesystem data tree, used as `data_basepath` in `hpc_config.yaml`. Example: `/beegfs/$USER/nascent-lulcc`. |
 | `HPC_TMP_ROOT` | **Required on HPC** | _(none)_ | Per-job temporary directory root on HPC scratch. Typically `$HPC_SCRATCH_ROOT/temp`. |
 | `TERRA_TEMP` | **Required on HPC** | `tempdir()` locally | Directory for `terra` intermediate raster files (`terra::terraOptions(tempdir=...)`). Falls back to `tempdir()` on local machines if unset. |
 
@@ -35,7 +35,7 @@ These three variables are validated at job submission time by `scripts/hpc_commo
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `DINAMICA_EGO_8_HOME` | **Required (both)** | _(none)_ | On HPC: absolute path to the built Dinamica EGO 8 `.sif` Apptainer image (e.g., `/cluster/project/<project>/containers/dinamica-ego-8.sif`). Locally: absolute path to the Dinamica EGO 8 installation directory. See `docs/README_HPC.md` for details. |
+| `DINAMICA_EGO_8_HOME` | **Required (both)** | _(none)_ | On HPC: absolute path to the built Dinamica EGO 8 `.sif` Apptainer image (e.g., `/project/<project>/containers/dinamica-ego-8.sif`). Locally: absolute path to the Dinamica EGO 8 installation directory. See `docs/README_HPC.md` for details. |
 | `DINAMICA_BACKEND` | Optional | `auto` | Backend selection hint consumed by `exec_dinamica()` in `src/dinamica_utils.r`. One of `auto` (detected from environment), `local`, or `hpc`. |
 
 ### Project Path Variables (HPC)
@@ -44,7 +44,7 @@ These are derived from `HPC_SCRATCH_ROOT` and expand automatically when `.env` i
 
 | Variable | Description |
 |---|---|
-| `NASCENT_LULCC_HOME` | Repository root on the HPC login node. Default: `/cluster/home/$USER/nascent-lulcc`. |
+| `NASCENT_LULCC_HOME` | Repository root on the HPC login node. Default: `/home/$USER/nascent-lulcc`. |
 | `NASCENT_LULCC_SRC` | `src/` directory path (`$NASCENT_LULCC_HOME/src`). |
 | `NASCENT_LULCC_SCRIPTS` | `scripts/` directory path. |
 | `NASCENT_LULCC_CONFIG` | `config/` directory path. |
@@ -57,8 +57,8 @@ These are derived from `HPC_SCRATCH_ROOT` and expand automatically when `.env` i
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `CONDA_ENVS_PATH` | Optional | `/cluster/home/$USER/environments` | Micromamba/conda environment install root. |
-| `R_LIBS_USER` | Optional | `/cluster/home/$USER/lib/R` | User R library path. |
+| `CONDA_ENVS_PATH` | Optional | `/home/$USER/environments` | Micromamba/conda environment install root. |
+| `R_LIBS_USER` | Optional | `/home/$USER/lib/R` | User R library path. |
 | `MAMBA_EXE` | Optional | auto-detected | Path to the micromamba executable. |
 | `TMPDIR` | Optional | `$HPC_TMP_ROOT` | System temp directory (used by R and shell tools). |
 | `R_TMPDIR` | Optional | `$TMPDIR/R` | R-specific temp directory. |
@@ -100,7 +100,7 @@ appropriate file. Override detection by passing `force_environment = "local"` or
 | `config/local_config.yaml` | Local workstation | `E:/nascent-lulcc-agg` (hardcoded) |
 | `config/hpc_config.yaml` | HPC (Euler SLURM) | `${HPC_SCRATCH_ROOT}` (expanded at load time) |
 
-Environment auto-detection checks for SLURM job IDs, PBS job IDs, presence of `/cluster`, and Euler
+Environment auto-detection checks for SLURM job IDs, PBS job IDs, presence of ``, and Euler
 hostname patterns. Both config files share the same top-level key structure:
 
 ```yaml

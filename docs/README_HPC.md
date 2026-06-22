@@ -43,7 +43,7 @@ artifact stays outside the repo (locked decision D-10).
 On Euler, set it to wherever the built `.sif` lives, e.g.:
 
 ```bash
-export DINAMICA_EGO_8_HOME=/cluster/project/<project>/containers/dinamica-ego-8.sif
+export DINAMICA_EGO_8_HOME=/project/<project>/containers/dinamica-ego-8.sif
 ```
 
 `exec_dinamica()` consumes that exact path as the image argument and builds
@@ -201,7 +201,7 @@ Exit-code contract (documented at the top of the script):
 `scripts/setup_environments.sh` detects HPC context via three OR'd signals:
 
 1. `SLURM_JOB_ID` or `SLURM_CLUSTER_NAME` environment variable is set
-2. `/cluster/scratch` directory exists on the host
+2. `/beegfs` directory exists on the host
 3. `--hpc` CLI flag or `FORCE_HPC=true` environment variable
 
 When HPC is detected AND `HPC_SCRATCH_ROOT` is unset, the script **refuses**
@@ -211,7 +211,7 @@ message:
 ```text
 ERROR: HPC context detected (<signal>) but HPC_SCRATCH_ROOT is unset.
        Refusing to install conda envs under $HOME (home filesystem quota).
-       Source the project .env or run: export HPC_SCRATCH_ROOT=/cluster/scratch/$USER/nascent-lulcc
+       Source the project .env or run: export HPC_SCRATCH_ROOT=/beegfs/$USER/nascent-lulcc
 ```
 
 Source `.env` (which sets `HPC_SCRATCH_ROOT`) before running:
@@ -221,7 +221,7 @@ bash scripts/setup_environments.sh --env allocation_env --non-interactive
 ```
 
 If you need to force HPC behaviour from a workstation (e.g. for a smoke run
-that does not have `/cluster/scratch` or SLURM env vars), pass the `--hpc`
+that does not have `/beegfs` or SLURM env vars), pass the `--hpc`
 flag explicitly — the script will still refuse to proceed without
 `HPC_SCRATCH_ROOT`. On a true workstation with no HPC signals and no `--hpc`
 flag, the script keeps the `$PROJECT_ROOT/.envs` path and emits a one-line
@@ -260,7 +260,7 @@ cd inst/
 ./setup_environments.sh
 ```
 
-This will create environments at `/cluster/scratch/bblack/micromamba/envs/` (adjust paths as needed).
+This will create environments at `/beegfs/black/micromamba/envs/` (adjust paths as needed).
 
 ### 2. Running the Complete Pipeline
 

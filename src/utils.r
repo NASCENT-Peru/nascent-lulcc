@@ -627,7 +627,7 @@ align_to_ref <- function(
 #'   shapefile = "hydro_units.shp",
 #'   ref = "reference_raster.tif",
 #'   out_path = "distances.tif",
-#'   tempdir = "/scratch/terra_temp"
+#'   tempdir = "/beegfs/terra_temp"
 #' )
 #' }
 #'

@@ -1,5 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=dist-calc
+# Routed to highmem: 48 x 2700M = 127G exceeds the 95000 MB compute cap.
+#SBATCH --partition=highmem
 #SBATCH --time=24:00:00
 #SBATCH --cpus-per-task=48
 #SBATCH --mem-per-cpu=2700M

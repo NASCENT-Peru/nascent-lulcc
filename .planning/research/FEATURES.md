@@ -75,7 +75,7 @@ These must exist for the allocation stage to be usable. Without them, every cras
 
 | Feature | Why Expected | Complexity | Status in codebase | Notes |
 |---|---|---|---|---|
-| **No hardcoded absolute paths in active source** | `simulation_trans_rates_prep.r` line 181 (`E:/...xlsx`), `calibration_predictor_prep.r` line 17 (`E:/terra_temp`), `hpc_common.sh` lines 13/89/114 (`/cluster/.../bblack/...`). Each is a hard-stop on HPC or for any other user. | Low | **Repair** — listed as PIPE-01/03/04 in PROJECT.md | Replace with `config[[...]]` lookups, `Sys.getenv("TERRA_TEMP", unset = tempdir())`, `$USER`. |
+| **No hardcoded absolute paths in active source** | `simulation_trans_rates_prep.r` line 181 (`E:/...xlsx`), `calibration_predictor_prep.r` line 17 (`E:/terra_temp`), `hpc_common.sh` lines 13/89/114 (`/.../black/...`). Each is a hard-stop on HPC or for any other user. | Low | **Repair** — listed as PIPE-01/03/04 in PROJECT.md | Replace with `config[[...]]` lookups, `Sys.getenv("TERRA_TEMP", unset = tempdir())`, `$USER`. |
 | **`raster` → `terra` migration in active source** | 73 `raster::` calls in non-`old/` source. `allocation_env.yml` doesn't include `r-raster`, so allocation will hard-fail anywhere a `raster::` call is reached. Already a latent bomb. | Medium | **Repair** — listed as PIPE-05 | Mechanical port: `raster::raster` → `terra::rast`, `raster::stack` → `terra::rast` (multilayer), `raster::overlay` → `terra::app`/`terra::lapp`, etc. |
 | **`DINAMICA_EGO_8_HOME` documented in `.env.template`** | Listed as a Gap in CONCERNS.md. Required by `dinamica_utils.r:39` but not documented anywhere. | Trivial | **Repair** | Add to `.env.template` with comment + example HPC path. |
 
@@ -97,7 +97,7 @@ These would make the pipeline robust beyond just "finishes once on HPC" — re-r
 | Feature | Value Proposition | Complexity | Notes |
 |---|---|---|---|
 | **Per-transition output caching** (probability map per `region × timestep × transition`) | Today even a successful region re-runs every transition's `predict()` (10+ minutes each) when called again. With per-transition cache: re-run after a single transition's bug fix touches only that transition. | Low | Same pattern as the region-level resume above, one level finer. Cache key = `(scenario, timestep, region, transition_id, model_hash, predictor_hash)`. The `model_hash` is critical: stale cache after model retraining is a silent correctness bug. Use `digest::digest(file = model_path)` or just `file.mtime`. |
-| **`furrr`-aware retry on transient failures** | Some failures are transient (filesystem hiccup, transient network on `/cluster/scratch`). A per-region retry-once-with-fresh-worker policy avoids losing 4 hours of work to a 1-second blip. | Medium | `furrr::future_map` does not retry natively. Wrap each region call in a `purrr::insistently(rate = rate_backoff(max_times = 2))` *outside* the future, so retry spins up a fresh worker (escapes any worker-corrupt state). Don't retry on `cause=oom_kill` (will just re-fail). |
+| **`furrr`-aware retry on transient failures** | Some failures are transient (filesystem hiccup, transient network on `/beegfs`). A per-region retry-once-with-fresh-worker policy avoids losing 4 hours of work to a 1-second blip. | Medium | `furrr::future_map` does not retry natively. Wrap each region call in a `purrr::insistently(rate = rate_backoff(max_times = 2))` *outside* the future, so retry spins up a fresh worker (escapes any worker-corrupt state). Don't retry on `cause=oom_kill` (will just re-fail). |
 | **`drake`-style or `targets`-style dependency graph** for the pipeline | Reproducible re-runs that automatically detect "input X changed → invalidate downstream Y, Z". The natural fit for a 7-stage pipeline. | High | The R ecosystem standard here is **`targets`** (successor to `drake`). For *this* project: the pipeline is already structured as 7 SLURM-chained scripts, and PROJECT.md "Out of Scope" is silent on `targets` adoption. **Recommend deferring** — adopting `targets` is a meaningful refactor and the SLURM dependency chain plus per-region resume covers ~80% of the value. Revisit only if the pipeline grows beyond one researcher. Confidence on this recommendation: MEDIUM — based on project scope signals, not benchmark data. |
 
 ### Caching Expensive Intermediates Across Workers
@@ -197,11 +197,11 @@ Prioritize:
 
 ## Sources
 
-- `c:/Users/bblack/switchdrive/git/nascent-lulcc/.planning/PROJECT.md` — requirements and crash profile (HIGH confidence, primary source)
-- `c:/Users/bblack/switchdrive/git/nascent-lulcc/.planning/codebase/CONCERNS.md` — known issues catalogue (HIGH)
-- `c:/Users/bblack/switchdrive/git/nascent-lulcc/TODO.md` — explicit allocation TODOs (HIGH)
-- `c:/Users/bblack/switchdrive/git/nascent-lulcc/src/allocation.r` lines 42–160 (profiling helpers), 700–800 (region loop), 1196–1230 (nhood cache), 1240–1370 (prediction loop) — current implementation state (HIGH)
-- `c:/Users/bblack/switchdrive/git/nascent-lulcc/src/utils.r` lines 18–92 (write_raster), 1010–1038 (log_msg, initialize_worker_log) — existing helpers to build on (HIGH)
+- `c:/Users/black/switchdrive/git/nascent-lulcc/.planning/PROJECT.md` — requirements and crash profile (HIGH confidence, primary source)
+- `c:/Users/black/switchdrive/git/nascent-lulcc/.planning/codebase/CONCERNS.md` — known issues catalogue (HIGH)
+- `c:/Users/black/switchdrive/git/nascent-lulcc/TODO.md` — explicit allocation TODOs (HIGH)
+- `c:/Users/black/switchdrive/git/nascent-lulcc/src/allocation.r` lines 42–160 (profiling helpers), 700–800 (region loop), 1196–1230 (nhood cache), 1240–1370 (prediction loop) — current implementation state (HIGH)
+- `c:/Users/black/switchdrive/git/nascent-lulcc/src/utils.r` lines 18–92 (write_raster), 1010–1038 (log_msg, initialize_worker_log) — existing helpers to build on (HIGH)
 - General R ecosystem knowledge for `future`/`furrr`/`terra`/`testthat`/`butcher`/`tidypredict`/`progressr`/`qs`/`digest` patterns (MEDIUM — external verification was unavailable in this session; before committing to any specific package version or claim about XGBoost fork-safety, `multicore` interactions, or `tidypredict` XGBoost coverage, verify against current Context7 / official package docs)
 
 **Verification flags for downstream phases:**

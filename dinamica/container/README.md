@@ -139,21 +139,21 @@ clone. The recommended location on Euler is the project filesystem so it is
 shared across users without re-building per operator:
 
 ```text
-/cluster/project/<project>/containers/dinamica-ego-8.sif
+/project/<project>/containers/dinamica-ego-8.sif
 ```
 
 If you do not yet have access to a project filesystem, a per-user staging path
 under scratch is acceptable:
 
 ```text
-/cluster/scratch/$USER/nascent-lulcc/containers/dinamica-ego-8.sif
+/beegfs/$USER/nascent-lulcc/containers/dinamica-ego-8.sif
 ```
 
 After publishing the `.sif`, export `DINAMICA_EGO_8_HOME` to the absolute path
 of that external artifact:
 
 ```bash
-export DINAMICA_EGO_8_HOME=/cluster/project/<project>/containers/dinamica-ego-8.sif
+export DINAMICA_EGO_8_HOME=/project/<project>/containers/dinamica-ego-8.sif
 ```
 
 This contract is also documented in `.env.template` and in

@@ -22,12 +22,12 @@ expected: `scripts/smoke_test_dinamica.sh --live` completes with exit 0, `exec_d
 result: **FAILED** — Six independent issues (G1–G6 below) prevent the contract from holding. The script *reports* `SUCCESS` because Dinamica returns exit 0 even on `std::exception`, which is itself one of the six findings.
 
   - Verified on Euler 2026-05-15 (`eu-login-04` / `eu-login-18`, apptainer 1.4.5 in /usr/bin).
-  - .sif build path: workaround works (build upstream Dockerfile on Docker-capable host → `docker save` → transfer → `apptainer build docker-archive://...`). Image at `/cluster/scratch/$USER/nascent-lulcc/containers/dinamica-ego-8.sif`, 1020M, sha not pinned.
+  - .sif build path: workaround works (build upstream Dockerfile on Docker-capable host → `docker save` → transfer → `apptainer build docker-archive://...`). Image at `/beegfs/$USER/nascent-lulcc/containers/dinamica-ego-8.sif`, 1020M, sha not pinned.
   - Container itself is functional: when invoked through `cd /opt/dinamica/usr && bin/DinamicaEGO.sh <abs-model.ego>`, Dinamica loads, parses, and produces meaningful errors instead of `std::exception`.
 
 ### 2. Live allocation_env solve + library() load (MEM-06 / SC5)
 expected: `micromamba activate allocation_env` resolves on HPC and all 11 prediction-time packages (`r-parsnip`, `r-recipes`, `r-ranger`, `r-xgboost`, `r-tidypredict`, `r-butcher`, `r-ps`, `r-lobstr`, `r-bundle`, `r-qs`, `r-rhpcblasctl`) load via `library()` without error.
-result: **PASS** (Euler 2026-05-15, eu-login-18). Env solved cleanly under `/cluster/scratch/$USER/nascent-lulcc/micromamba/envs/allocation_env` after exporting `HPC_SCRATCH_ROOT`. All 11 packages reported `OK` via `requireNamespace()`; `xgboost` reported version `1.7.6.1` (matches the MEM-06 contract pin `r-xgboost=1.7`). One pre-existing finding G7 surfaced during this test (silent home-fallback when `HPC_SCRATCH_ROOT` is unset) — see Gaps.
+result: **PASS** (Euler 2026-05-15, eu-login-18). Env solved cleanly under `/beegfs/$USER/nascent-lulcc/micromamba/envs/allocation_env` after exporting `HPC_SCRATCH_ROOT`. All 11 packages reported `OK` via `requireNamespace()`; `xgboost` reported version `1.7.6.1` (matches the MEM-06 contract pin `r-xgboost=1.7`). One pre-existing finding G7 surfaced during this test (silent home-fallback when `HPC_SCRATCH_ROOT` is unset) — see Gaps.
 
 ### 3. Live SIGKILL + diagnose_alloc_crash.sh (OBS-02 / SC2)
 expected: After a real allocation worker is OOM-killed, `bash scripts/diagnose_alloc_crash.sh` surfaces SLURM `sacct`/`seff` OOM evidence, a SENTINEL entry in the relevant region log, and a MaxRSS metric.
@@ -39,7 +39,7 @@ result: **partial — Dinamica-independent live SLURM OOM probe submitted (job 6
 JID=66581425
 echo "=== sacct ==="; sacct -j $JID --format=JobID,State,ExitCode,MaxRSS,ReqMem -P
 echo "=== seff ===";  seff $JID 2>&1 | head -20
-echo "=== output ==="; cat /cluster/scratch/$USER/nascent-lulcc/test3-logs/oom-$JID.{out,err} 2>/dev/null
+echo "=== output ==="; cat /beegfs/$USER/nascent-lulcc/test3-logs/oom-$JID.{out,err} 2>/dev/null
 echo "=== diagnose_alloc_crash.sh ==="
 bash scripts/diagnose_alloc_crash.sh --job-id $JID
 ```
@@ -74,7 +74,7 @@ deferred: 1
 
 ### G3 — Container `$HOME` shadowed by apptainer's default bind-mounts
 - **Phase 1 contract violated:** Production-time launcher in `src/dinamica_utils.r:189-190` builds `apptainer exec <sif> DinamicaConsole <args>` with no `--home` flag. Apptainer bind-mounts the host's `$HOME` over the container's `/root`, hiding `/root/.dinamica_ego_8.conf` (the file the Dockerfile writes at build time). Dinamica reads `$HOME/.dinamica_ego_8.conf` which doesn't exist for the operator user → init failure.
-- **Evidence:** `ls -la /cluster/home/bblack/.dinamica_ego_8.conf` → no such file; `ls -la /root/.dinamica_ego_8.conf` inside container → present.
+- **Evidence:** `ls -la /home/black/.dinamica_ego_8.conf` → no such file; `ls -la /root/.dinamica_ego_8.conf` inside container → present.
 - **Workaround applied:** stage `<scratch>/dinamica-home/.dinamica_ego_8.conf` and pass `--home <scratch>/dinamica-home` to `apptainer exec`.
 - **Durable fix:** `resolve_dinamica_launch()` must (a) create `<scratch>/dinamica-home/.dinamica_ego_8.conf` if missing and (b) emit `--home <scratch>/dinamica-home` into the container args.
 
@@ -94,10 +94,10 @@ deferred: 1
 
 ### G7 — `setup_environments.sh` silently installs envs under `$HOME` when `HPC_SCRATCH_ROOT` is unset
 - **Phase 1 contract violated:** D-15 says `HPC_SCRATCH_ROOT` is REQUIRED on HPC and pre-flight should fail fast on missing scratch contract variables. `scripts/setup_environments.sh:87-90` silently falls back to `$PROJECT_ROOT/.envs` instead — burning ~3 GB of conda packages into a home filesystem that typically has hard quotas (Euler default home quota is small; `r-base` + `gdal` + `r-arrow` + `r-xgboost` etc. exceeds it for most users).
-- **Evidence:** First run on Euler 2026-05-15 printed `Env install root: /cluster/home/bblack/nascent-lulcc/.envs` despite the verification host's claim that the script is HPC_SCRATCH_ROOT-aware. The transaction proceeded all the way through download/install before being noticed.
+- **Evidence:** First run on Euler 2026-05-15 printed `Env install root: /home/black/nascent-lulcc/.envs` despite the verification host's claim that the script is HPC_SCRATCH_ROOT-aware. The transaction proceeded all the way through download/install before being noticed.
 - **Anticipated:** No — the verification report at `01-VERIFICATION.md` listed this fallback as VERIFIED behaviour but never reconciled it with D-15 ("fail fast on missing scratch contract variables").
-- **Workaround applied:** Source `.env` (or manually export `HPC_SCRATCH_ROOT=/cluster/scratch/$USER/nascent-lulcc`) before running `setup_environments.sh`.
-- **Durable fix:** `scripts/setup_environments.sh` should detect the HPC context (e.g. presence of `SLURM_*` env, or `/cluster/scratch` directory, or `--hpc` flag) and refuse to fall back to `$HOME/.envs` when scratch is unset. Match the `scripts/hpc_common.sh --check-stage7-contract` gate. At minimum, the script should print a loud WARNING when the fallback is selected so operators don't fill their home quota.
+- **Workaround applied:** Source `.env` (or manually export `HPC_SCRATCH_ROOT=/beegfs/$USER/nascent-lulcc`) before running `setup_environments.sh`.
+- **Durable fix:** `scripts/setup_environments.sh` should detect the HPC context (e.g. presence of `SLURM_*` env, or `/beegfs` directory, or `--hpc` flag) and refuse to fall back to `$HOME/.envs` when scratch is unset. Match the `scripts/hpc_common.sh --check-stage7-contract` gate. At minimum, the script should print a loud WARNING when the fallback is selected so operators don't fill their home quota.
 
 ### G6 — Direct `DinamicaConsole` invocation is not a supported entrypoint
 - **Phase 1 contract violated:** Phase 1 SC6 + the entire `src/dinamica_utils.r:resolve_dinamica_launch()` design. The launcher builds `apptainer exec <sif> DinamicaConsole <model>`, but `/opt/dinamica/usr/bin/DinamicaConsole` invoked directly fails with `std::exception` regardless of args, env, or model. The supported entrypoint is `bin/DinamicaEGO.sh` invoked from `cwd=/opt/dinamica/usr`. The wrapper script sets `PROJ_DATA`, `DINAMICA_EGO_8_INSTALLATION_DIRECTORY`, `DINAMICA_EGO_8_GDAL_DATA`, `DINAMICA_EGO_8_LOG_PATH`, computes the right relative `bin/DinamicaConsole` path, and dispatches between Console / Coordinator / Agent / GUI based on argv.

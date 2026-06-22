@@ -109,8 +109,8 @@ nascent-lulcc is a Land Use/Land Cover Change (LULCC) modelling pipeline for Per
 
 ## Configuration System
 
-- **Dual-environment config**: `config/local_config.yaml` (local, `E:/nascent-lulcc-agg`) and `config/hpc_config.yaml` (HPC, `/cluster/scratch/bblack/nascent-lulcc`)
-- Auto-detection via SLURM env vars, `/cluster` mount, and hostname patterns (`src/setup.r`)
+- **Dual-environment config**: `config/local_config.yaml` (local, `E:/nascent-lulcc-agg`) and `config/hpc_config.yaml` (HPC, `/beegfs/black/nascent-lulcc`)
+- Auto-detection via SLURM env vars, `` mount, and hostname patterns (`src/setup.r`)
 - All paths are resolved relative to `data_basepath` from the active config
 - Additional config files: `config/model_specs.yaml` (ML hyperparameters), `config/lulc_schema.json` (class aggregation), `config/pred_data.yaml` (predictor catalogue, 931KB), `config/ancillary_data.yaml` (administrative boundary sources)
 - Scenario interventions: `config/SSP0_interventions.yml` through `config/SSP5_interventions.yml`

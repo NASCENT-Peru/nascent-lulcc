@@ -1,5 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=trans-model
+# Routed to highmem: 3 x 42G = 126G exceeds the 95000 MB compute cap.
+#SBATCH --partition=highmem
 #SBATCH --time=72:00:00
 #SBATCH --cpus-per-task=3
 #SBATCH --mem-per-cpu=42G

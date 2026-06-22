@@ -246,7 +246,7 @@ resolve_dinamica_launch <- function(
       stop(
         "HPC_SCRATCH_ROOT is not set. Phase 1.1 D-105 requires HPC_SCRATCH_ROOT ",
         "for the apptainer --home and --env DINAMICA_EGO_8_TEMP_DIR staging. ",
-        "Source the project .env or export HPC_SCRATCH_ROOT=/cluster/scratch/$USER/nascent-lulcc.",
+        "Source the project .env or export HPC_SCRATCH_ROOT=/beegfs/$USER/nascent-lulcc.",
         call. = FALSE
       )
     }

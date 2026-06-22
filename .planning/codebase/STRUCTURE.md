@@ -144,7 +144,7 @@ nascent-lulcc/
 
 **Configuration entry point:**
 - `config/local_config.yaml` — primary config for local development; edit `data_basepath` to match local data drive.
-- `config/hpc_config.yaml` — HPC config; `data_basepath: /cluster/scratch/bblack/nascent-lulcc`.
+- `config/hpc_config.yaml` — HPC config; `data_basepath: /beegfs/black/nascent-lulcc`.
 
 **Pipeline orchestration:**
 - `scripts/master_pipeline.sh` — submit the entire pipeline as chained SLURM jobs.

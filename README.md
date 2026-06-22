@@ -35,7 +35,7 @@ Upload the repository to your HPC home directory:
 
 ```bash
 # Target path on ETH Euler
-/cluster/home/$USER/nascent-lulcc
+/home/$USER/nascent-lulcc
 ```
 
 ### 2. Configure Environment Variables
@@ -71,7 +71,7 @@ bash scripts/install_micromamba_simple.sh
 bash scripts/setup_environments.sh
 ```
 
-Environments are created in `/cluster/scratch/$USER/micromamba/envs/` (scratch — recreate if wiped):
+Environments are created in `/beegfs/$USER/micromamba/envs/` (scratch — recreate if wiped):
 
 | Environment | Used by |
 |---|---|
@@ -91,7 +91,7 @@ See `docs/MICROMAMBA_SETUP.md` for full setup instructions and troubleshooting.
 The pipeline auto-detects the execution environment via SLURM environment variables and hostname patterns (`src/setup.r`). No manual switch is required:
 
 - **Local development**: reads `config/local_config.yaml` (`data_basepath: E:/nascent-lulcc-agg`)
-- **HPC (ETH Euler)**: reads `config/hpc_config.yaml` (`data_basepath: /cluster/scratch/$USER/nascent-lulcc`)
+- **HPC (ETH Euler)**: reads `config/hpc_config.yaml` (`data_basepath: /beegfs/$USER/nascent-lulcc`)
 
 Both configs share an identical key structure. All data paths are resolved relative to `data_basepath` at runtime — no hardcoded paths exist in `src/`.
 
@@ -116,7 +116,7 @@ The pipeline consists of 7 sequential stages with SLURM `afterok` dependency cha
 Submit all stages as a chained SLURM job sequence:
 
 ```bash
-cd /cluster/home/$USER/nascent-lulcc/scripts
+cd /home/$USER/nascent-lulcc/scripts
 bash master_pipeline.sh
 ```
 
