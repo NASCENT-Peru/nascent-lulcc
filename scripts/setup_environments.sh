@@ -101,8 +101,8 @@ on_hpc=false
 hpc_signal=""
 if [ -n "${SLURM_JOB_ID:-}" ] || [ -n "${SLURM_CLUSTER_NAME:-}" ]; then
     on_hpc=true; hpc_signal="SLURM env var"
-elif [ -d /cluster/scratch ]; then
-    on_hpc=true; hpc_signal="/cluster/scratch present"
+elif [ -d /beefgfs ]; then
+    on_hpc=true; hpc_signal="/beefgfs present"
 elif [ "${FORCE_HPC:-false}" = "true" ]; then
     on_hpc=true; hpc_signal="--hpc flag"
 fi
