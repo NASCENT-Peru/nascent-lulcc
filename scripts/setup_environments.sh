@@ -90,32 +90,39 @@ eval "$($MAMBA_EXE shell hook -s bash)"
 # ---------------------------------------------------------------------------
 # Resolve env install root (Phase 1.1 — D-112 / PIPE-04)
 # ---------------------------------------------------------------------------
-# Three-signal HPC detection mirrors scripts/hpc_common.sh:check_stage7_contract():
+# The Stage 7 contract variable HPC_SCRATCH_ROOT is authoritative: whenever it
+# is set we install under it, regardless of what the host probes report. The
+# probes below exist ONLY for the safety case — recognising that we are clearly
+# on an HPC node so we can REFUSE to fall back to $PROJECT_ROOT/.envs (which
+# fills the $HOME quota) when the operator forgot to set or source it.
+#
+# Probe signals (any one => "on HPC"):
 #   1. SLURM_JOB_ID or SLURM_CLUSTER_NAME set
-#   2. /cluster/scratch directory exists
+#   2. a known scratch filesystem root exists (/beegfs, /cluster/scratch)
 #   3. --hpc flag or FORCE_HPC=true environment variable
-# On HPC detection without HPC_SCRATCH_ROOT, REFUSE to fall back to
-# $PROJECT_ROOT/.envs (which fills $HOME quota); exit non-zero with a clear,
-# named-signal message.
+# NOTE: probe 2 is unreliable on login nodes where the parallel filesystem is
+# auto-mounted (a bare `[ -d /beegfs ]` can be false there) — which is exactly
+# why HPC_SCRATCH_ROOT, not the probe, decides the install location.
 on_hpc=false
 hpc_signal=""
 if [ -n "${SLURM_JOB_ID:-}" ] || [ -n "${SLURM_CLUSTER_NAME:-}" ]; then
     on_hpc=true; hpc_signal="SLURM env var"
-elif [ -d /beefgfs ]; then
-    on_hpc=true; hpc_signal="/beefgfs present"
+elif [ -d /beegfs ] || [ -d /cluster/scratch ]; then
+    on_hpc=true; hpc_signal="scratch filesystem present"
 elif [ "${FORCE_HPC:-false}" = "true" ]; then
     on_hpc=true; hpc_signal="--hpc flag"
 fi
 
-if [ "$on_hpc" = "true" ]; then
-    if [ -z "${HPC_SCRATCH_ROOT:-}" ]; then
-        echo "ERROR: HPC context detected ($hpc_signal) but HPC_SCRATCH_ROOT is unset." >&2
-        echo "       Refusing to install conda envs under \$HOME (home filesystem quota)." >&2
-        echo "       Source the project .env or run: export HPC_SCRATCH_ROOT=/cluster/scratch/\$USER/nascent-lulcc" >&2
-        exit 1
-    fi
+if [ -n "${HPC_SCRATCH_ROOT:-}" ]; then
+    # Contract variable wins outright (normal HPC path once .env is sourced).
     ENV_BASE_PATH="$HPC_SCRATCH_ROOT/micromamba/envs"
-    echo "Env install root (HPC): $ENV_BASE_PATH"
+    echo "Env install root (HPC_SCRATCH_ROOT): $ENV_BASE_PATH"
+elif [ "$on_hpc" = "true" ]; then
+    echo "ERROR: HPC context detected ($hpc_signal) but HPC_SCRATCH_ROOT is unset." >&2
+    echo "       Refusing to install conda envs under \$HOME (home filesystem quota)." >&2
+    echo "       Source the project .env first, or run:" >&2
+    echo "         export HPC_SCRATCH_ROOT=/beegfs/\$USER/nascent-lulcc" >&2
+    exit 1
 else
     ENV_BASE_PATH="$PROJECT_ROOT/.envs"
     echo "Env install root (local fallback, no HPC signals): $ENV_BASE_PATH"
