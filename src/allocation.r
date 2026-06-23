@@ -528,6 +528,63 @@ get_allocation_predict_batch_rows <- function() {
   val
 }
 
+# Number of threads the per-transition ranger predict call may use (Phase 3.5,
+# Goal 2). This is a SCOPED relaxation: ONLY the ranger predict OpenMP region is
+# allowed > 1 thread. pin_native_threads_to_one() (L194) stays fully in force for
+# BLAS/OpenBLAS/MKL/GDAL/data.table/arrow — do NOT raise OMP_NUM_THREADS or touch
+# arrow::set_cpu_count, RhpcBLASctl, or setDTthreads to grant ranger threads;
+# ranger honours an explicit num.threads argument over the OMP env default, so
+# the relaxation is one argument on one call, never a global thread-pool change.
+#
+# Resolution (see 03.5-RESEARCH.md Q3):
+#   - cores = SLURM_CPUS_PER_TASK, else parallel::detectCores(logical = TRUE),
+#     else 1.
+#   - effective_workers = 1 when ALLOCATION_PARALLEL_STRATEGY is "sequential"
+#     (the region runs serially in one worker, so prediction gets all cores —
+#     the smoke script sets ALLOCATION_NUM_WORKERS=cores even in sequential mode,
+#     so dividing by it there would wrongly cap threads at cores/N); otherwise
+#     effective_workers = max(1, ALLOCATION_NUM_WORKERS).
+#   - Explicit ALLOCATION_PREDICT_NUM_THREADS=N (positive int) -> N; empty/unset
+#     -> auto = floor(cores / effective_workers).
+#   - The result is hard-clamped to [1, cores %/% effective_workers] so a
+#     misconfigured or oversize knob can never oversubscribe the node, and is
+#     always a single integer >= 1 (never NA, 0, or > cores).
+get_allocation_predict_num_threads <- function() {
+  raw <- Sys.getenv("ALLOCATION_PREDICT_NUM_THREADS", unset = "")
+
+  cores <- suppressWarnings(as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", unset = "")))
+  if (is.na(cores) || cores < 1L) {
+    cores <- tryCatch(
+      as.integer(parallel::detectCores(logical = TRUE)),
+      error = function(e) 1L
+    )
+    if (is.na(cores) || cores < 1L) cores <- 1L
+  }
+
+  strategy <- tolower(trimws(Sys.getenv("ALLOCATION_PARALLEL_STRATEGY", unset = "")))
+  if (identical(strategy, "sequential")) {
+    effective_workers <- 1L
+  } else {
+    effective_workers <- suppressWarnings(
+      as.integer(Sys.getenv("ALLOCATION_NUM_WORKERS", unset = "1"))
+    )
+    if (is.na(effective_workers) || effective_workers < 1L) effective_workers <- 1L
+  }
+
+  budget <- max(1L, cores %/% effective_workers)
+
+  if (nzchar(raw)) {
+    t <- suppressWarnings(as.integer(raw))
+    if (is.na(t) || t < 1L) t <- 1L
+  } else {
+    t <- budget
+  }
+
+  # Hard clamp so a garbage / oversize knob can never oversubscribe:
+  # 1 <= t <= cores / effective_workers.
+  as.integer(max(1L, min(t, budget)))
+}
+
 load_allocation_class_map <- function(config) {
   lulc_schema <- jsonlite::fromJSON(
     config[["lulc_aggregation_path"]],
@@ -1029,6 +1086,18 @@ predict_saved_transition_prob <- function(model_obj, new_data, log_file = NULL) 
       log_msg("        Path: mlr3 learner; predict_newdata()", log_file)
       new_data_subset <- subset_saved_transition_data(new_data, predictor_names)
 
+      # Scoped multi-threaded ranger prediction (Phase 3.5, Goal 2). Resolve the
+      # thread count ONCE per transition so it is captured by predict_block_prob1's
+      # closure and applied identically across batches. This is the only place
+      # num.threads > 1 is permitted — pin_native_threads_to_one() stays in force
+      # for every other native pool (BLAS/GDAL/arrow/data.table). Logged once so
+      # the smoke log proves the relaxation took effect.
+      nthreads <- get_allocation_predict_num_threads()
+      log_msg(
+        sprintf("        predict num.threads=%d", nthreads),
+        log_file
+      )
+
       # Predict P(class == "1") for one block of rows. Tries the mlr3 R6 path and
       # falls back to direct prediction on the underlying fitted model when the
       # installed mlr3 version's R6 bindings don't match the stored train_task.
@@ -1036,6 +1105,14 @@ predict_saved_transition_prob <- function(model_obj, new_data, log_file = NULL) 
       # is emitted at most once per transition even when called per-batch.
       fallback_logged <- FALSE
       predict_block_prob1 <- function(block) {
+        # Apply the resolved thread count to the mlr3 learner (param tagged
+        # `threads`, default 1 in mlr3learners) BEFORE predict_newdata so the
+        # ranger predict OpenMP region honours it (Pitfall 5). try() so a learner
+        # without the param silently no-ops rather than aborting the prediction.
+        try(
+          model_obj$learner$param_set$set_values(num.threads = nthreads),
+          silent = TRUE
+        )
         pred_attempt <- tryCatch(
           model_obj$learner$predict_newdata(newdata = block),
           error = function(e) e
@@ -1056,7 +1133,10 @@ predict_saved_transition_prob <- function(model_obj, new_data, log_file = NULL) 
         if (!length(lvl_1)) lvl_1 <- 2L  # default: second level = positive class
 
         if (inherits(underlying, "ranger")) {
-          raw <- predict(underlying, data = block, num.threads = 1L)
+          # Scoped relaxation (Phase 3.5): the direct-fallback ranger predict must
+          # also honour the resolved thread count — setting the learner param above
+          # does NOT affect this path (Pitfall 5). Was hardcoded num.threads = 1L.
+          raw <- predict(underlying, data = block, num.threads = nthreads)
           # ranger returns probability matrix when probability=TRUE (set by classif.ranger)
           as.numeric(raw$predictions[, lvl_1])
         } else if (inherits(underlying, c("glmnet", "cv.glmnet"))) {
