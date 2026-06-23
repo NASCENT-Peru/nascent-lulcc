@@ -84,6 +84,13 @@ export ALLOCATION_WORKER_RSS_BUDGET_MB=${ALLOCATION_WORKER_RSS_BUDGET_MB:-16384}
 # "from"-class transitions in row-batches and cap prediction-time peak RSS — needed
 # for cuenca_del_amazonas / selva_andina on memory-constrained nodes. Passed through
 # from the environment; left unexported here so the default stays single-shot.
+# Optional scoped ranger predict threads (Phase 3.5, Goal 2). Empty/unset (the
+# default below) lets get_allocation_predict_num_threads() auto-derive
+# floor(cores / effective_workers) — and in sequential strategy that is the full
+# core count. Set an explicit integer to override (hard-clamped so it can never
+# oversubscribe). Only the ranger predict call is allowed > 1 thread; all other
+# native pools stay pinned to 1 by pin_native_threads_to_one().
+export ALLOCATION_PREDICT_NUM_THREADS=${ALLOCATION_PREDICT_NUM_THREADS:-}
 
 echo "ALLOCATION_PROFILE=$ALLOCATION_PROFILE"
 echo "ALLOCATION_PARALLEL_STRATEGY=$ALLOCATION_PARALLEL_STRATEGY"
@@ -94,6 +101,7 @@ echo "ALLOCATION_REGION_FILTER=$ALLOCATION_REGION_FILTER"
 echo "ALLOCATION_YEAR_POST_FILTER=$ALLOCATION_YEAR_POST_FILTER"
 echo "ALLOCATION_WORKER_RSS_BUDGET_MB=$ALLOCATION_WORKER_RSS_BUDGET_MB"
 echo "ALLOCATION_PREDICT_BATCH_ROWS=${ALLOCATION_PREDICT_BATCH_ROWS:-<unset: single-shot>}"
+echo "ALLOCATION_PREDICT_NUM_THREADS=${ALLOCATION_PREDICT_NUM_THREADS:-<unset: auto cores/workers>}"
 echo
 
 RUN_ID="${SLURM_JOB_ID:-$(date +%Y%m%d-%H%M%S)-${ALLOCATION_REGION_FILTER:-allregions}}"

@@ -1086,6 +1086,18 @@ predict_saved_transition_prob <- function(model_obj, new_data, log_file = NULL) 
       log_msg("        Path: mlr3 learner; predict_newdata()", log_file)
       new_data_subset <- subset_saved_transition_data(new_data, predictor_names)
 
+      # Scoped multi-threaded ranger prediction (Phase 3.5, Goal 2). Resolve the
+      # thread count ONCE per transition so it is captured by predict_block_prob1's
+      # closure and applied identically across batches. This is the only place
+      # num.threads > 1 is permitted — pin_native_threads_to_one() stays in force
+      # for every other native pool (BLAS/GDAL/arrow/data.table). Logged once so
+      # the smoke log proves the relaxation took effect.
+      nthreads <- get_allocation_predict_num_threads()
+      log_msg(
+        sprintf("        predict num.threads=%d", nthreads),
+        log_file
+      )
+
       # Predict P(class == "1") for one block of rows. Tries the mlr3 R6 path and
       # falls back to direct prediction on the underlying fitted model when the
       # installed mlr3 version's R6 bindings don't match the stored train_task.
@@ -1093,6 +1105,14 @@ predict_saved_transition_prob <- function(model_obj, new_data, log_file = NULL) 
       # is emitted at most once per transition even when called per-batch.
       fallback_logged <- FALSE
       predict_block_prob1 <- function(block) {
+        # Apply the resolved thread count to the mlr3 learner (param tagged
+        # `threads`, default 1 in mlr3learners) BEFORE predict_newdata so the
+        # ranger predict OpenMP region honours it (Pitfall 5). try() so a learner
+        # without the param silently no-ops rather than aborting the prediction.
+        try(
+          model_obj$learner$param_set$set_values(num.threads = nthreads),
+          silent = TRUE
+        )
         pred_attempt <- tryCatch(
           model_obj$learner$predict_newdata(newdata = block),
           error = function(e) e
@@ -1113,7 +1133,10 @@ predict_saved_transition_prob <- function(model_obj, new_data, log_file = NULL) 
         if (!length(lvl_1)) lvl_1 <- 2L  # default: second level = positive class
 
         if (inherits(underlying, "ranger")) {
-          raw <- predict(underlying, data = block, num.threads = 1L)
+          # Scoped relaxation (Phase 3.5): the direct-fallback ranger predict must
+          # also honour the resolved thread count — setting the learner param above
+          # does NOT affect this path (Pitfall 5). Was hardcoded num.threads = 1L.
+          raw <- predict(underlying, data = block, num.threads = nthreads)
           # ranger returns probability matrix when probability=TRUE (set by classif.ranger)
           as.numeric(raw$predictions[, lvl_1])
         } else if (inherits(underlying, c("glmnet", "cv.glmnet"))) {
