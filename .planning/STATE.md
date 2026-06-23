@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 3.2 context captured (year_steps decision; Plan 01 needs revision)
-last_updated: "2026-06-23T08:35:46.724Z"
-last_activity: 2026-06-23 -- Phase 03.5 planning complete
+last_updated: "2026-06-23T08:41:43.747Z"
+last_activity: 2026-06-23 -- Phase 03.5 execution started
 progress:
   total_phases: 10
   completed_phases: 6
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** allocation.r completes reliably for all scenarios × regions × timesteps, producing simulated LULC maps without crashing.
-**Current focus:** Phase 03.3 — probability-map-saturation-allocation-throughput
+**Current focus:** Phase 03.5 — reduce-allocation-memory-floor-lazy-per-transition-predictor
 
 ## Current Position
 
-Phase: 03.3 (probability-map-saturation-allocation-throughput) — EXECUTING
-Plan: 3 of 5
-Status: Ready to execute
-Last activity: 2026-06-23 -- Phase 03.5 planning complete
+Phase: 03.5 (reduce-allocation-memory-floor-lazy-per-transition-predictor) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 03.5
+Last activity: 2026-06-23 -- Phase 03.5 execution started
 
 ### Roadmap Evolution
 

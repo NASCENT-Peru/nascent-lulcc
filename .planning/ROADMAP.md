@@ -213,12 +213,12 @@ Multi-scenario node packing (the original Phase 5 "Goal 1" / S2) is merged into 
 
 **Depends on:** Phase 3
 **Requirements**: PERF-01, PERF-02
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
 
 **Wave 1**
-- [ ] 03.5-01-PLAN.md — Scoped threaded ranger prediction: get_allocation_predict_num_threads() resolver + num.threads on both predict sites (Goal 2 throughput).
+- [x] 03.5-01-PLAN.md — Scoped threaded ranger prediction: get_allocation_predict_num_threads() resolver + num.threads on both predict sites (Goal 2 throughput).
 
 **Wave 2** *(blocked on Wave 1 — shared src/allocation.r ownership)*
 - [ ] 03.5-02-PLAN.md — Lazy per-from-class predictor reads: load_from_class_predictor_data() + cache + ALLOCATION_PREDICTOR_LAZY escape hatch (Goal 1 memory floor).
@@ -255,6 +255,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 3.2. Transition Pipeline Consistency | 0/3 | Not started (INSERTED 2005-05-22) | - |
 | 3.3. Probability Map Saturation & Allocation Throughput | 4/5 | Wave 1-3 plans complete; operator gate pending (03.3-05) | partial — Wave 1-3 2005-05-26 |
 | 3.4. Stale Pipeline Artifact Re-run | 0/TBD | Not started (INSERTED 2005-05-29) | - |
-| 3.5. Reduce Allocation Memory Floor | 0/3 | Planned (INSERTED 2026-06-22; 3 plans, 3 waves) | - |
+| 3.5. Reduce Allocation Memory Floor | 1/3 | In Progress|  |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
 
