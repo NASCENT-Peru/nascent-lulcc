@@ -6,7 +6,7 @@
 # regions). Reserve fat-exclusive (1.5TB) to run all regions at once, or set
 # ALLOCATION_PARALLEL_STRATEGY=sequential and reserve highmem-exclusive (188GB).
 # No --partition: the Rundeck reservation places the job on the reserved node.
-#SBATCH --time=48:00:00
+#SBATCH --time=100:00:00
 #SBATCH --exclusive
 #SBATCH --mem=0
 #SBATCH --cpus-per-task=8
