@@ -81,6 +81,90 @@ detect_dinamica_backend <- function() {
   )
 }
 
+#' Ensure the staged Dinamica PyEnvironment is executable (self-heal + preflight)
+#'
+#' Dinamica EGO 8 materializes its bundled Python under
+#' `<staged_home>/.local/share/Dinamica EGO 8/PyEnvironment` on first use. When
+#' that tree is extracted onto a filesystem that drops the execute bit — observed
+#' on beegfs, where `python3.12` lands as mode 0644 — the embedded interpreter
+#' fails to initialize with the cryptic message
+#' `failed to get the Python codec of the filesystem encoding`. beegfs itself is
+#' NOT mounted noexec (flags are `rw,nosuid,nodev,relatime`); only the bits are
+#' missing, and `DinamicaConsole -version` / `smoketest.ego` never surface it
+#' because they don't drive Python — only the allocation model does.
+#'
+#' Fast path: a single executability stat on the interpreter. Only when that
+#' fails do we run the (typically one-time) heal pass — chmod the `bin/` tree and
+#' shared libraries to 0755. If the heal cannot make the interpreter executable
+#' (e.g. a default ACL on the staged-home keeps stripping `+x`), we stop with an
+#' actionable message rather than letting Dinamica fail cryptically minutes later.
+#'
+#' Note: a truly fresh staged-home has no PyEnvironment yet (Dinamica extracts it
+#' *during* the run), so the very first run on a new staged-home can still fail;
+#' the next run self-heals once the tree exists. This is a deliberate trade-off —
+#' resolving the launch contract must not itself launch Dinamica to extract.
+#'
+#' @param staged_home The apptainer `--home` dir (`HPC_SCRATCH_ROOT/dinamica-home`).
+#' @return `invisible(TRUE)` when the PyEnvironment is (now) executable or absent.
+#'   Raises `stop()` if a heal was attempted but the interpreter is still not
+#'   executable.
+#' @keywords internal
+.ensure_dinamica_pyenv_executable <- function(staged_home) {
+  pyenv <- file.path(staged_home, ".local", "share",
+                     "Dinamica EGO 8", "PyEnvironment")
+  if (!dir.exists(pyenv)) {
+    # First run on a fresh staged-home: Dinamica extracts the PyEnvironment
+    # during the run itself, so there is nothing to heal yet.
+    return(invisible(TRUE))
+  }
+  py_bin <- file.path(pyenv, "bin", "python3", "python3.12")
+
+  # Fast path: interpreter already executable -> nothing to do (steady state).
+  if (file.exists(py_bin) && file.access(py_bin, mode = 1L) == 0L) {
+    return(invisible(TRUE))
+  }
+
+  # Heal path (typically once, right after Dinamica first extracts the env):
+  # restore exec bits on the bin/ tree and shared libraries. Target bin/ + *.so*
+  # rather than a full recursive chmod to avoid a slow pass over the whole
+  # stdlib on beegfs.
+  message("Restoring exec bits on Dinamica PyEnvironment (one-time self-heal): ",
+          pyenv)
+  bin_dir <- file.path(pyenv, "bin")
+  to_fix <- if (dir.exists(bin_dir)) {
+    list.files(bin_dir, recursive = TRUE, full.names = TRUE)
+  } else {
+    character()
+  }
+  to_fix <- unique(c(
+    to_fix,
+    list.files(pyenv, pattern = "\\.so($|\\.)", recursive = TRUE,
+               full.names = TRUE)
+  ))
+  if (length(to_fix)) {
+    # 0755: owner rwx, group/other rx — matches the operator chmod that
+    # resolved the codec-init failure.
+    suppressWarnings(Sys.chmod(to_fix, mode = "0755", use_umask = FALSE))
+  }
+
+  # Fail fast and legibly if the heal could not make the interpreter executable.
+  # Only assert against the canonical binary path — a different Dinamica layout
+  # (where py_bin does not exist) gets the best-effort chmod above and proceeds,
+  # letting Dinamica report its own error if the layout is genuinely broken.
+  if (file.exists(py_bin) && file.access(py_bin, mode = 1L) != 0L) {
+    stop(
+      "Dinamica's staged Python interpreter is not executable and chmod did ",
+      "not fix it:\n  ", py_bin, "\n",
+      "beegfs is not mounted noexec, so this is almost certainly a default ACL ",
+      "on the staged-home stripping the execute bit. Inspect with:\n",
+      "  getfacl -d ", shQuote(dirname(py_bin)), "\n",
+      "then clear/repair the default ACL, or chmod -R u+rwX the PyEnvironment.",
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
 #' Resolve the full Dinamica launch contract without executing anything
 #'
 #' This is the single source of truth for the local/HPC backend decision,
@@ -276,6 +360,12 @@ resolve_dinamica_launch <- function(
     # Dinamica requires the system conf to exist even if empty (Plan 07 finding).
     system_conf <- file.path(staged_home, ".dinamica_ego_8_system.conf")
     if (!file.exists(system_conf)) file.create(system_conf)
+
+    # Self-heal the bundled Python's exec bits when the staged PyEnvironment was
+    # extracted 0644 (beegfs), which otherwise fails with the cryptic
+    # "failed to get the Python codec of the filesystem encoding". No-op in
+    # steady state and on a fresh staged-home (env not extracted yet).
+    .ensure_dinamica_pyenv_executable(staged_home)
 
     # D-106 — model path interpolated into the bash -c payload must be
     # absolute (the launcher's relative-path branch is fragile under `cd`).

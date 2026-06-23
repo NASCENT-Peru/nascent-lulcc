@@ -53,7 +53,6 @@ if [ -z "${DINAMICA_EGO_8_HOME:-}" ]; then
     exit 1
 fi
 
-# Default work_dir: costa_peruana region from job 364249.
 # Override by setting ALLOCATION_WORK_DIR in the environment before sbatch.
 DEFAULT_WORK_DIR="$HPC_SCRATCH_ROOT/outputs/simulations/BAU/2026/region_costa_peruana"
 export ALLOCATION_WORK_DIR="${ALLOCATION_WORK_DIR:-$DEFAULT_WORK_DIR}"

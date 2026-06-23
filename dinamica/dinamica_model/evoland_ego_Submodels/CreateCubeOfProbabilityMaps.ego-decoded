@@ -98,9 +98,9 @@ Script {{
 
     convertToDouble := CalculateMap {
         expression = [
-            i1
+            round(i1 * 2147483647)
         ],
-        cellType = .float32,
+        cellType = .int32,
         nullValue = .default,
         resultIsSparse = .no,
         resultFormat = .none
@@ -157,9 +157,9 @@ Script {{
         @alias = convert to double
         convertToDouble0 := CalculateMap {
             expression = [
-                i1
+                round(i1 * 2147483647)
             ],
-            cellType = .float32,
+            cellType = .int32,
             nullValue = .default,
             resultIsSparse = .no,
             resultFormat = .none

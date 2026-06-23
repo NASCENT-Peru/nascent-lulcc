@@ -219,6 +219,50 @@ test_that("resolve_dinamica_launch() HPC creates staged-home + staged-tmp idempo
     info = "Idempotent seed must NOT rewrite the conf file on a second call.")
 })
 
+test_that(".ensure_dinamica_pyenv_executable() no-ops when the PyEnvironment is absent", {
+  skip_if_not(is.function(.env$.ensure_dinamica_pyenv_executable))
+
+  # A fresh staged-home has no PyEnvironment yet (Dinamica extracts it during
+  # the run). The guard must return invisibly without erroring.
+  staged_home <- tempfile("dinamica_home_")
+  dir.create(staged_home, recursive = TRUE, showWarnings = FALSE)
+  expect_true(.env$.ensure_dinamica_pyenv_executable(staged_home))
+})
+
+test_that("resolve_dinamica_launch() HPC self-heals a non-executable staged PyEnvironment", {
+  skip_if_not(is.function(.env$resolve_dinamica_launch))
+  # Exec-bit semantics are POSIX; Windows does not model the unix +x bit.
+  skip_on_os("windows")
+
+  model <- file.path(.repo_root, "dinamica", "dinamica_model", "allocation.ego-decoded")
+  staged_root <- tempfile("hpc_scratch_")
+  pyenv <- file.path(staged_root, "dinamica-home", ".local", "share",
+                     "Dinamica EGO 8", "PyEnvironment")
+  py_bin_dir <- file.path(pyenv, "bin", "python3")
+  dir.create(py_bin_dir, recursive = TRUE, showWarnings = FALSE)
+  py_bin <- file.path(py_bin_dir, "python3.12")
+  writeLines("#!/bin/sh\nexit 0", py_bin)
+  # Reproduce the beegfs symptom: interpreter written without the execute bit.
+  Sys.chmod(py_bin, mode = "0644", use_umask = FALSE)
+  expect_false(file.access(py_bin, mode = 1L) == 0L)
+
+  withr::local_envvar(
+    DINAMICA_EGO_8_HOME = "/tmp/dinamica.sif",
+    DINAMICA_BACKEND    = "hpc",
+    HPC_SCRATCH_ROOT    = staged_root
+  )
+
+  .env$resolve_dinamica_launch(
+    model_path       = model,
+    backend          = "hpc",
+    runtime_override = "apptainer",
+    probe_runtime    = FALSE
+  )
+
+  expect_true(file.access(py_bin, mode = 1L) == 0L,
+    info = "resolve_dinamica_launch() must restore the +x bit on the staged interpreter.")
+})
+
 test_that("resolve_dinamica_launch() HPC fails clearly when HPC_SCRATCH_ROOT is unset (D-105)", {
   skip_if_not(is.function(.env$resolve_dinamica_launch))
 
