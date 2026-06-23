@@ -2076,6 +2076,111 @@ preload_region_predictor_data <- function(
 }
 
 
+#' Lazily load parquet predictor columns for ONE from-class's sparse cell keys.
+#'
+#' Per-from-class analogue of preload_region_predictor_data(). Instead of
+#' collecting the full region predictor table, this reads only the predictor
+#' columns a from-class's transitions need, scoped to that from-class's sparse
+#' cell keys via an Arrow `inner_join` against a key table — NOT a
+#' `filter(cell_id %in% big_vector)`, which is the known-slow Acero path the
+#' L2256-2259 comment warns about (Phase 3.5 RESEARCH Pitfall 1). The result is
+#' cached per from_val by the caller so each distinct from-class is scanned at
+#' most once.
+#'
+#' The output is row/column-equivalent to preload_region_predictor_data()
+#' restricted to the same keys/columns: static columns filtered by region only,
+#' dynamic columns filtered by region + scenario, merged by cell_id with
+#' all = TRUE (the same merge the eager preload uses), keyed by cell_id. The
+#' downstream keyed left-join `region_pred_dt[J(lookup_keys), nomatch = NA]`
+#' (Pitfall 4) operates against this from-class-sized table unchanged, so
+#' per-transition cell counts and NA-fill are identical to the eager path.
+#'
+#' @param ds_static Arrow dataset for static predictors
+#' @param ds_dynamic Arrow dataset for dynamic predictors
+#' @param cols Character vector of predictor names to load (parquet columns only)
+#' @param region_value Integer region partition value
+#' @param scenario SSP scenario string for the dynamic partition filter
+#' @param ref_cell_keys Integer vector of the from-class's ref_cell_id keys
+#' @param log_file Optional path to per-worker log file
+#' @return data.table keyed by cell_id with the requested predictor columns,
+#'   scoped to the supplied keys. Empty cols or empty keys yield an empty
+#'   cell_id-only data.table (no error).
+load_from_class_predictor_data <- function(
+  ds_static,
+  ds_dynamic,
+  cols,
+  region_value,
+  scenario,
+  ref_cell_keys,
+  log_file = NULL
+) {
+  cols <- unique(as.character(cols))
+  ref_cell_keys <- unique(as.integer(ref_cell_keys))
+  if (length(cols) == 0L || length(ref_cell_keys) == 0L) {
+    return(data.table::data.table(cell_id = integer()))
+  }
+
+  static_cols <- intersect(cols, names(ds_static$schema))
+  dyn_cols <- intersect(cols, names(ds_dynamic$schema))
+
+  # Arrow table of the sparse from-class keys. The inner_join is a hash-join
+  # Acero pushes into the scan — the FAST path. A bare
+  # filter(cell_id %in% ref_cell_keys) on a multi-million-element vector is the
+  # slow path the L2256-2259 comment warns about (Pitfall 1). Do NOT replace
+  # this with %in%, and do NOT relax arrow threads.
+  key_tbl <- arrow::arrow_table(cell_id = ref_cell_keys)
+
+  static_df <- if (length(static_cols) > 0L) {
+    ds_static |>
+      dplyr::filter(region == !!region_value) |>
+      dplyr::select(cell_id, dplyr::all_of(static_cols)) |>
+      dplyr::inner_join(key_tbl, by = "cell_id") |>
+      dplyr::collect() |>
+      data.table::as.data.table()
+  } else {
+    data.table::data.table(cell_id = integer())
+  }
+
+  dyn_df <- if (length(dyn_cols) > 0L) {
+    ds_dynamic |>
+      dplyr::filter(region == !!region_value, scenario == !!scenario) |>
+      dplyr::select(cell_id, dplyr::all_of(dyn_cols)) |>
+      dplyr::inner_join(key_tbl, by = "cell_id") |>
+      dplyr::collect() |>
+      data.table::as.data.table()
+  } else {
+    data.table::data.table(cell_id = integer())
+  }
+
+  if (nrow(static_df) == 0L && nrow(dyn_df) == 0L) {
+    return(data.table::data.table(cell_id = integer()))
+  }
+
+  result <- if (nrow(static_df) > 0L && nrow(dyn_df) > 0L) {
+    merge(static_df, dyn_df, by = "cell_id", all = TRUE)
+  } else if (nrow(static_df) > 0L) {
+    static_df
+  } else {
+    dyn_df
+  }
+
+  data.table::setkeyv(result, "cell_id")
+  log_msg(
+    sprintf(
+      "    From-class predictor data loaded: %d from-class keys -> %d cells, %d static cols (%s), %d dynamic cols (%s)",
+      length(ref_cell_keys),
+      nrow(result),
+      length(static_cols),
+      paste(static_cols, collapse = ", "),
+      length(dyn_cols),
+      paste(dyn_cols, collapse = ", ")
+    ),
+    log_file
+  )
+  result
+}
+
+
 #' Generate probability maps for all transitions in a region
 #'
 #' Loads fitted tidymodels workflows one at a time, predicts transition
