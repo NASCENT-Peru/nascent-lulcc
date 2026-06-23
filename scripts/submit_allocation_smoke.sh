@@ -91,6 +91,12 @@ export ALLOCATION_WORKER_RSS_BUDGET_MB=${ALLOCATION_WORKER_RSS_BUDGET_MB:-16384}
 # oversubscribe). Only the ranger predict call is allowed > 1 thread; all other
 # native pools stay pinned to 1 by pin_native_threads_to_one().
 export ALLOCATION_PREDICT_NUM_THREADS=${ALLOCATION_PREDICT_NUM_THREADS:-}
+# Lazy per-from-class predictor reads (Phase 3.5, Goal 1). Unset (the default
+# below) = lazy ON: per-region predictor RAM is bounded by the largest single
+# from-class table instead of the full region table, cutting the preload memory
+# floor. Set ALLOCATION_PREDICTOR_LAZY=0 to revert to the eager full-region
+# preload (the bisect escape hatch for the lazy-vs-eager aggregate-cost risk).
+export ALLOCATION_PREDICTOR_LAZY=${ALLOCATION_PREDICTOR_LAZY:-}
 
 echo "ALLOCATION_PROFILE=$ALLOCATION_PROFILE"
 echo "ALLOCATION_PARALLEL_STRATEGY=$ALLOCATION_PARALLEL_STRATEGY"
@@ -102,6 +108,7 @@ echo "ALLOCATION_YEAR_POST_FILTER=$ALLOCATION_YEAR_POST_FILTER"
 echo "ALLOCATION_WORKER_RSS_BUDGET_MB=$ALLOCATION_WORKER_RSS_BUDGET_MB"
 echo "ALLOCATION_PREDICT_BATCH_ROWS=${ALLOCATION_PREDICT_BATCH_ROWS:-<unset: single-shot>}"
 echo "ALLOCATION_PREDICT_NUM_THREADS=${ALLOCATION_PREDICT_NUM_THREADS:-<unset: auto cores/workers>}"
+echo "ALLOCATION_PREDICTOR_LAZY=${ALLOCATION_PREDICTOR_LAZY:-<unset: lazy per-from-class ON>}"
 echo
 
 RUN_ID="${SLURM_JOB_ID:-$(date +%Y%m%d-%H%M%S)-${ALLOCATION_REGION_FILTER:-allregions}}"

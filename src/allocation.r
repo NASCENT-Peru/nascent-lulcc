@@ -585,6 +585,22 @@ get_allocation_predict_num_threads <- function() {
   as.integer(max(1L, min(t, budget)))
 }
 
+# Whether generate_probability_maps() reads predictors lazily, per from-class
+# (Phase 3.5, Goal 1). Default ON: the eager full-region preload
+# (preload_region_predictor_data) is replaced by per-from-class
+# load_from_class_predictor_data() reads, cached so each distinct from-class is
+# scanned at most once. ALLOCATION_PREDICTOR_LAZY="0"/"false"/"no" reverts to
+# the exact eager preload path byte-for-byte — the bisect escape hatch for the
+# central falsifiable risk A3 (whether the lazy per-from-class scan beats the
+# eager region scan in aggregate). Unset/empty or "1"/"true"/"yes" => lazy.
+get_allocation_predictor_lazy <- function() {
+  raw <- tolower(trimws(Sys.getenv("ALLOCATION_PREDICTOR_LAZY", unset = "")))
+  if (raw %in% c("0", "false", "no", "off")) {
+    return(FALSE)
+  }
+  TRUE
+}
+
 load_allocation_class_map <- function(config) {
   lulc_schema <- jsonlite::fromJSON(
     config[["lulc_aggregation_path"]],
@@ -2076,6 +2092,111 @@ preload_region_predictor_data <- function(
 }
 
 
+#' Lazily load parquet predictor columns for ONE from-class's sparse cell keys.
+#'
+#' Per-from-class analogue of preload_region_predictor_data(). Instead of
+#' collecting the full region predictor table, this reads only the predictor
+#' columns a from-class's transitions need, scoped to that from-class's sparse
+#' cell keys via an Arrow `inner_join` against a key table — NOT a
+#' `filter(cell_id %in% big_vector)`, which is the known-slow Acero path the
+#' L2256-2259 comment warns about (Phase 3.5 RESEARCH Pitfall 1). The result is
+#' cached per from_val by the caller so each distinct from-class is scanned at
+#' most once.
+#'
+#' The output is row/column-equivalent to preload_region_predictor_data()
+#' restricted to the same keys/columns: static columns filtered by region only,
+#' dynamic columns filtered by region + scenario, merged by cell_id with
+#' all = TRUE (the same merge the eager preload uses), keyed by cell_id. The
+#' downstream keyed left-join `region_pred_dt[J(lookup_keys), nomatch = NA]`
+#' (Pitfall 4) operates against this from-class-sized table unchanged, so
+#' per-transition cell counts and NA-fill are identical to the eager path.
+#'
+#' @param ds_static Arrow dataset for static predictors
+#' @param ds_dynamic Arrow dataset for dynamic predictors
+#' @param cols Character vector of predictor names to load (parquet columns only)
+#' @param region_value Integer region partition value
+#' @param scenario SSP scenario string for the dynamic partition filter
+#' @param ref_cell_keys Integer vector of the from-class's ref_cell_id keys
+#' @param log_file Optional path to per-worker log file
+#' @return data.table keyed by cell_id with the requested predictor columns,
+#'   scoped to the supplied keys. Empty cols or empty keys yield an empty
+#'   cell_id-only data.table (no error).
+load_from_class_predictor_data <- function(
+  ds_static,
+  ds_dynamic,
+  cols,
+  region_value,
+  scenario,
+  ref_cell_keys,
+  log_file = NULL
+) {
+  cols <- unique(as.character(cols))
+  ref_cell_keys <- unique(as.integer(ref_cell_keys))
+  if (length(cols) == 0L || length(ref_cell_keys) == 0L) {
+    return(data.table::data.table(cell_id = integer()))
+  }
+
+  static_cols <- intersect(cols, names(ds_static$schema))
+  dyn_cols <- intersect(cols, names(ds_dynamic$schema))
+
+  # Arrow table of the sparse from-class keys. The inner_join is a hash-join
+  # Acero pushes into the scan — the FAST path. A bare
+  # filter(cell_id %in% ref_cell_keys) on a multi-million-element vector is the
+  # slow path the L2256-2259 comment warns about (Pitfall 1). Do NOT replace
+  # this with %in%, and do NOT relax arrow threads.
+  key_tbl <- arrow::arrow_table(cell_id = ref_cell_keys)
+
+  static_df <- if (length(static_cols) > 0L) {
+    ds_static |>
+      dplyr::filter(region == !!region_value) |>
+      dplyr::select(cell_id, dplyr::all_of(static_cols)) |>
+      dplyr::inner_join(key_tbl, by = "cell_id") |>
+      dplyr::collect() |>
+      data.table::as.data.table()
+  } else {
+    data.table::data.table(cell_id = integer())
+  }
+
+  dyn_df <- if (length(dyn_cols) > 0L) {
+    ds_dynamic |>
+      dplyr::filter(region == !!region_value, scenario == !!scenario) |>
+      dplyr::select(cell_id, dplyr::all_of(dyn_cols)) |>
+      dplyr::inner_join(key_tbl, by = "cell_id") |>
+      dplyr::collect() |>
+      data.table::as.data.table()
+  } else {
+    data.table::data.table(cell_id = integer())
+  }
+
+  if (nrow(static_df) == 0L && nrow(dyn_df) == 0L) {
+    return(data.table::data.table(cell_id = integer()))
+  }
+
+  result <- if (nrow(static_df) > 0L && nrow(dyn_df) > 0L) {
+    merge(static_df, dyn_df, by = "cell_id", all = TRUE)
+  } else if (nrow(static_df) > 0L) {
+    static_df
+  } else {
+    dyn_df
+  }
+
+  data.table::setkeyv(result, "cell_id")
+  log_msg(
+    sprintf(
+      "    From-class predictor data loaded: %d from-class keys -> %d cells, %d static cols (%s), %d dynamic cols (%s)",
+      length(ref_cell_keys),
+      nrow(result),
+      length(static_cols),
+      paste(static_cols, collapse = ", "),
+      length(dyn_cols),
+      paste(dyn_cols, collapse = ", ")
+    ),
+    log_file
+  )
+  result
+}
+
+
 #' Generate probability maps for all transitions in a region
 #'
 #' Loads fitted tidymodels workflows one at a time, predicts transition
@@ -2253,26 +2374,61 @@ generate_probability_maps <- function(
     log_file
   )
 
-  # Pre-load ALL parquet predictor columns for the region in one Arrow scan.
-  # This replaces per-transition cell_id %in% Arrow filters (which are very
-  # slow for large cell_id vectors) with a single region-partition read
-  # followed by fast in-memory data.table keyed lookups per transition.
-  all_preds_flat <- unique(unlist(model_info$predictor_names, use.names = FALSE))
-  all_parquet_preds <- setdiff(all_preds_flat, grep("_nhood_", all_preds_flat, value = TRUE))
-  t_pred_preload <- prof_tic()
-  region_pred_dt <- preload_region_predictor_data(
-    ds_static = ds_static,
-    ds_dynamic = ds_dynamic,
-    preds = all_parquet_preds,
-    region_value = region_val,
-    scenario = ssp_name,
-    log_file = log_file
-  )
-  prof_toc(
-    t_pred_preload,
-    sprintf("region=%s stage=predictor_preload", region_suffix),
+  # Predictor read path: lazy per-from-class (default, Phase 3.5 Goal 1) vs.
+  # eager full-region preload (escape hatch ALLOCATION_PREDICTOR_LAZY=0). The
+  # lazy path bounds per-region predictor RAM by the largest single from-class
+  # table instead of the full region table; the eager path is preserved
+  # byte-for-byte for bisecting risk A3.
+  predictor_lazy <- get_allocation_predictor_lazy()
+  log_msg(
+    sprintf(
+      "    Predictor read path: %s (ALLOCATION_PREDICTOR_LAZY=%s)",
+      if (predictor_lazy) "lazy per-from-class" else "eager full-region preload",
+      if (predictor_lazy) "1/true (default)" else "0/false"
+    ),
     log_file
   )
+
+  if (predictor_lazy) {
+    # Lazy path: defer reads to the per-transition loop, cached per from_val so
+    # each distinct from-class is scanned at most once. Precompute the
+    # column-union each from-class needs (superset over its transitions, minus
+    # neighbourhood predictors which are read separately) so the cached read
+    # projects exactly those columns. region_pred_dt is populated from the cache
+    # inside the loop (RESEARCH Pattern 2).
+    col_union_by_from <- split(
+      model_info$predictor_names,
+      model_info$from_val
+    )
+    col_union_by_from <- lapply(col_union_by_from, function(lst) {
+      flat <- unique(unlist(lst, use.names = FALSE))
+      setdiff(flat, grep("_nhood_", flat, value = TRUE))
+    })
+    from_class_cache <- new.env(parent = emptyenv())
+    region_pred_dt <- NULL
+  } else {
+    # Eager path (escape hatch): pre-load ALL parquet predictor columns for the
+    # region in one Arrow scan. This replaces per-transition cell_id %in% Arrow
+    # filters (which are very slow for large cell_id vectors) with a single
+    # region-partition read followed by fast in-memory data.table keyed lookups
+    # per transition.
+    all_preds_flat <- unique(unlist(model_info$predictor_names, use.names = FALSE))
+    all_parquet_preds <- setdiff(all_preds_flat, grep("_nhood_", all_preds_flat, value = TRUE))
+    t_pred_preload <- prof_tic()
+    region_pred_dt <- preload_region_predictor_data(
+      ds_static = ds_static,
+      ds_dynamic = ds_dynamic,
+      preds = all_parquet_preds,
+      region_value = region_val,
+      scenario = ssp_name,
+      log_file = log_file
+    )
+    prof_toc(
+      t_pred_preload,
+      sprintf("region=%s stage=predictor_preload", region_suffix),
+      log_file
+    )
+  }
 
   # Map (from_val, to_val) pairs to their trans_rates.csv row index so we can
   # write TIFs with the row-number prefix that Dinamica's probability-map
@@ -2340,6 +2496,39 @@ generate_probability_maps <- function(
     if (nrow(from_idx) == 0L) {
       prof_toc(t_trans_total, trans_tag, log_file)
       next
+    }
+
+    # Lazy path: read this from-class's predictor columns once, cached by
+    # from_val, scoped to its sparse cell keys (RESEARCH Pattern 2). region_pred_dt
+    # becomes the from-class-sized cached table; the keyed-join block below
+    # operates against it unchanged (Pitfall 4). Each distinct from_val triggers
+    # exactly one load_from_class_predictor_data() call. Profiled under the
+    # predictor_load stage so the lazy read time is attributed.
+    if (predictor_lazy) {
+      cache_key <- as.character(from_val)
+      if (is.null(from_class_cache[[cache_key]])) {
+        t_fromclass_load <- prof_tic()
+        from_class_cache[[cache_key]] <- load_from_class_predictor_data(
+          ds_static = ds_static,
+          ds_dynamic = ds_dynamic,
+          cols = col_union_by_from[[cache_key]],
+          region_value = region_val,
+          scenario = ssp_name,
+          ref_cell_keys = from_idx$ref_cell_id,
+          log_file = log_file
+        )
+        prof_toc(
+          t_fromclass_load,
+          sprintf(
+            "region=%s stage=predictor_load from=%d to=%d",
+            region_suffix,
+            from_val,
+            to_val
+          ),
+          log_file
+        )
+      }
+      region_pred_dt <- from_class_cache[[cache_key]]
     }
 
     t_model_load <- prof_tic()
