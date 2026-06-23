@@ -528,6 +528,63 @@ get_allocation_predict_batch_rows <- function() {
   val
 }
 
+# Number of threads the per-transition ranger predict call may use (Phase 3.5,
+# Goal 2). This is a SCOPED relaxation: ONLY the ranger predict OpenMP region is
+# allowed > 1 thread. pin_native_threads_to_one() (L194) stays fully in force for
+# BLAS/OpenBLAS/MKL/GDAL/data.table/arrow — do NOT raise OMP_NUM_THREADS or touch
+# arrow::set_cpu_count, RhpcBLASctl, or setDTthreads to grant ranger threads;
+# ranger honours an explicit num.threads argument over the OMP env default, so
+# the relaxation is one argument on one call, never a global thread-pool change.
+#
+# Resolution (see 03.5-RESEARCH.md Q3):
+#   - cores = SLURM_CPUS_PER_TASK, else parallel::detectCores(logical = TRUE),
+#     else 1.
+#   - effective_workers = 1 when ALLOCATION_PARALLEL_STRATEGY is "sequential"
+#     (the region runs serially in one worker, so prediction gets all cores —
+#     the smoke script sets ALLOCATION_NUM_WORKERS=cores even in sequential mode,
+#     so dividing by it there would wrongly cap threads at cores/N); otherwise
+#     effective_workers = max(1, ALLOCATION_NUM_WORKERS).
+#   - Explicit ALLOCATION_PREDICT_NUM_THREADS=N (positive int) -> N; empty/unset
+#     -> auto = floor(cores / effective_workers).
+#   - The result is hard-clamped to [1, cores %/% effective_workers] so a
+#     misconfigured or oversize knob can never oversubscribe the node, and is
+#     always a single integer >= 1 (never NA, 0, or > cores).
+get_allocation_predict_num_threads <- function() {
+  raw <- Sys.getenv("ALLOCATION_PREDICT_NUM_THREADS", unset = "")
+
+  cores <- suppressWarnings(as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", unset = "")))
+  if (is.na(cores) || cores < 1L) {
+    cores <- tryCatch(
+      as.integer(parallel::detectCores(logical = TRUE)),
+      error = function(e) 1L
+    )
+    if (is.na(cores) || cores < 1L) cores <- 1L
+  }
+
+  strategy <- tolower(trimws(Sys.getenv("ALLOCATION_PARALLEL_STRATEGY", unset = "")))
+  if (identical(strategy, "sequential")) {
+    effective_workers <- 1L
+  } else {
+    effective_workers <- suppressWarnings(
+      as.integer(Sys.getenv("ALLOCATION_NUM_WORKERS", unset = "1"))
+    )
+    if (is.na(effective_workers) || effective_workers < 1L) effective_workers <- 1L
+  }
+
+  budget <- max(1L, cores %/% effective_workers)
+
+  if (nzchar(raw)) {
+    t <- suppressWarnings(as.integer(raw))
+    if (is.na(t) || t < 1L) t <- 1L
+  } else {
+    t <- budget
+  }
+
+  # Hard clamp so a garbage / oversize knob can never oversubscribe:
+  # 1 <= t <= cores / effective_workers.
+  as.integer(max(1L, min(t, budget)))
+}
+
 load_allocation_class_map <- function(config) {
   lulc_schema <- jsonlite::fromJSON(
     config[["lulc_aggregation_path"]],
