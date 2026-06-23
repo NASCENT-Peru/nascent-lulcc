@@ -212,11 +212,19 @@ Plans:
 Multi-scenario node packing (the original Phase 5 "Goal 1" / S2) is merged into Phase 4 — not in scope here.
 
 **Depends on:** Phase 3
-**Requirements**: TBD
-**Plans:** 0 plans
+**Requirements**: PERF-01, PERF-02
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 03.5 to break down)
+
+**Wave 1**
+- [ ] 03.5-01-PLAN.md — Scoped threaded ranger prediction: get_allocation_predict_num_threads() resolver + num.threads on both predict sites (Goal 2 throughput).
+
+**Wave 2** *(blocked on Wave 1 — shared src/allocation.r ownership)*
+- [ ] 03.5-02-PLAN.md — Lazy per-from-class predictor reads: load_from_class_predictor_data() + cache + ALLOCATION_PREDICTOR_LAZY escape hatch (Goal 1 memory floor).
+
+**Wave 3** *(blocked on Wave 1+2; operator-gated HPC smoke)*
+- [ ] 03.5-03-PLAN.md — selva_andina smoke validation: before/after profile deltas vs job 571309, two-stage isolation, equivalence + residual-floor assessment.
 
 ### Phase 4: End-to-End Correctness & Performance
 **Goal**: All four scenarios run to completion across all regions and timesteps, with `predict` no longer dominating wall time, restarts skipping completed work atomically, the latent correctness gaps (raster/terra split, missing CVXR loop, drifted intervention paths) closed, and the full sweep parallelised efficiently across Rundeck nodes rather than run as a single serial process.
@@ -247,6 +255,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 3.2. Transition Pipeline Consistency | 0/3 | Not started (INSERTED 2005-05-22) | - |
 | 3.3. Probability Map Saturation & Allocation Throughput | 4/5 | Wave 1-3 plans complete; operator gate pending (03.3-05) | partial — Wave 1-3 2005-05-26 |
 | 3.4. Stale Pipeline Artifact Re-run | 0/TBD | Not started (INSERTED 2005-05-29) | - |
-| 3.5. Reduce Allocation Memory Floor | 0/TBD | Not started (INSERTED 2026-06-22) | - |
+| 3.5. Reduce Allocation Memory Floor | 0/3 | Planned (INSERTED 2026-06-22; 3 plans, 3 waves) | - |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
 
