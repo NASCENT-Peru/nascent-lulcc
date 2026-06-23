@@ -585,6 +585,22 @@ get_allocation_predict_num_threads <- function() {
   as.integer(max(1L, min(t, budget)))
 }
 
+# Whether generate_probability_maps() reads predictors lazily, per from-class
+# (Phase 3.5, Goal 1). Default ON: the eager full-region preload
+# (preload_region_predictor_data) is replaced by per-from-class
+# load_from_class_predictor_data() reads, cached so each distinct from-class is
+# scanned at most once. ALLOCATION_PREDICTOR_LAZY="0"/"false"/"no" reverts to
+# the exact eager preload path byte-for-byte — the bisect escape hatch for the
+# central falsifiable risk A3 (whether the lazy per-from-class scan beats the
+# eager region scan in aggregate). Unset/empty or "1"/"true"/"yes" => lazy.
+get_allocation_predictor_lazy <- function() {
+  raw <- tolower(trimws(Sys.getenv("ALLOCATION_PREDICTOR_LAZY", unset = "")))
+  if (raw %in% c("0", "false", "no", "off")) {
+    return(FALSE)
+  }
+  TRUE
+}
+
 load_allocation_class_map <- function(config) {
   lulc_schema <- jsonlite::fromJSON(
     config[["lulc_aggregation_path"]],
@@ -2358,26 +2374,61 @@ generate_probability_maps <- function(
     log_file
   )
 
-  # Pre-load ALL parquet predictor columns for the region in one Arrow scan.
-  # This replaces per-transition cell_id %in% Arrow filters (which are very
-  # slow for large cell_id vectors) with a single region-partition read
-  # followed by fast in-memory data.table keyed lookups per transition.
-  all_preds_flat <- unique(unlist(model_info$predictor_names, use.names = FALSE))
-  all_parquet_preds <- setdiff(all_preds_flat, grep("_nhood_", all_preds_flat, value = TRUE))
-  t_pred_preload <- prof_tic()
-  region_pred_dt <- preload_region_predictor_data(
-    ds_static = ds_static,
-    ds_dynamic = ds_dynamic,
-    preds = all_parquet_preds,
-    region_value = region_val,
-    scenario = ssp_name,
-    log_file = log_file
-  )
-  prof_toc(
-    t_pred_preload,
-    sprintf("region=%s stage=predictor_preload", region_suffix),
+  # Predictor read path: lazy per-from-class (default, Phase 3.5 Goal 1) vs.
+  # eager full-region preload (escape hatch ALLOCATION_PREDICTOR_LAZY=0). The
+  # lazy path bounds per-region predictor RAM by the largest single from-class
+  # table instead of the full region table; the eager path is preserved
+  # byte-for-byte for bisecting risk A3.
+  predictor_lazy <- get_allocation_predictor_lazy()
+  log_msg(
+    sprintf(
+      "    Predictor read path: %s (ALLOCATION_PREDICTOR_LAZY=%s)",
+      if (predictor_lazy) "lazy per-from-class" else "eager full-region preload",
+      if (predictor_lazy) "1/true (default)" else "0/false"
+    ),
     log_file
   )
+
+  if (predictor_lazy) {
+    # Lazy path: defer reads to the per-transition loop, cached per from_val so
+    # each distinct from-class is scanned at most once. Precompute the
+    # column-union each from-class needs (superset over its transitions, minus
+    # neighbourhood predictors which are read separately) so the cached read
+    # projects exactly those columns. region_pred_dt is populated from the cache
+    # inside the loop (RESEARCH Pattern 2).
+    col_union_by_from <- split(
+      model_info$predictor_names,
+      model_info$from_val
+    )
+    col_union_by_from <- lapply(col_union_by_from, function(lst) {
+      flat <- unique(unlist(lst, use.names = FALSE))
+      setdiff(flat, grep("_nhood_", flat, value = TRUE))
+    })
+    from_class_cache <- new.env(parent = emptyenv())
+    region_pred_dt <- NULL
+  } else {
+    # Eager path (escape hatch): pre-load ALL parquet predictor columns for the
+    # region in one Arrow scan. This replaces per-transition cell_id %in% Arrow
+    # filters (which are very slow for large cell_id vectors) with a single
+    # region-partition read followed by fast in-memory data.table keyed lookups
+    # per transition.
+    all_preds_flat <- unique(unlist(model_info$predictor_names, use.names = FALSE))
+    all_parquet_preds <- setdiff(all_preds_flat, grep("_nhood_", all_preds_flat, value = TRUE))
+    t_pred_preload <- prof_tic()
+    region_pred_dt <- preload_region_predictor_data(
+      ds_static = ds_static,
+      ds_dynamic = ds_dynamic,
+      preds = all_parquet_preds,
+      region_value = region_val,
+      scenario = ssp_name,
+      log_file = log_file
+    )
+    prof_toc(
+      t_pred_preload,
+      sprintf("region=%s stage=predictor_preload", region_suffix),
+      log_file
+    )
+  }
 
   # Map (from_val, to_val) pairs to their trans_rates.csv row index so we can
   # write TIFs with the row-number prefix that Dinamica's probability-map
@@ -2445,6 +2496,39 @@ generate_probability_maps <- function(
     if (nrow(from_idx) == 0L) {
       prof_toc(t_trans_total, trans_tag, log_file)
       next
+    }
+
+    # Lazy path: read this from-class's predictor columns once, cached by
+    # from_val, scoped to its sparse cell keys (RESEARCH Pattern 2). region_pred_dt
+    # becomes the from-class-sized cached table; the keyed-join block below
+    # operates against it unchanged (Pitfall 4). Each distinct from_val triggers
+    # exactly one load_from_class_predictor_data() call. Profiled under the
+    # predictor_load stage so the lazy read time is attributed.
+    if (predictor_lazy) {
+      cache_key <- as.character(from_val)
+      if (is.null(from_class_cache[[cache_key]])) {
+        t_fromclass_load <- prof_tic()
+        from_class_cache[[cache_key]] <- load_from_class_predictor_data(
+          ds_static = ds_static,
+          ds_dynamic = ds_dynamic,
+          cols = col_union_by_from[[cache_key]],
+          region_value = region_val,
+          scenario = ssp_name,
+          ref_cell_keys = from_idx$ref_cell_id,
+          log_file = log_file
+        )
+        prof_toc(
+          t_fromclass_load,
+          sprintf(
+            "region=%s stage=predictor_load from=%d to=%d",
+            region_suffix,
+            from_val,
+            to_val
+          ),
+          log_file
+        )
+      }
+      region_pred_dt <- from_class_cache[[cache_key]]
     }
 
     t_model_load <- prof_tic()
