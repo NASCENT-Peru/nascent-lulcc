@@ -53,6 +53,10 @@ mkdir -p logs validation_outputs
 REGION="${VAL_REGION:-andes}"
 SCEN="${VAL_SCENARIO:-BAU}"
 THREADS="${VAL_THREADS:-40}"
+# Which configs to run (space-separated). Default = all three. Override to skip
+# runs already done, e.g. after fixing the lazy read with eager still valid:
+#   sbatch --export=ALL,VAL_RUNS="lazy-1thr lazy-threads" scripts/run_andes_validation.sh
+RUNS="${VAL_RUNS:-lazy-1thr lazy-threads eager-1thr}"
 TAG="${SLURM_JOB_ID:-$(date +%Y%m%d-%H%M%S)}"
 # Scenario output root = config[["simulation_output_dir"]]. Override via VAL_SIM_OUT
 # if your config differs from the observed beegfs path.
@@ -62,6 +66,7 @@ REGION_SUFFIX="$(echo "$REGION" | tr ' ' '_' | tr '[:upper:]' '[:lower:]')"
 echo "================================================================"
 echo "Andes Phase 3.5 validation chain"
 echo "  region=$REGION (suffix=$REGION_SUFFIX)  scenario=$SCEN  threads(run2)=$THREADS"
+echo "  runs=$RUNS"
 echo "  driver job=$TAG  node=$(hostname -s)  cpus-per-task=${SLURM_CPUS_PER_TASK:-?}"
 echo "  sim_out=$SIM_OUT"
 echo "================================================================"
@@ -95,9 +100,14 @@ run_one () {
     return 0
 }
 
-run_one lazy-1thr    ALLOCATION_PREDICTOR_LAZY=1 ALLOCATION_PREDICT_NUM_THREADS=1
-run_one lazy-threads ALLOCATION_PREDICTOR_LAZY=1 ALLOCATION_PREDICT_NUM_THREADS="$THREADS"
-run_one eager-1thr   ALLOCATION_PREDICTOR_LAZY=0 ALLOCATION_PREDICT_NUM_THREADS=1
+for r in $RUNS; do
+    case "$r" in
+        lazy-1thr)    run_one lazy-1thr    ALLOCATION_PREDICTOR_LAZY=1 ALLOCATION_PREDICT_NUM_THREADS=1 ;;
+        lazy-threads) run_one lazy-threads ALLOCATION_PREDICTOR_LAZY=1 ALLOCATION_PREDICT_NUM_THREADS="$THREADS" ;;
+        eager-1thr)   run_one eager-1thr   ALLOCATION_PREDICTOR_LAZY=0 ALLOCATION_PREDICT_NUM_THREADS=1 ;;
+        *) echo "WARN: unknown run '$r' — skipping (valid: lazy-1thr lazy-threads eager-1thr)" ;;
+    esac
+done
 
 echo
 echo "================================================================"

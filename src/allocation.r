@@ -2144,13 +2144,23 @@ load_from_class_predictor_data <- function(
   # filter(cell_id %in% ref_cell_keys) on a multi-million-element vector is the
   # slow path the L2256-2259 comment warns about (Pitfall 1). Do NOT replace
   # this with %in%, and do NOT relax arrow threads.
-  key_tbl <- arrow::arrow_table(cell_id = ref_cell_keys)
+  #
+  # arrow_table() infers int32 from R integers, but the prepped parquet stores
+  # cell_id as int64. Acero's hash-join requires identical key types — a bare
+  # int32 key table errors (or silently matches nothing), which made every lazy
+  # run die at the first transition. Cast the key table to each dataset's own
+  # cell_id type so the join keys always match (works for int32 or int64).
+  make_key_tbl <- function(ds) {
+    arrow::arrow_table(cell_id = ref_cell_keys)$cast(
+      arrow::schema(cell_id = ds$schema$GetFieldByName("cell_id")$type)
+    )
+  }
 
   static_df <- if (length(static_cols) > 0L) {
     ds_static |>
       dplyr::filter(region == !!region_value) |>
       dplyr::select(cell_id, dplyr::all_of(static_cols)) |>
-      dplyr::inner_join(key_tbl, by = "cell_id") |>
+      dplyr::inner_join(make_key_tbl(ds_static), by = "cell_id") |>
       dplyr::collect() |>
       data.table::as.data.table()
   } else {
@@ -2161,7 +2171,7 @@ load_from_class_predictor_data <- function(
     ds_dynamic |>
       dplyr::filter(region == !!region_value, scenario == !!scenario) |>
       dplyr::select(cell_id, dplyr::all_of(dyn_cols)) |>
-      dplyr::inner_join(key_tbl, by = "cell_id") |>
+      dplyr::inner_join(make_key_tbl(ds_dynamic), by = "cell_id") |>
       dplyr::collect() |>
       data.table::as.data.table()
   } else {
