@@ -114,7 +114,8 @@ for r in $RUNS; do
         lazy-1thr)    run_one lazy-1thr    ALLOCATION_PREDICTOR_LAZY=1 ALLOCATION_PREDICT_NUM_THREADS=1 ;;
         lazy-threads) run_one lazy-threads ALLOCATION_PREDICTOR_LAZY=1 ALLOCATION_PREDICT_NUM_THREADS="$THREADS" ;;
         eager-1thr)   run_one eager-1thr   ALLOCATION_PREDICTOR_LAZY=0 ALLOCATION_PREDICT_NUM_THREADS=1 ;;
-        *) echo "WARN: unknown run '$r' — skipping (valid: lazy-1thr lazy-threads eager-1thr)" ;;
+        eager-threads) run_one eager-threads ALLOCATION_PREDICTOR_LAZY=0 ALLOCATION_PREDICT_NUM_THREADS="$THREADS" ;;
+        *) echo "WARN: unknown run '$r' — skipping (valid: lazy-1thr lazy-threads eager-1thr eager-threads)" ;;
     esac
 done
 
