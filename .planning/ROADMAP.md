@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 3.2: Transition Pipeline Consistency** *(INSERTED 2005-05-22)* - Harden the end-to-end flow of viable transitions from identification through feature selection, modelling, rate preparation, and allocation so each stage operates on exactly the same transition set with no silent additions, drops, or mismatches.
 - [ ] **Phase 3.3: Probability Map Saturation & Allocation Throughput** *(INSERTED 2005-05-26)* - Address Dinamica's low allocation throughput: probability maps don't contain sufficient non-zero values, causing Expander/Patcher to place only a small fraction of the change matrix demand (e.g., 4,477 of hundreds of thousands of requested transitions in Phase 3.1 BAU costa_peruana smoke).
 - [ ] **Phase 3.4: Stale Pipeline Artifact Re-run** *(INSERTED 2005-05-29)* - Regenerate simulation trans_rates CSVs and alloc_params on HPC with Phase 3.2-corrected code; unblocks Phase 3.3 operator gate. Root cause: rate CSVs were generated before `forbidden_from_classes` config key and `load_unmodelled_transitions()` were active, so id_trans=34 (mining→high_intensity_agricultural) survived into the active set and triggered the ALLOC-08 hard stop.
-- [ ] **Phase 3.5: Reduce Allocation Memory Floor** *(INSERTED 2026-06-22)* - Cut the ~80GB per-region predictor-preload floor via lazy per-transition Parquet reads (target ~10–20GB) and let large-transition ranger prediction use spare cores (`num.threads>1`); flips allocation from memory-bound to core-bound so cheaper/more nodes can each run a region. (Split from the removed Phase 5; multi-scenario node packing merged into Phase 4.)
+- [x] **Phase 3.5: Reduce Allocation Memory Floor** *(INSERTED 2026-06-22)* - Cut the ~80GB per-region predictor-preload floor via lazy per-transition Parquet reads (target ~10–20GB) and let large-transition ranger prediction use spare cores (`num.threads>1`); flips allocation from memory-bound to core-bound so cheaper/more nodes can each run a region. (Split from the removed Phase 5; multi-scenario node packing merged into Phase 4.) (completed 2026-06-24)
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port; parallelise the full scenario sweep across Rundeck nodes (S2 multi-scenario packing)
 
 ## Phase Details
@@ -213,7 +213,7 @@ Multi-scenario node packing (the original Phase 5 "Goal 1" / S2) is merged into 
 
 **Depends on:** Phase 3
 **Requirements**: PERF-01, PERF-02
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 
@@ -224,7 +224,7 @@ Plans:
 - [x] 03.5-02-PLAN.md — Lazy per-from-class predictor reads: load_from_class_predictor_data() + cache + ALLOCATION_PREDICTOR_LAZY escape hatch (Goal 1 memory floor).
 
 **Wave 3** *(blocked on Wave 1+2; operator-gated HPC smoke)*
-- [ ] 03.5-03-PLAN.md — selva_andina smoke validation: before/after profile deltas vs job 571309, two-stage isolation, equivalence + residual-floor assessment.
+- [x] 03.5-03-PLAN.md — selva_andina smoke validation: before/after profile deltas vs job 571309, two-stage isolation, equivalence + residual-floor assessment.
 
 ### Phase 4: End-to-End Correctness & Performance
 **Goal**: All four scenarios run to completion across all regions and timesteps, with `predict` no longer dominating wall time, restarts skipping completed work atomically, the latent correctness gaps (raster/terra split, missing CVXR loop, drifted intervention paths) closed, and the full sweep parallelised efficiently across Rundeck nodes rather than run as a single serial process.
@@ -255,6 +255,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 3.2. Transition Pipeline Consistency | 0/3 | Not started (INSERTED 2005-05-22) | - |
 | 3.3. Probability Map Saturation & Allocation Throughput | 4/5 | Wave 1-3 plans complete; operator gate pending (03.3-05) | partial — Wave 1-3 2005-05-26 |
 | 3.4. Stale Pipeline Artifact Re-run | 0/TBD | Not started (INSERTED 2005-05-29) | - |
-| 3.5. Reduce Allocation Memory Floor | 2/3 | In Progress|  |
+| 3.5. Reduce Allocation Memory Floor | 3/3 | Complete   | 2026-06-24 |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
 
