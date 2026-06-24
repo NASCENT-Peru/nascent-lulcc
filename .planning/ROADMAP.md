@@ -17,9 +17,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Model Size Reduction** - Replace tidymodels with mlr3 in transition_modelling.r; save models as .qs via qs::qsave() with ranger save.memory=TRUE; all artefacts <200 MB *(completed 2005-05-07)*
 - [ ] **Phase 3: Parallelism & Memory Architecture** - Switch to fork-based multicore on Linux, share nhood rasters, eliminate OOM
 - [x] **Phase 3.1: Allocation Correctness & Dinamica Integration** *(INSERTED 2005-05-22; completed 2005-05-25)* - Fix model over-loading (filter to active transitions), eliminate phantom NA TIFs (nomatch=NULL), fix Dinamica HPC fallback guard, re-export demand CSV from XLSX (`clean_numeric` couldn't parse Excel-introduced thousand-separator format), and verify end-to-end allocation including the Dinamica CA step via dedicated smoke test
-- [ ] **Phase 3.2: Transition Pipeline Consistency** *(INSERTED 2005-05-22)* - Harden the end-to-end flow of viable transitions from identification through feature selection, modelling, rate preparation, and allocation so each stage operates on exactly the same transition set with no silent additions, drops, or mismatches.
-- [ ] **Phase 3.3: Probability Map Saturation & Allocation Throughput** *(INSERTED 2005-05-26)* - Address Dinamica's low allocation throughput: probability maps don't contain sufficient non-zero values, causing Expander/Patcher to place only a small fraction of the change matrix demand (e.g., 4,477 of hundreds of thousands of requested transitions in Phase 3.1 BAU costa_peruana smoke).
-- [ ] **Phase 3.4: Stale Pipeline Artifact Re-run** *(INSERTED 2005-05-29)* - Regenerate simulation trans_rates CSVs and alloc_params on HPC with Phase 3.2-corrected code; unblocks Phase 3.3 operator gate. Root cause: rate CSVs were generated before `forbidden_from_classes` config key and `load_unmodelled_transitions()` were active, so id_trans=34 (mining→high_intensity_agricultural) survived into the active set and triggered the ALLOC-08 hard stop.
+- [x] **Phase 3.2: Transition Pipeline Consistency** *(INSERTED 2005-05-22; completed 2026-06-24)* - Harden the end-to-end flow of viable transitions from identification through feature selection, modelling, rate preparation, and allocation so each stage operates on exactly the same transition set with no silent additions, drops, or mismatches.
+- [x] **Phase 3.3: Probability Map Saturation & Allocation Throughput** *(INSERTED 2005-05-26; completed 2026-06-24 — operator gate met by andes full run, saturation 22/24)* - Address Dinamica's low allocation throughput: probability maps don't contain sufficient non-zero values, causing Expander/Patcher to place only a small fraction of the change matrix demand (e.g., 4,477 of hundreds of thousands of requested transitions in Phase 3.1 BAU costa_peruana smoke).
+- [x] **Phase 3.4: Stale Pipeline Artifact Re-run** *(INSERTED 2005-05-29; completed 2026-06-24 — UAT 1-3 pass; Test-4 float32-cube Expander blocker fixed (int32 cast) and confirmed by andes posterior.tif)* - Regenerate simulation trans_rates CSVs and alloc_params on HPC with Phase 3.2-corrected code; unblocks Phase 3.3 operator gate. Root cause: rate CSVs were generated before `forbidden_from_classes` config key and `load_unmodelled_transitions()` were active, so id_trans=34 (mining→high_intensity_agricultural) survived into the active set and triggered the ALLOC-08 hard stop.
 - [x] **Phase 3.5: Reduce Allocation Memory Floor** *(INSERTED 2026-06-22)* - Cut the ~80GB per-region predictor-preload floor via lazy per-transition Parquet reads (target ~10–20GB) and let large-transition ranger prediction use spare cores (`num.threads>1`); flips allocation from memory-bound to core-bound so cheaper/more nodes can each run a region. (Split from the removed Phase 5; multi-scenario node packing merged into Phase 4.) (completed 2026-06-24)
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port; parallelise the full scenario sweep across Rundeck nodes (S2 multi-scenario packing)
 
@@ -154,13 +154,13 @@ Plans:
 Plans:
 
 **Wave 1**
-- [ ] 03.2-01-PLAN.md — Fix `final_summary` crash bug in `transition_feature_selection.r`; move hardcoded `year_steps`, `scalars`, and mining prohibition to config; verify PIPE-01/PIPE-02 no-regression.
+- [x] 03.2-01-PLAN.md — Fix `final_summary` crash bug in `transition_feature_selection.r`; move hardcoded `year_steps`, `scalars`, and mining prohibition to config; verify PIPE-01/PIPE-02 no-regression.
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 03.2-02-PLAN.md — Add structured AUDIT log lines at stage 2→3 boundary (`transition_modelling.r`), stage 4 (`simulation_trans_rates_prep.r`), and promote stage 5 warning to stop() (`allocation.r`).
+- [x] 03.2-02-PLAN.md — Add structured AUDIT log lines at stage 2→3 boundary (`transition_modelling.r`), stage 4 (`simulation_trans_rates_prep.r`), and promote stage 5 warning to stop() (`allocation.r`).
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 03.2-03-PLAN.md — Create `scripts/audit_transition_pipeline.r` cross-stage consistency checker covering all four pipeline stages (id_trans set-difference via Stages 1, 2, 3, 4 artifacts).
+- [x] 03.2-03-PLAN.md — Create `scripts/audit_transition_pipeline.r` cross-stage consistency checker covering all four pipeline stages (id_trans set-difference via Stages 1, 2, 3, 4 artifacts).
 
 ### Phase 3.3: Probability Map Saturation & Allocation Throughput *(INSERTED 2005-05-26)*
 **Goal**: Dinamica's Expander + Patcher allocate substantially all of the requested change matrix cells (target: ≥90% of demanded transitions placed) for a reference scenario × region × timestep, rather than the ~1% throughput observed in Phase 3.1 (4,477 of hundreds of thousands of requested cells in BAU × costa_peruana × 2022→2026). The root cause — probability maps not containing enough non-zero high-probability cells to support the demanded volume of transitions — is identified and remediated through one or more of: model calibration adjustments, prediction post-processing (e.g., probability map smoothing or floor), Patcher parameter tuning (`Mean_Patch_Size`, `Patch_Size_Variance`, `Patch_Isometry`), Expander `Perc_expander` rebalancing, or probability map generation improvements.
@@ -186,7 +186,7 @@ Plans:
 - [x] 03.3-04-PLAN.md — Test coverage: tests/testthat/test-allocation-single-source-writer.R (ALLOC-06/08) + tests/testthat/test-saturation-diagnostics.R (ALLOC-07/10).
 
 **Wave 4** *(blocked on Wave 2, Wave 3 completion; has operator-gate checkpoint)*
-- [ ] 03.3-05-PLAN.md — Add ALLOC-06..10 to REQUIREMENTS.md; update ROADMAP.md; operator-gate live HPC verification (BAU x all Peruvian regions x 2022->2026); write 03.3-SUMMARY.md.
+- [x] 03.3-05-PLAN.md — Add ALLOC-06..10 to REQUIREMENTS.md; update ROADMAP.md; operator-gate live HPC verification (BAU x all Peruvian regions x 2022->2026); write 03.3-SUMMARY.md. *(closed 2026-06-24: ALLOC-06..10 in REQUIREMENTS; operator gate met by andes full run — saturation_summary.csv, 22/24 transitions ≥0.90; see 03.3-05-SUMMARY.md)*
 
 ### Phase 3.4: Stale Pipeline Artifact Re-run *(INSERTED 2005-05-29)*
 **Goal**: Simulation trans_rates CSVs and alloc_params.csv on Euler are regenerated with Phase 3.2-corrected code so id_trans=34 (and any other no-model transition) is excluded from the active set before allocation runs — removing the ALLOC-08 blocker for Phase 3.3's operator gate.
@@ -201,7 +201,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 03.4-01-PLAN.md — Operator pre-flight, trans_rates re-run, alloc_params calibration, and allocation smoke for all 4 regions
+- [x] 03.4-01-PLAN.md — Operator pre-flight, trans_rates re-run, alloc_params calibration, and allocation smoke for all 4 regions *(closed 2026-06-24: UAT tests 1-3 pass (pre-flight, sim-trans-rates + alloc_params all 4 regions); Test-4 float32-cube Expander blocker fixed via int32 cube cast and confirmed by andes posterior.tif — see 03.4-UAT.md)*
 
 ### Phase 3.5: Reduce Allocation Memory Floor *(INSERTED 2026-06-22)*
 **Goal:** Shrink per-region allocation memory and prediction wall time so the sweep scales — two changes to `src/allocation.r`'s prediction path:
@@ -252,9 +252,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 2. Model Size Reduction | 4/4 | Complete | 2005-05-07 |
 | 3. Parallelism & Memory Architecture | 0/TBD | Not started | - |
 | 3.1. Allocation Correctness & Dinamica Integration | 1/1 | Complete — 4,477 cells changed (103→105); demand CSV fix unblocked optimizer | 2005-05-25 |
-| 3.2. Transition Pipeline Consistency | 0/3 | Not started (INSERTED 2005-05-22) | - |
-| 3.3. Probability Map Saturation & Allocation Throughput | 4/5 | Wave 1-3 plans complete; operator gate pending (03.3-05) | partial — Wave 1-3 2005-05-26 |
-| 3.4. Stale Pipeline Artifact Re-run | 0/TBD | Not started (INSERTED 2005-05-29) | - |
+| 3.2. Transition Pipeline Consistency | 3/3 | Complete — all plans executed (audit_transition_pipeline.r, AUDIT lines, config moves); roadmap tracking was stale | 2026-06-24 |
+| 3.3. Probability Map Saturation & Allocation Throughput | 5/5 | Complete — operator gate met by andes full run (saturation 22/24 ≥0.90); ALLOC-06..10 in REQUIREMENTS | 2026-06-24 |
+| 3.4. Stale Pipeline Artifact Re-run | 1/1 | Complete — UAT 1-3 pass (all 4 regions); float32-cube Expander blocker fixed (int32 cast), confirmed by andes posterior.tif | 2026-06-24 |
 | 3.5. Reduce Allocation Memory Floor | 3/3 | Complete   | 2026-06-24 |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
 
