@@ -57,6 +57,14 @@ THREADS="${VAL_THREADS:-40}"
 # runs already done, e.g. after fixing the lazy read with eager still valid:
 #   sbatch --export=ALL,VAL_RUNS="lazy-1thr lazy-threads" scripts/run_andes_validation.sh
 RUNS="${VAL_RUNS:-lazy-1thr lazy-threads eager-1thr}"
+# Phase 3.4 batched prediction. The 26M-cell from-class (natural_grasslands,
+# class 102) makes a single-shot ranger predict spike peak_rss to ~178GB and
+# OOM even the 188GB node. Batching caps that transient. Default 5M rows;
+# set VAL_BATCH_ROWS=0 to disable (single-shot, will OOM on this region).
+BATCH_ROWS="${VAL_BATCH_ROWS:-5000000}"
+if [ -n "$BATCH_ROWS" ] && [ "$BATCH_ROWS" != "0" ]; then
+    export ALLOCATION_PREDICT_BATCH_ROWS="$BATCH_ROWS"
+fi
 TAG="${SLURM_JOB_ID:-$(date +%Y%m%d-%H%M%S)}"
 # Scenario output root = config[["simulation_output_dir"]]. Override via VAL_SIM_OUT
 # if your config differs from the observed beegfs path.
@@ -67,6 +75,7 @@ echo "================================================================"
 echo "Andes Phase 3.5 validation chain"
 echo "  region=$REGION (suffix=$REGION_SUFFIX)  scenario=$SCEN  threads(run2)=$THREADS"
 echo "  runs=$RUNS"
+echo "  predict_batch_rows=${ALLOCATION_PREDICT_BATCH_ROWS:-<single-shot>}"
 echo "  driver job=$TAG  node=$(hostname -s)  cpus-per-task=${SLURM_CPUS_PER_TASK:-?}"
 echo "  sim_out=$SIM_OUT"
 echo "================================================================"
