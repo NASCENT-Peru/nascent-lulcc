@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Phase 3.2 context captured (year_steps decision; Plan 01 needs revision)
-last_updated: "2026-06-23T08:41:43.747Z"
+status: ready_to_plan
+stopped_at: Phase 03.5 complete (3/3) — ready to discuss Phase 4
+last_updated: 2026-06-24T19:24:18.253Z
 last_activity: 2026-06-23 -- Phase 03.5 execution started
 progress:
   total_phases: 10
   completed_phases: 6
   total_plans: 31
-  completed_plans: 26
+  completed_plans: 29
   percent: 60
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** allocation.r completes reliably for all scenarios × regions × timesteps, producing simulated LULC maps without crashing.
-**Current focus:** Phase 03.5 — reduce-allocation-memory-floor-lazy-per-transition-predictor
+**Current focus:** Phase 4 — end to end correctness & performance
 
 ## Current Position
 
-Phase: 03.5 (reduce-allocation-memory-floor-lazy-per-transition-predictor) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 03.5
-Last activity: 2026-06-23 -- Phase 03.5 execution started
+Phase: 4
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-06-24
 
 ### Roadmap Evolution
 
@@ -43,7 +43,7 @@ Progress: [████████░░] 81%
 
 **Velocity:**
 
-- Total plans completed: 12
+- Total plans completed: 15
 - Average duration: ~13 min/plan (across Phases 1, 1.1, 2)
 - Total execution time: ~2.6 hours
 
@@ -56,6 +56,7 @@ Progress: [████████░░] 81%
 | 2. Model Size Reduction | 4 (02-01, 02-02, 02-03, 02-04) | ~71 min combined | ~18 min |
 | 3. Parallelism & Memory Architecture | 0 | — | — |
 | 4. End-to-End Correctness & Performance | 0 | — | — |
+| 03.5 | 3 | - | - |
 
 **Recent Trend:**
 
