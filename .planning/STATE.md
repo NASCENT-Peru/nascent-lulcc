@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Phase 03.5 complete (3/3) — ready to discuss Phase 4
-last_updated: 2026-06-24T19:24:18.253Z
-last_activity: 2026-06-23 -- Phase 03.5 execution started
+status: planning
+stopped_at: Phase 3.2 context captured (year_steps decision; Plan 01 needs revision)
+last_updated: "2026-06-24T20:57:00.605Z"
+last_activity: 2026-06-24
 progress:
-  total_phases: 10
-  completed_phases: 6
+  total_phases: 11
+  completed_phases: 8
   total_plans: 31
-  completed_plans: 29
-  percent: 60
+  completed_plans: 30
+  percent: 73
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 4
+Phase: 03.6
 Plan: Not started
 Status: Ready to plan
 Last activity: 2026-06-24
@@ -38,6 +38,8 @@ Last activity: 2026-06-24
 - Phase 3.5 inserted after Phase 3 (2026-06-22): Reduce the allocation memory floor — (a) lazy per-transition Parquet predictor reads to cut the ~80GB preload floor to ~10–20GB (memory-bound → core-bound), and (b) threaded ranger prediction using spare cores. Multi-scenario node packing (S2) folded into Phase 4's goal + success criteria. (Replaces the briefly-added Phase 5, which was split: Goals 2+3 → Phase 3.5, Goal 1 → Phase 4.)
 
 Progress: [████████░░] 81%
+
+- Phase 03.6 inserted after Phase 3: Complete single-scenario end-to-end run (all regions x all timesteps) (URGENT)
 
 ## Performance Metrics
 
