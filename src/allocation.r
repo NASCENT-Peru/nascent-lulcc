@@ -1815,8 +1815,36 @@ run_allocation_one_timestep <- function(
     .options = furrr::furrr_options(seed = TRUE)
   )
 
-  # Mosaic region posteriors back to full extent
-  message("    Mosaicing region posteriors...")
+  # D-05: decouple per-region chaining from the shared national mosaic write.
+  #
+  # Under ALLOCATION_REGION_FILTER each per-region parallel job processes exactly
+  # one region (length(region_inputs) == 1). In that case we MUST NOT write or
+  # return the region-agnostic national mosaic (timestep_dir/posterior_<year>.tif):
+  #   - concurrent per-region jobs would clobber the same shared path, and
+  #   - the loop in run_allocation_for_scenario would wrongly chain the next
+  #     timestep's anterior on a single-region-extended mosaic.
+  # Instead we return this region's OWN posterior (region_<suffix>/posterior.tif,
+  # the furrr worker's return value). The next anterior is rebuilt by
+  # prepare_region_worker_inputs via terra::mask(maskvalues=region_val,
+  # inverse=TRUE) + trim, which restricts current_lulc_path to the region's cells;
+  # because region footprints are disjoint, a region-trimmed posterior re-masked to
+  # the same region is a no-op on that region's footprint, so the region's own
+  # posterior carries exactly the cells the next anterior needs. The national
+  # mosaic for the parallel-jobs case is produced ONLY by the post-hoc assembly
+  # job (Plan 03). Detection is keyed on length(region_inputs) so no new global
+  # env var is introduced.
+  if (length(region_inputs) == 1) {
+    output_path <- posterior_paths[[1]]
+    message(sprintf(
+      "    Single-region run: chaining on region posterior (no national mosaic written): %s",
+      output_path
+    ))
+    return(output_path)
+  }
+
+  # Multi-region (unfiltered) run: mosaic region posteriors back to full extent
+  # and write the national posterior_<year>.tif as before.
+  message("    Mosaicing region posteriors (national mosaic)...")
   region_rasters <- lapply(posterior_paths, terra::rast)
 
   # Extend all to the full extent of the original LULC, then merge
@@ -1825,11 +1853,7 @@ run_allocation_one_timestep <- function(
     terra::extend(r, full_extent)
   })
 
-  if (length(region_rasters) == 1) {
-    mosaiced <- region_rasters[[1]]
-  } else {
-    mosaiced <- do.call(terra::merge, region_rasters)
-  }
+  mosaiced <- do.call(terra::merge, region_rasters)
 
   # Save mosaiced result
   output_path <- file.path(timestep_dir, sprintf("posterior_%d.tif", year_post))
@@ -1843,6 +1867,10 @@ run_allocation_one_timestep <- function(
   rm(region_rasters, mosaiced)
   gc(verbose = FALSE)
 
+  message(sprintf(
+    "    Multi-region run: returning national mosaic path: %s",
+    output_path
+  ))
   return(output_path)
 }
 
