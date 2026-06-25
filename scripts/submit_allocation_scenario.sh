@@ -19,11 +19,14 @@
 # HPC scratch (config[["reg_dir"]]); the launcher fails closed if the probe
 # returns zero regions.
 #
-# Resume (D-09): for each region the launcher scans existing
-#   <simulation_output_dir>/<SCENARIO>/<year>/region_<suffix>/posterior.tif
-# across the posterior years (tail of simulation_year_steps). It exports
-# ALLOCATION_YEAR_POST_FILTER for the FIRST incomplete posterior year so the
-# region resumes from there instead of re-running completed timesteps. Plan 01
+# Resume (D-09): resume is DRIVER-SIDE. The launcher only skips a region whose
+# posteriors are ALL already present (so no node is wasted); any region with at least
+# one missing posterior is submitted with NO year filter, and the driver
+# (run_allocation_for_scenario) scans that region's posteriors, resumes at the first
+# gap, and runs the remaining timesteps through 2060 (overwriting any stale
+# downstream posterior). The launcher does NOT set ALLOCATION_YEAR_POST_FILTER for
+# resume — that variable is the single-timestep SMOKE filter, and overloading it made
+# a resumed region run exactly ONE step per submission (03.6-REVIEW.md CR-01). Plan 01
 # D-10 atomic writes guarantee the scan only ever sees fully-written posteriors.
 
 set -uo pipefail
@@ -130,18 +133,24 @@ for REGION in "${REGIONS[@]}"; do
     # region_suffix == gsub(" ","_",tolower()) in allocation.r:862 / run_andes_validation.sh:72
     REGION_SUFFIX="$(echo "$REGION" | tr ' ' '_' | tr '[:upper:]' '[:lower:]')"
 
-    # Timestep resume (D-09): find the FIRST incomplete posterior year. Atomic
-    # writes (Plan 01 D-10) mean an existing posterior.tif is always complete.
-    RESUME_YEAR=""
+    # Skip-complete optimisation (file-presence, D-09): if EVERY posterior year
+    # already exists for this region there is nothing to do — don't allocate a node
+    # just to have the driver exit. Otherwise submit the region job and let the
+    # driver self-resume (contiguous resume in run_allocation_for_scenario: it scans
+    # this region's posteriors, resumes at the first gap, and runs the tail to 2060).
+    # Atomic writes (Plan 01 D-10) mean an existing posterior.tif is always complete.
+    # We intentionally do NOT pass ALLOCATION_YEAR_POST_FILTER — that is the
+    # single-timestep SMOKE filter, not a resume control (overloading it ran exactly
+    # one step per submission; 03.6-REVIEW.md CR-01).
+    INCOMPLETE=0
     for YEAR in "${POSTERIOR_YEARS[@]}"; do
-        POST="$SIM_OUT/$SCENARIO/$YEAR/region_${REGION_SUFFIX}/posterior.tif"
-        if [ ! -f "$POST" ]; then
-            RESUME_YEAR="$YEAR"
+        if [ ! -f "$SIM_OUT/$SCENARIO/$YEAR/region_${REGION_SUFFIX}/posterior.tif" ]; then
+            INCOMPLETE=1
             break
         fi
     done
 
-    if [ -z "$RESUME_YEAR" ]; then
+    if [ "$INCOMPLETE" -eq 0 ]; then
         # Every posterior year already exists for this region — nothing to do.
         echo "  [$REGION] all ${#POSTERIOR_YEARS[@]} posteriors present — skipping (already complete)."
         SUBMIT_SUMMARY+=("$REGION -> skipped(complete)")
@@ -150,16 +159,8 @@ for REGION in "${REGIONS[@]}"; do
 
     PARTITION="$(partition_for_region "$REGION_SUFFIX")"
 
-    # Build --export. Only set ALLOCATION_YEAR_POST_FILTER when resuming from a
-    # later year; if the first posterior year is incomplete the full chain runs
-    # (leave it unset so the driver starts from the schedule's first step).
+    # Driver self-resumes; do NOT set ALLOCATION_YEAR_POST_FILTER (smoke filter).
     EXPORT="ALL,ALLOC_REGION=$REGION,ALLOC_SCENARIO=$SCENARIO"
-    if [ "$RESUME_YEAR" != "${POSTERIOR_YEARS[0]}" ]; then
-        EXPORT="$EXPORT,ALLOCATION_YEAR_POST_FILTER=$RESUME_YEAR"
-        echo "  [$REGION] resuming from posterior year $RESUME_YEAR (earlier posteriors present)."
-    else
-        echo "  [$REGION] no completed posteriors — running full chain."
-    fi
 
     JOB_ID=$(sbatch --parsable \
         --partition="$PARTITION" \
@@ -171,8 +172,8 @@ for REGION in "${REGIONS[@]}"; do
         exit 1
     fi
 
-    echo "  [$REGION] submitted job $JOB_ID on partition $PARTITION (resume=$RESUME_YEAR)."
-    SUBMIT_SUMMARY+=("$REGION -> $JOB_ID (partition=$PARTITION resume=$RESUME_YEAR)")
+    echo "  [$REGION] submitted job $JOB_ID on partition $PARTITION (driver self-resumes from first gap)."
+    SUBMIT_SUMMARY+=("$REGION -> $JOB_ID (partition=$PARTITION)")
     if [ -z "$ID_LIST" ]; then ID_LIST="$JOB_ID"; else ID_LIST="$ID_LIST:$JOB_ID"; fi
 done
 

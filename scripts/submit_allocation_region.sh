@@ -33,8 +33,10 @@
 # Inputs (set by the launcher via --export=ALL,...):
 #   ALLOC_REGION              region label (-> ALLOCATION_REGION_FILTER). REQUIRED.
 #   ALLOC_SCENARIO            scenario (default BAU; -> ALLOCATION_PROFILE_SCENARIO).
-#   ALLOCATION_YEAR_POST_FILTER  resume year (left as exported by the launcher;
-#                             unset => the full chain runs from 2022).
+#   ALLOCATION_YEAR_POST_FILTER  OPTIONAL single-timestep SMOKE filter (one posterior
+#                             year). NOT a resume control — resume is driver-side and
+#                             automatic (run_allocation_for_scenario self-resumes from
+#                             the first gap). Normally unset for production runs.
 # Pass-throughs (same defaults as submit_allocation_smoke.sh):
 #   ALLOCATION_PREDICT_BATCH_ROWS  batches the 26M-cell from-class predict (andes
 #                             needs it). ALLOCATION_PREDICTOR_LAZY,
@@ -99,9 +101,10 @@ if [ ! -f "$R_SCRIPT" ]; then
     exit 1
 fi
 
-# Scope the run to this single region (D-01). Do NOT hardcode
-# ALLOCATION_YEAR_POST_FILTER here: leave it as whatever the launcher exported
-# (a resume year, or unset => full chain).
+# Scope the run to this single region (D-01). With ALLOCATION_REGION_FILTER set, the
+# driver self-resumes (D-09 contiguous resume in run_allocation_for_scenario). Do NOT
+# hardcode ALLOCATION_YEAR_POST_FILTER here: the launcher no longer sets it for
+# resume; if an operator exports it for a SMOKE test it passes through unchanged.
 export ALLOCATION_REGION_FILTER="$ALLOC_REGION"
 export ALLOCATION_PROFILE_SCENARIO="$ALLOC_SCENARIO"
 export ALLOCATION_PROFILE=TRUE
@@ -117,7 +120,7 @@ echo "ALLOCATION_REGION_FILTER=$ALLOCATION_REGION_FILTER"
 echo "ALLOCATION_PROFILE_SCENARIO=$ALLOCATION_PROFILE_SCENARIO"
 echo "ALLOCATION_PROFILE=$ALLOCATION_PROFILE"
 echo "ALLOCATION_NUM_WORKERS=$ALLOCATION_NUM_WORKERS"
-echo "ALLOCATION_YEAR_POST_FILTER=${ALLOCATION_YEAR_POST_FILTER:-<unset: full chain from start>}"
+echo "ALLOCATION_YEAR_POST_FILTER=${ALLOCATION_YEAR_POST_FILTER:-<unset: driver self-resumes>}"
 echo "ALLOCATION_PREDICT_BATCH_ROWS=${ALLOCATION_PREDICT_BATCH_ROWS:-<unset: single-shot>}"
 echo "ALLOCATION_PREDICTOR_LAZY=${ALLOCATION_PREDICTOR_LAZY:-<unset: lazy per-from-class ON>}"
 echo "ALLOCATION_PREDICT_NUM_THREADS=${ALLOCATION_PREDICT_NUM_THREADS:-<unset: auto cores/workers>}"
