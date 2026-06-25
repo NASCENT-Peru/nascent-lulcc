@@ -29,6 +29,10 @@
 # @return final_path (invisibly), after a successful atomic rename.
 write_raster_atomic <- function(raster, final_path, wopt) {
   tmp_path <- paste0(final_path, ".tmp.tif")
+  # GDAL may emit a sidecar (e.g. <path>.aux.xml) next to the raster; it must
+  # travel with the renamed file or it is orphaned under the .tmp name (WR-06).
+  tmp_sidecar <- paste0(tmp_path, ".aux.xml")
+  final_sidecar <- paste0(final_path, ".aux.xml")
   # overwrite=TRUE so a leftover .tmp.tif from a prior killed write is replaced.
   terra::writeRaster(
     raster,
@@ -37,11 +41,27 @@ write_raster_atomic <- function(raster, final_path, wopt) {
     wopt = wopt
   )
   if (!file.rename(tmp_path, final_path)) {
+    # Fail closed, but unlink the temp(s) first so a failed rename does not
+    # accumulate orphaned .tmp.tif files on shared scratch (WR-06).
+    unlink(c(tmp_path, tmp_sidecar))
     stop(sprintf(
       "Atomic raster write failed: could not rename '%s' -> '%s'",
       tmp_path,
       final_path
     ))
+  }
+  # Move the sidecar alongside its raster if GDAL produced one. Non-fatal: the
+  # raster is already in place, so a stranded sidecar (cached stats only) warns
+  # and is removed rather than aborting the run.
+  if (file.exists(tmp_sidecar)) {
+    if (!file.rename(tmp_sidecar, final_sidecar)) {
+      unlink(tmp_sidecar)
+      warning(sprintf(
+        "Atomic raster write: could not move sidecar '%s' -> '%s' (orphan removed)",
+        tmp_sidecar,
+        final_sidecar
+      ))
+    }
   }
   invisible(final_path)
 }
@@ -1505,7 +1525,10 @@ run_allocation_for_scenario <- function(
   # Load initial LULC raster for the simulation start year
   start_year <- config[["simulation_start_year"]]
   end_year <- config[["simulation_end_year"]]
-  step_length <- config[["step_length"]]
+  # IN-01: step_length is INTENTIONALLY retained but UNUSED — the schedule is built
+  # from simulation_year_steps (D-11), not step_length. Do NOT reintroduce it into
+  # pair construction (it ends at 2058/9 steps, never reaching 2060). See note below.
+  step_length <- config[["step_length"]] # nolint: object_usage_linter.
 
   lulc_files <- list.files(
     config[["aggregated_lulc_dir"]],
