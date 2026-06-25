@@ -66,8 +66,11 @@ echo "Region job body: $REGION_JOB"
 echo "Mosaic assembly job (afterok target): $MOSAIC_JOB"
 echo
 
-setup_common_env
-activate_env "$ENV_PATH"
+# WR-04: fail closed if env setup/activation fails (these run under `set +e`, so an
+# unchecked failure would otherwise let verify_rscript pick a stale on-PATH Rscript
+# and probe regions/schedule from a different environment than the jobs run in).
+setup_common_env || { echo "ERROR: setup_common_env failed" >&2; exit 1; }
+activate_env "$ENV_PATH" || { echo "ERROR: activate_env failed for $ENV_PATH" >&2; exit 1; }
 echo
 RSCRIPT_BIN=$(verify_rscript "$ENV_PATH")
 if [ $? -ne 0 ]; then
@@ -177,11 +180,26 @@ for REGION in "${REGIONS[@]}"; do
     if [ -z "$ID_LIST" ]; then ID_LIST="$JOB_ID"; else ID_LIST="$ID_LIST:$JOB_ID"; fi
 done
 
-# --- Queue the dependent national-mosaic assembly job (D-03) -----------------
+# --- Queue the national-mosaic assembly job (D-03) --------------------------
+# WR-02: assembly submission is INDEPENDENT of whether region jobs were submitted.
+# If every region was already complete (ID_LIST empty) the national mosaics may
+# still be missing (e.g. a prior afterok mosaic job failed, was cancelled, or its
+# dependency was released on a partial failure) — so submit the assembler WITHOUT a
+# dependency to fill them. Otherwise gate it afterok on all region ids. The assembler
+# skips any year whose region posteriors are incomplete, so an unconditional submit
+# is safe.
 MOSAIC_ID=""
 if [ -z "$ID_LIST" ]; then
     echo
-    echo "All regions already complete — no region jobs submitted; skipping mosaic assembly."
+    echo "All regions already complete — submitting mosaic assembly (no dependency) to fill any missing national mosaics."
+    MOSAIC_ID=$(sbatch --parsable \
+        --export=ALL,ALLOC_SCENARIO="$SCENARIO" \
+        "$MOSAIC_JOB")
+    RC=$?
+    if [ $RC -ne 0 ] || [ -z "$MOSAIC_ID" ]; then
+        echo "ERROR: failed to submit mosaic-assembly job (no dependency, rc=$RC)." >&2
+        exit 1
+    fi
 else
     # afterok on ALL region ids (colon-joined). The mosaic job runs only if every
     # region succeeds; it is the sole writer of the national posterior_<year>.tif.
@@ -205,6 +223,6 @@ for line in "${SUBMIT_SUMMARY[@]}"; do
     echo "  $line"
 done
 echo "  region-ids: ${ID_LIST:-<none>}"
-echo "  mosaic-assembly job: ${MOSAIC_ID:-<none — all regions complete>} (afterok:${ID_LIST:-<none>})"
+echo "  mosaic-assembly job: ${MOSAIC_ID:-<none>} (dependency afterok:${ID_LIST:-<none — submitted unconditionally>})"
 echo
 echo "STATE launcher=allocation_scenario scenario=$SCENARIO regions=${#REGIONS[@]} region_ids=${ID_LIST:-none} mosaic_id=${MOSAIC_ID:-none}"
