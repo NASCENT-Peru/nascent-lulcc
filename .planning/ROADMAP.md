@@ -132,7 +132,7 @@ Plans:
 **Goal:** A single scenario (BAU) runs to completion across ALL regions and ALL timesteps, producing posterior rasters for every region/timestep — the capstone proof of the Phase 3 machinery at scale: validated lazy per-from-class reads + scoped threaded prediction (3.5), corrected transition pipeline (3.2), probability-map saturation + int32-cube Dinamica allocation (3.3/3.4). This is the unmet portion of the Phase 3 parent goal; Phase 4 remains multi-scenario / final correctness & performance.
 **Requirements**: RUN-01, RUN-02, RUN-03, RUN-04, RUN-05, RUN-06 (run-completeness criteria across all regions × timesteps — see REQUIREMENTS.md)
 **Depends on:** Phases 3.1–3.5 (all complete)
-**Plans:** 2/5 plans executed
+**Plans:** 3/5 plans executed
 
 Plans:
 
@@ -141,7 +141,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 — driver contract must be fixed first; the three plans have no file overlap and run in parallel)*
 - [x] 03.6-02-PLAN.md — Launcher: per-region highmem fan-out + timestep-level resume + afterok national-mosaic dependency (D-04/D-09/D-01/D-02)
-- [ ] 03.6-03-PLAN.md — Post-hoc national mosaic assembler for every timestep + thin SBATCH wrapper (D-03)
+- [x] 03.6-03-PLAN.md — Post-hoc national mosaic assembler for every timestep + thin SBATCH wrapper (D-03)
 - [ ] 03.6-04-PLAN.md — Run manifest: full region×timestep completeness + differs-from-anterior bar + saturation roll-up + plausibility QA → PASS/INCOMPLETE (D-06/D-07/D-08/D-08b)
 
 **Wave 3** *(blocked on Waves 1+2; operator-gated)*
@@ -278,6 +278,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 3.3. Probability Map Saturation & Allocation Throughput | 5/5 | Complete — operator gate met by andes full run (saturation 22/24 ≥0.90); ALLOC-06..10 in REQUIREMENTS | 2026-06-24 |
 | 3.4. Stale Pipeline Artifact Re-run | 1/1 | Complete — UAT 1-3 pass (all 4 regions); float32-cube Expander blocker fixed (int32 cast), confirmed by andes posterior.tif | 2026-06-24 |
 | 3.5. Reduce Allocation Memory Floor | 3/3 | Complete   | 2026-06-24 |
-| 3.6. Complete Single-Scenario End-to-End Run | 2/5 | In Progress|  |
+| 3.6. Complete Single-Scenario End-to-End Run | 3/5 | In Progress|  |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
 
