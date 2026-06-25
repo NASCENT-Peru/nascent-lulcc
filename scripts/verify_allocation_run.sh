@@ -83,9 +83,10 @@ set -e
 # Surface the single structured verdict line the manifest emitted.
 VERDICT_LINE="$(grep -E '^STATE manifest verdict=' "$MANIFEST_LOG" | tail -n1 || true)"
 
-# Resolve the manifest CSV path for operator review (config-derived).
-MANIFEST_CSV="$(grep -oE 'Wrote run manifest CSV.*: .*run_manifest\.csv' "$MANIFEST_LOG" \
-    | sed -E 's/^.*: //' | tail -n1 || true)"
+# Resolve the manifest CSV path for operator review (config-derived). IN-04: grep the
+# machine-stable `STATE manifest csv=<path>` key the manifest emits, not the prose.
+MANIFEST_CSV="$(grep -E '^STATE manifest csv=' "$MANIFEST_LOG" \
+    | tail -n1 | sed -E 's/^STATE manifest csv=//' || true)"
 
 rm -f "$MANIFEST_LOG"
 

@@ -405,26 +405,51 @@ if (file.exists(demand_csv) && length(final_year_class_area) > 0L) {
     if (length(class_col) >= 1L && length(area_col) >= 1L) {
       class_col <- class_col[[1L]]
       area_col <- area_col[[1L]]
-      total_obs <- sum(unlist(final_year_class_area))
-      total_dem <- sum(suppressWarnings(as.numeric(demand_df[[area_col]])), na.rm = TRUE)
-      for (k in seq_len(nrow(demand_df))) {
-        cls <- as.character(demand_df[[class_col]][[k]])
-        dem <- suppressWarnings(as.numeric(demand_df[[area_col]][[k]]))
-        if (is.na(dem) || total_dem <= 0 || total_obs <= 0) next
-        dem_frac <- dem / total_dem
-        obs <- final_year_class_area[[cls]]
-        obs_frac <- if (is.null(obs)) 0 else as.numeric(obs) / total_obs
-        rel_dev <- abs(obs_frac - dem_frac)
-        if (rel_dev > demand_tolerance) {
-          demand_warnings <- demand_warnings + 1L
-          log_msg(sprintf(
-            paste(
-              "AUDIT stage=plausibility scenario=%s year=%d class=%s",
-              "obs_frac=%.4f demand_frac=%.4f dev=%.4f tolerance=%.2f status=demand_mismatch"
-            ),
-            scenario, as.integer(final_year), cls,
-            obs_frac, dem_frac, rel_dev, demand_tolerance
-          ))
+      # WR-03: final_year_class_area is keyed by integer LULC code (terra::freq value).
+      # If the demand table's class column uses a DISJOINT key space (e.g. class names
+      # like "forest"), every lookup below misses, obs_frac collapses to 0, and a
+      # spurious demand_mismatch is reported for every class. Detect that up front:
+      # count how many demand rows resolve against the observed key space; if none do,
+      # the comparison is meaningless — emit one explicit key-space-mismatch line and
+      # skip the per-class loop rather than flooding misleading warnings.
+      demand_keys <- as.character(demand_df[[class_col]])
+      matched_keys <- sum(vapply(
+        demand_keys,
+        function(c) !is.null(final_year_class_area[[c]]),
+        logical(1)
+      ))
+      if (matched_keys == 0L) {
+        log_msg(sprintf(
+          paste(
+            "AUDIT stage=plausibility scenario=%s year=%d status=demand_key_space_mismatch",
+            "demand_classes=%d observed_classes=%d",
+            "note=demand_class_column_does_not_match_integer_lulc_codes"
+          ),
+          scenario, as.integer(final_year),
+          length(demand_keys), length(final_year_class_area)
+        ))
+      } else {
+        total_obs <- sum(unlist(final_year_class_area))
+        total_dem <- sum(suppressWarnings(as.numeric(demand_df[[area_col]])), na.rm = TRUE)
+        for (k in seq_len(nrow(demand_df))) {
+          cls <- as.character(demand_df[[class_col]][[k]])
+          dem <- suppressWarnings(as.numeric(demand_df[[area_col]][[k]]))
+          if (is.na(dem) || total_dem <= 0 || total_obs <= 0) next
+          dem_frac <- dem / total_dem
+          obs <- final_year_class_area[[cls]]
+          obs_frac <- if (is.null(obs)) 0 else as.numeric(obs) / total_obs
+          rel_dev <- abs(obs_frac - dem_frac)
+          if (rel_dev > demand_tolerance) {
+            demand_warnings <- demand_warnings + 1L
+            log_msg(sprintf(
+              paste(
+                "AUDIT stage=plausibility scenario=%s year=%d class=%s",
+                "obs_frac=%.4f demand_frac=%.4f dev=%.4f tolerance=%.2f status=demand_mismatch"
+              ),
+              scenario, as.integer(final_year), cls,
+              obs_frac, dem_frac, rel_dev, demand_tolerance
+            ))
+          }
         }
       }
     } else {
@@ -448,6 +473,9 @@ manifest_out <- file.path(simulation_output_dir, scenario, "run_manifest.csv")
 ensure_dir(dirname(manifest_out))
 utils::write.csv(manifest, manifest_out, row.names = FALSE)
 log_msg(sprintf("Wrote run manifest CSV (%d rows): %s", nrow(manifest), manifest_out))
+# IN-04: machine-stable path line (exact key) for the verifier to grep, so the CSV
+# path is not recovered by parsing the human-readable prose above.
+log_msg(sprintf("STATE manifest csv=%s", manifest_out))
 
 # ---------------------------------------------------------------------------
 # Verdict (D-08). INCOMPLETE if ANY:
