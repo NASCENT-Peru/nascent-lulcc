@@ -853,6 +853,22 @@ prepare_region_worker_inputs <- function(scenario, year_ant, year_post,
   focal_matrices <- load_allocation_focal_matrices(config)
   current_lulc <- terra::rast(current_lulc_path)
   region_rast <- terra::rast(region_rast_path)
+  # WR-01 / D-05: under a single-region (filtered) chain the anterior arrives as the
+  # PRIOR timestep's region-trimmed posterior, whose extent is the region bbox — a
+  # strict sub-extent of the national region_rast. terra::mask() requires matching
+  # extents and otherwise aborts with "[mask] extents do not match" (verified
+  # empirically), so re-mask of a trimmed anterior would crash at the SECOND
+  # timestep. Align current_lulc to the region_rast grid first. terra::extend() only
+  # grows the extent (NA-padding the new cells), so it is a no-op when current_lulc
+  # already spans the national grid (the initial LULC, or a multi-region mosaic) and,
+  # for a trimmed anterior, reproduces exactly the cells of the prior full-extent
+  # behaviour (extend->mask->trim round-trips to identical geometry + values).
+  if (!isTRUE(all.equal(
+    as.vector(terra::ext(current_lulc)),
+    as.vector(terra::ext(region_rast))
+  ))) {
+    current_lulc <- terra::extend(current_lulc, terra::ext(region_rast))
+  }
   region_inputs <- vector("list", nrow(regions))
 
   t_nhood_precompute <- prof_tic()
@@ -1569,6 +1585,93 @@ run_allocation_for_scenario <- function(
     ))
   }
 
+  # D-09 contiguous resume (file-presence-only). CR-01/CR-02 fix.
+  #
+  # Applies ONLY to a region-filtered single-region job running the FULL schedule
+  # (not the smoke single-year filter or the profile single-index subset above —
+  # those are dev knobs that must keep running exactly the step they name). The
+  # per-region launcher submits one such job per region with NO year filter and
+  # lets the driver self-resume here.
+  #
+  # Semantics (a CHAINED simulation — each step's anterior is the previous step's
+  # posterior): scan this region's posteriors in schedule order, find the LONGEST
+  # UNBROKEN prefix that exists from the start, and resume at the first gap. Run
+  # EVERY remaining timestep through the end, OVERWRITING any present-but-
+  # non-contiguous downstream posterior — it is stale because its anterior is being
+  # regenerated. We never per-timestep "skip if the file exists": that would chain
+  # the next step off a stale downstream posterior (see 03.6-REVIEW.md CR-01/CR-02).
+  # File presence alone marks completeness; Plan 01 D-10 atomic writes guarantee an
+  # existing posterior.tif is fully written.
+  resume_active <-
+    !nzchar(Sys.getenv("ALLOCATION_YEAR_POST_FILTER", unset = "")) &&
+    is.null(profile_timestep_index) &&
+    nzchar(Sys.getenv("ALLOCATION_REGION_FILTER", unset = "")) &&
+    nrow(regions) == 1L
+  if (resume_active) {
+    resume_region_label <- regions$label[[1]]
+    resume_region_suffix <- gsub(" ", "_", tolower(resume_region_label))
+    region_posterior_path <- function(year_post) {
+      file.path(
+        sim_dir,
+        as.character(year_post),
+        paste0("region_", resume_region_suffix),
+        "posterior.tif"
+      )
+    }
+    # Longest contiguous-from-start run of existing posteriors (file-presence only).
+    complete_prefix <- 0L
+    for (k in seq_along(year_ends)) {
+      if (file.exists(region_posterior_path(year_ends[k]))) {
+        complete_prefix <- k
+      } else {
+        break
+      }
+    }
+    if (complete_prefix >= length(year_ends)) {
+      message(sprintf(
+        "Resume: region '%s' already has all %d posteriors (%d..%d) — nothing to do.",
+        resume_region_label,
+        length(year_ends),
+        year_ends[1],
+        tail(year_ends, 1)
+      ))
+      return(invisible(NULL))
+    }
+    if (complete_prefix > 0L) {
+      prev_year_post <- year_ends[complete_prefix]
+      current_lulc_path <- region_posterior_path(prev_year_post)
+      if (!file.exists(current_lulc_path)) {
+        stop(sprintf(
+          "Resume: prior posterior missing for chaining: %s",
+          current_lulc_path
+        ))
+      }
+      message(sprintf(
+        paste0(
+          "Resume: region '%s' contiguous through %d (%d/%d steps complete); ",
+          "resuming at %d -> %d, chaining on %s. Posteriors after the first gap ",
+          "are recomputed (overwritten)."
+        ),
+        resume_region_label,
+        prev_year_post,
+        complete_prefix,
+        length(year_ends),
+        year_starts[complete_prefix + 1L],
+        year_ends[complete_prefix + 1L],
+        current_lulc_path
+      ))
+      keep <- (complete_prefix + 1L):length(year_starts)
+      year_starts <- year_starts[keep]
+      year_ends <- year_ends[keep]
+    } else {
+      message(sprintf(
+        "Resume: region '%s' has no contiguous posteriors — running the full chain from %d.",
+        resume_region_label,
+        year_starts[1]
+      ))
+    }
+  }
+
   # Calibration period: use the last (most recent) data period
   calibration_period <- config[["data_periods"]][length(config[[
     "data_periods"
@@ -1847,28 +1950,31 @@ run_allocation_one_timestep <- function(
     .options = furrr::furrr_options(seed = TRUE)
   )
 
-  # D-05: decouple per-region chaining from the shared national mosaic write.
+  # D-05 / WR-05: decouple per-region chaining from the shared national mosaic write.
   #
   # Under ALLOCATION_REGION_FILTER each per-region parallel job processes exactly
-  # one region (length(region_inputs) == 1). In that case we MUST NOT write or
-  # return the region-agnostic national mosaic (timestep_dir/posterior_<year>.tif):
+  # one region. In that case we MUST NOT write or return the region-agnostic
+  # national mosaic (timestep_dir/posterior_<year>.tif):
   #   - concurrent per-region jobs would clobber the same shared path, and
   #   - the loop in run_allocation_for_scenario would wrongly chain the next
   #     timestep's anterior on a single-region-extended mosaic.
   # Instead we return this region's OWN posterior (region_<suffix>/posterior.tif,
   # the furrr worker's return value). The next anterior is rebuilt by
-  # prepare_region_worker_inputs via terra::mask(maskvalues=region_val,
-  # inverse=TRUE) + trim, which restricts current_lulc_path to the region's cells;
-  # because region footprints are disjoint, a region-trimmed posterior re-masked to
-  # the same region is a no-op on that region's footprint, so the region's own
-  # posterior carries exactly the cells the next anterior needs. The national
-  # mosaic for the parallel-jobs case is produced ONLY by the post-hoc assembly
-  # job (Plan 03). Detection is keyed on length(region_inputs) so no new global
-  # env var is introduced.
-  if (length(region_inputs) == 1) {
+  # prepare_region_worker_inputs, which now extends the chained-in posterior back to
+  # the national region_rast grid BEFORE terra::mask(maskvalues=region_val,
+  # inverse=TRUE) + trim (see the WR-01 extend there) — the prior assumption that a
+  # trimmed posterior could be re-masked directly was wrong (terra::mask aborts on
+  # mismatched extents). The national mosaic for the parallel-jobs case is produced
+  # ONLY by the post-hoc assembly job (Plan 03).
+  #
+  # WR-05: gate on ALLOCATION_REGION_FILTER (explicit operator intent) AND a single
+  # region — NOT on region count alone. A genuine national run whose regions.json
+  # happens to declare one region must still write/chain on the national mosaic.
+  region_filtered <- nzchar(Sys.getenv("ALLOCATION_REGION_FILTER", unset = ""))
+  if (region_filtered && length(region_inputs) == 1) {
     output_path <- posterior_paths[[1]]
     message(sprintf(
-      "    Single-region run: chaining on region posterior (no national mosaic written): %s",
+      "    Single-region (filtered) run: chaining on region posterior (no national mosaic written): %s",
       output_path
     ))
     return(output_path)
