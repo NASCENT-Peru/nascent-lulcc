@@ -80,13 +80,16 @@ set +e
 MANIFEST_RC=${PIPESTATUS[0]}
 set -e
 
-# Surface the single structured verdict line the manifest emitted.
-VERDICT_LINE="$(grep -E '^STATE manifest verdict=' "$MANIFEST_LOG" | tail -n1 || true)"
+# Surface the single structured verdict line the manifest emitted. NOTE: log_msg()
+# in src/utils.r prefixes every line with "<timestamp> | ", so do NOT anchor these
+# greps to start-of-line (^) — that anchor silently never matches (IN-04).
+VERDICT_LINE="$(grep -E 'STATE manifest verdict=' "$MANIFEST_LOG" | tail -n1 | sed -E 's/^.*(STATE manifest verdict=)/\1/' || true)"
 
 # Resolve the manifest CSV path for operator review (config-derived). IN-04: grep the
-# machine-stable `STATE manifest csv=<path>` key the manifest emits, not the prose.
-MANIFEST_CSV="$(grep -E '^STATE manifest csv=' "$MANIFEST_LOG" \
-    | tail -n1 | sed -E 's/^STATE manifest csv=//' || true)"
+# machine-stable `STATE manifest csv=<path>` key the manifest emits (not the prose),
+# tolerating the log_msg "<timestamp> | " prefix; strip everything up to the key.
+MANIFEST_CSV="$(grep -E 'STATE manifest csv=' "$MANIFEST_LOG" \
+    | tail -n1 | sed -E 's/^.*STATE manifest csv=//' || true)"
 
 rm -f "$MANIFEST_LOG"
 
