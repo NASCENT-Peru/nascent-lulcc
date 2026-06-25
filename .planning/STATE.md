@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03.6-02-PLAN.md
-last_updated: "2026-06-25T12:50:35.955Z"
+stopped_at: Completed 03.6-04-PLAN.md
+last_updated: "2026-06-25T13:23:39.138Z"
 last_activity: 2026-06-25 -- Phase 03.6 execution started
 progress:
   total_phases: 11
   completed_phases: 8
   total_plans: 36
-  completed_plans: 33
+  completed_plans: 34
   percent: 73
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 ## Current Position
 
 Phase: 03.6 (complete-single-scenario-end-to-end-run) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Executing Phase 03.6
 Last activity: 2026-06-25 -- Phase 03.6 execution started
 
@@ -37,7 +37,7 @@ Last activity: 2026-06-25 -- Phase 03.6 execution started
 - Phase 3.3 inserted after Phase 3.2 (2026-05-26, URGENT): Dinamica allocation throughput observed at ~1% in Phase 3.1 (4,477 of hundreds of thousands of requested cells placed); root cause likely probability maps with too few non-zero values to support the demanded volume; phase diagnoses and remediates
 - Phase 3.5 inserted after Phase 3 (2026-06-22): Reduce the allocation memory floor — (a) lazy per-transition Parquet predictor reads to cut the ~80GB preload floor to ~10–20GB (memory-bound → core-bound), and (b) threaded ranger prediction using spare cores. Multi-scenario node packing (S2) folded into Phase 4's goal + success criteria. (Replaces the briefly-added Phase 5, which was split: Goals 2+3 → Phase 3.5, Goal 1 → Phase 4.)
 
-Progress: [█████████░] 92%
+Progress: [█████████░] 94%
 
 - Phase 03.6 inserted after Phase 3: Complete single-scenario end-to-end run (all regions x all timesteps) (URGENT)
 
@@ -69,6 +69,7 @@ Progress: [█████████░] 92%
 | Phase 03.6 P01 | 6 min | 3 tasks | 1 files |
 | Phase 03.6 P02 | 4 min | 2 tasks | 2 files |
 | Phase 03.6 P03 | 7 min | 2 tasks | 2 files |
+| Phase 03.6 P04 | ~15 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,8 @@ Recent decisions affecting current work:
 - [Phase ?]: Phase 03.6 (03.6-03): post-hoc assemble_national_mosaic.r is the SOLE writer of national posterior_<year>.tif under per-region parallel jobs — iterates tail(simulation_year_steps,-1), merges per-region region_<suffix>/posterior.tif via terra::merge + write_raster_atomic (INT2U/LZW), byte-comparable to the inline writer it replaces
 - [Phase ?]: Phase 03.6 (03.6-03): mosaic full_extent derived once from the initial-LULC raster (aggregated_lulc_dir for simulation_start_year), not a per-year anterior — the inline writer's current_lulc_path was the previous national mosaic carrying the same initial extent, so this is byte-comparable and needs no on-disk per-year national anterior the post-hoc job cannot assume exists
 - [Phase ?]: Phase 03.6 (03.6-03): assembler refuses partial mosaics — any missing region posterior for a year emits AUDIT stage=mosaic status=missing and skips that year (no partial national raster); partial completeness is Plan 04's manifest job (T-036-08)
+- [Phase 03.6]: Run completion declared by data not logs: run_manifest.r PASS only when the full region x timestep matrix exists + valid GeoTIFFs + differs-from-anterior + national mosaics present + count==regions*timesteps + no hard degeneracy; saturation reported (AUDIT) but never gates (D-06/D-07/D-08)
+- [Phase 03.6]: Plausibility (D-08b) via terra::freq: per-cell hard all-one-class degeneracy => INCOMPLETE; national final-year per-class fraction mismatch vs tools/simulation_lulc_areas_2060.csv => soft warning (absent table skipped, never INCOMPLETE)
 
 ### Pending Todos
 
@@ -115,6 +118,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-25T12:49:56.932Z
-Stopped at: Completed 03.6-02-PLAN.md
+Last session: 2026-06-25T13:23:29.289Z
+Stopped at: Completed 03.6-04-PLAN.md
 Resume file: None
