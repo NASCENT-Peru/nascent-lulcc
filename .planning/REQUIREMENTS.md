@@ -51,6 +51,15 @@
 - [ ] **ALLOC-09**: A standalone `scripts/diagnose_allocation_saturation.r` produces a post-hoc per-transition saturation report comparing the demanded change matrix against actual posterior counts, reusing the same metric helpers as the inline summary
 - [ ] **ALLOC-10**: Probability-map quality metrics (coverage; P50/P90/P95/P99/max; demand-vs-capacity ratio) are computed and logged for every active transition during each region run
 
+### Run Completeness (Phase 3.6)
+
+- [ ] **RUN-01**: A single scenario (BAU) runs to completion across every region × every timestep in `simulation_year_steps` — for each (region, timestep) a valid GeoTIFF `posterior.tif` exists and the national `posterior_<year>.tif` mosaic exists for every timestep; the run-manifest asserts `count == regions × timesteps` and emits PASS/INCOMPLETE
+- [ ] **RUN-02**: The allocation driver derives its timestep pairs from the authoritative `simulation_year_steps` schedule (not the `step_length` `seq()`), reaching 2060 (10 steps); the run only proceeds when a matching `BAU-<region>-trans_rates-<year_ant>.csv` exists for every `year_ant` (blocking pre-flight gate; PIPE-08/09 git-head check enforced before submission)
+- [ ] **RUN-03**: Per-region parallel jobs are decoupled — each region chains each timestep on its OWN `region_<suffix>/posterior.tif` (never the shared national mosaic), so concurrent region jobs cannot clobber a shared path; one highmem/fat node per region with adequate `--mem` (never bare sbatch onto the ~93GB compute partition)
+- [ ] **RUN-04**: The national `posterior_<year>.tif` series is assembled post-hoc for every timestep from per-region posteriors (sole writer of the national path under parallel jobs), byte-comparable to the inline writer it replaces
+- [ ] **RUN-05**: Every (region, timestep) posterior DIFFERS from its anterior (rules out the degenerate "nothing happened" case); saturation is aggregated and reported but does NOT gate completion; trajectory plausibility QA flags hard all-one-class degeneracy (→ INCOMPLETE) and soft demand-mismatch (→ warning)
+- [ ] **RUN-06**: Per-timestep posterior/mosaic writes are atomic (`<name>.tmp.tif` → `file.rename()`) so a job killed mid-write cannot leave a half-written posterior; on restart the launcher resumes each region from the next incomplete timestep (timestep-level resume) rather than re-running completed work
+
 ## v2 Requirements
 
 ### Model Framework
@@ -107,6 +116,12 @@ Updated during roadmap creation.
 | ALLOC-08 | Phase 3.3 | Pending |
 | ALLOC-09 | Phase 3.3 | Pending |
 | ALLOC-10 | Phase 3.3 | Pending |
+| RUN-01 | Phase 3.6 | Pending |
+| RUN-02 | Phase 3.6 | Pending |
+| RUN-03 | Phase 3.6 | Pending |
+| RUN-04 | Phase 3.6 | Pending |
+| RUN-05 | Phase 3.6 | Pending |
+| RUN-06 | Phase 3.6 | Pending |
 
 **Coverage:**
 - v1 requirements: 28 total

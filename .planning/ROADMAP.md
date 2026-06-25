@@ -20,7 +20,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3.2: Transition Pipeline Consistency** *(INSERTED 2005-05-22; completed 2026-06-24)* - Harden the end-to-end flow of viable transitions from identification through feature selection, modelling, rate preparation, and allocation so each stage operates on exactly the same transition set with no silent additions, drops, or mismatches.
 - [x] **Phase 3.3: Probability Map Saturation & Allocation Throughput** *(INSERTED 2005-05-26; completed 2026-06-24 — operator gate met by andes full run, saturation 22/24)* - Address Dinamica's low allocation throughput: probability maps don't contain sufficient non-zero values, causing Expander/Patcher to place only a small fraction of the change matrix demand (e.g., 4,477 of hundreds of thousands of requested transitions in Phase 3.1 BAU costa_peruana smoke).
 - [x] **Phase 3.4: Stale Pipeline Artifact Re-run** *(INSERTED 2005-05-29; completed 2026-06-24 — UAT 1-3 pass; Test-4 float32-cube Expander blocker fixed (int32 cast) and confirmed by andes posterior.tif)* - Regenerate simulation trans_rates CSVs and alloc_params on HPC with Phase 3.2-corrected code; unblocks Phase 3.3 operator gate. Root cause: rate CSVs were generated before `forbidden_from_classes` config key and `load_unmodelled_transitions()` were active, so id_trans=34 (mining→high_intensity_agricultural) survived into the active set and triggered the ALLOC-08 hard stop.
-- [x] **Phase 3.5: Reduce Allocation Memory Floor** *(INSERTED 2026-06-22)* - Cut the ~80GB per-region predictor-preload floor via lazy per-transition Parquet reads (target ~10–20GB) and let large-transition ranger prediction use spare cores (`num.threads>1`); flips allocation from memory-bound to core-bound so cheaper/more nodes can each run a region. (Split from the removed Phase 5; multi-scenario node packing merged into Phase 4.) (completed 2026-06-24)
+- [x] **Phase 3.5: Reduce Allocation Memory Floor** *(INSERTED 2026-06-22)* - Cut the ~80GB per-region predictor-preload floor via lazy per-transition Parquet reads (target ~10–20GB) and let large-transition ranger prediction use spare cores (`num.threads>1`); flips allocation from memory-bound to core-bound so cheaper/more nodes can each run a region. (Split from the removed Phase 5; multi-scenario node packing merged into Phase 4.)
+ (completed 2026-06-24)
 - [ ] **Phase 3.6: Complete Single-Scenario End-to-End Run** *(INSERTED 2026-06-24)* - A single scenario (BAU) runs to completion across all regions and all timesteps, producing posterior rasters for every region/timestep — capstone proof of the Phase 3 machinery at scale.
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port; parallelise the full scenario sweep across Rundeck nodes (S2 multi-scenario packing)
 
@@ -126,15 +127,25 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 03-03-PLAN.md - Add the reproducible HPC smoke-run wrapper and automated verifier proving no OOM, bounded worker RSS, and readable output.
 
-### Phase 03.6: Complete Single-Scenario End-to-End Run *(INSERTED 2026-06-24)*
+### Phase 3.6: Complete Single-Scenario End-to-End Run *(INSERTED 2026-06-24)*
 
 **Goal:** A single scenario (BAU) runs to completion across ALL regions and ALL timesteps, producing posterior rasters for every region/timestep — the capstone proof of the Phase 3 machinery at scale: validated lazy per-from-class reads + scoped threaded prediction (3.5), corrected transition pipeline (3.2), probability-map saturation + int32-cube Dinamica allocation (3.3/3.4). This is the unmet portion of the Phase 3 parent goal; Phase 4 remains multi-scenario / final correctness & performance.
-**Requirements**: TBD (set during planning — likely PERF-01/PERF-02 plus run-completeness criteria across all regions × timesteps)
+**Requirements**: RUN-01, RUN-02, RUN-03, RUN-04, RUN-05, RUN-06 (run-completeness criteria across all regions × timesteps — see REQUIREMENTS.md)
 **Depends on:** Phases 3.1–3.5 (all complete)
-**Plans:** 0 plans
+**Plans:** 5 plans in 3 waves
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 03.6 to break down)
+
+**Wave 1**
+- [ ] 03.6-01-PLAN.md — src/allocation.r driver edits: D-11 schedule reconcile (simulation_year_steps) + D-05 per-region chaining decouple + D-10 atomic writes
+
+**Wave 2** *(blocked on Wave 1 — driver contract must be fixed first; the three plans have no file overlap and run in parallel)*
+- [ ] 03.6-02-PLAN.md — Launcher: per-region highmem fan-out + timestep-level resume + afterok national-mosaic dependency (D-04/D-09/D-01/D-02)
+- [ ] 03.6-03-PLAN.md — Post-hoc national mosaic assembler for every timestep + thin SBATCH wrapper (D-03)
+- [ ] 03.6-04-PLAN.md — Run manifest: full region×timestep completeness + differs-from-anterior bar + saturation roll-up + plausibility QA → PASS/INCOMPLETE (D-06/D-07/D-08/D-08b)
+
+**Wave 3** *(blocked on Waves 1+2; operator-gated)*
+- [ ] 03.6-05-PLAN.md — Blocking rate-table pre-flight gate (D-11 prereq / PIPE-08/09) + live HPC BAU run + manifest PASS verification (D-01/D-06)
 
 ### Phase 3.1: Allocation Correctness & Dinamica Integration *(INSERTED 2005-05-22)*
 **Goal**: The first end-to-end allocation that includes Dinamica running under apptainer produces a real posterior.tif (not an anterior copy), model loading is bounded to only the transitions active in the current scenario/year, and the probability map save writes exactly the TIFs that were predicted (no phantom NA-prob placeholders).
@@ -269,4 +280,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 3.5. Reduce Allocation Memory Floor | 3/3 | Complete   | 2026-06-24 |
 | 3.6. Complete Single-Scenario End-to-End Run | 0/TBD | Not planned yet (INSERTED 2026-06-24) | - |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
-
+
