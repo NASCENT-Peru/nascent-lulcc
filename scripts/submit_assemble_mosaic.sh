@@ -59,8 +59,11 @@ echo "Path: $ENV_PATH"
 echo "Node: $(hostname -s 2>/dev/null || echo '?')  cpus-per-task=${SLURM_CPUS_PER_TASK:-?}"
 echo
 
-setup_common_env
-activate_env "$ENV_PATH"
+# WR-04: fail closed if env setup/activation fails (these run under `set +e`, so an
+# unchecked failure would otherwise let verify_rscript pick a stale on-PATH Rscript
+# and run the job against the wrong interpreter).
+setup_common_env || { echo "ERROR: setup_common_env failed" >&2; exit 1; }
+activate_env "$ENV_PATH" || { echo "ERROR: activate_env failed for $ENV_PATH" >&2; exit 1; }
 echo
 
 RSCRIPT_BIN=$(verify_rscript "$ENV_PATH")

@@ -135,7 +135,9 @@ if (is.null(year_steps) || length(year_steps) < 2L) {
     "Add an explicit ordered list to your config YAML — see 03.2-CONTEXT.md D-01."
   ), call. = FALSE)
 }
-posterior_years <- tail(year_steps, -1)
+# IN-03: cast to integer to match run_manifest.r (as.integer(tail(...))) so the two
+# capstone artifacts agree on year typing even if a non-integral boundary slips in.
+posterior_years <- as.integer(tail(year_steps, -1))
 if (!is.null(single_year)) {
   if (!single_year %in% posterior_years) {
     stop(sprintf(
@@ -176,14 +178,21 @@ lulc_files <- list.files(
   pattern = "\\.tif$",
   full.names = TRUE
 )
-initial_lulc_file <- lulc_files[grepl(as.character(start_year), lulc_files)]
-if (length(initial_lulc_file) == 0L) {
+# IN-02: anchor the year match to the file NAME with non-digit boundaries (not a bare
+# substring of the full path) and assert a UNIQUE hit, so a path component containing
+# the year digits elsewhere cannot silently select the wrong national extent.
+initial_lulc_file <- lulc_files[grepl(
+  sprintf("(^|[^0-9])%d([^0-9]|$)", as.integer(start_year)),
+  basename(lulc_files)
+)]
+if (length(initial_lulc_file) != 1L) {
   stop(sprintf(
-    "No initial LULC raster found for start year %d in %s.",
-    start_year, config[["aggregated_lulc_dir"]]
+    "Expected exactly one initial LULC raster for start year %d in %s, found %d: %s",
+    start_year, config[["aggregated_lulc_dir"]], length(initial_lulc_file),
+    paste(basename(initial_lulc_file), collapse = ", ")
   ), call. = FALSE)
 }
-full_extent <- terra::ext(terra::rast(initial_lulc_file[1]))
+full_extent <- terra::ext(terra::rast(initial_lulc_file))
 
 log_msg(sprintf(
   "Assembling national mosaics: scenario=%s years=%s regions=%d",
