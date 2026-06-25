@@ -14,6 +14,39 @@
 # j <- 1
 
 # ---------------------------------------------------------------------------
+# Atomic raster write (D-10).
+# Write the raster to a sibling `.tmp.tif` path first, then file.rename() it
+# into final position only after terra::writeRaster returns without error.
+# A SIGKILL mid-write can then only leave the discardable `.tmp.tif`, never a
+# half-written final posterior that the D-09 timestep-resume would mistake for
+# complete. file.rename within the same directory/filesystem is atomic on POSIX.
+# No prior file.rename/.tmp precedent exists in the repo — this is the single,
+# local, uniform idiom for every R-side per-timestep raster write.
+#
+# @param raster     terra SpatRaster to write.
+# @param final_path Final destination path for the GeoTIFF.
+# @param wopt       List passed to terra::writeRaster wopt= (datatype/gdal).
+# @return final_path (invisibly), after a successful atomic rename.
+write_raster_atomic <- function(raster, final_path, wopt) {
+  tmp_path <- paste0(final_path, ".tmp.tif")
+  # overwrite=TRUE so a leftover .tmp.tif from a prior killed write is replaced.
+  terra::writeRaster(
+    raster,
+    tmp_path,
+    overwrite = TRUE,
+    wopt = wopt
+  )
+  if (!file.rename(tmp_path, final_path)) {
+    stop(sprintf(
+      "Atomic raster write failed: could not rename '%s' -> '%s'",
+      tmp_path,
+      final_path
+    ))
+  }
+  invisible(final_path)
+}
+
+# ---------------------------------------------------------------------------
 # Profiling helpers (opt-in via ALLOCATION_PROFILE env var).
 # When the env var is unset/FALSE, prof_tic() returns NULL and prof_toc() is a
 # no-op — no Sys.time() call, no log line, zero overhead beyond a single
@@ -838,11 +871,10 @@ prepare_region_worker_inputs <- function(scenario, year_ant, year_post,
     )
     lulc_region <- terra::trim(lulc_region, padding = 0)
     anterior_path <- file.path(region_work_dir, "anterior.tif")
-    terra::writeRaster(
+    write_raster_atomic(
       lulc_region,
       anterior_path,
-      overwrite = TRUE,
-      wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
+      list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
     )
     rm(lulc_region)
     gc(verbose = FALSE)
@@ -1855,13 +1887,12 @@ run_allocation_one_timestep <- function(
 
   mosaiced <- do.call(terra::merge, region_rasters)
 
-  # Save mosaiced result
+  # Save mosaiced result atomically (D-10)
   output_path <- file.path(timestep_dir, sprintf("posterior_%d.tif", year_post))
-  terra::writeRaster(
+  write_raster_atomic(
     mosaiced,
     output_path,
-    overwrite = TRUE,
-    wopt = list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
+    list(datatype = "INT2U", gdal = c("COMPRESS=LZW"))
   )
 
   rm(region_rasters, mosaiced)
