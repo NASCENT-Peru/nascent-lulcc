@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Phase 03.6 context gathered
-last_updated: "2026-06-25T06:45:30.362Z"
-last_activity: 2026-06-25 -- Phase 3.6 planning complete
+status: executing
+stopped_at: Completed 03.6-01-PLAN.md
+last_updated: "2026-06-25T07:06:45.498Z"
+last_activity: 2026-06-25 -- Phase 03.6 execution started
 progress:
   total_phases: 11
   completed_phases: 8
   total_plans: 36
-  completed_plans: 30
+  completed_plans: 31
   percent: 73
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** allocation.r completes reliably for all scenarios × regions × timesteps, producing simulated LULC maps without crashing.
-**Current focus:** Phase 4 — end to end correctness & performance
+**Current focus:** Phase 03.6 — complete-single-scenario-end-to-end-run
 
 ## Current Position
 
-Phase: 03.6
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-06-25 -- Phase 3.6 planning complete
+Phase: 03.6 (complete-single-scenario-end-to-end-run) — EXECUTING
+Plan: 2 of 5
+Status: Executing Phase 03.6
+Last activity: 2026-06-25 -- Phase 03.6 execution started
 
 ### Roadmap Evolution
 
@@ -37,7 +37,7 @@ Last activity: 2026-06-25 -- Phase 3.6 planning complete
 - Phase 3.3 inserted after Phase 3.2 (2026-05-26, URGENT): Dinamica allocation throughput observed at ~1% in Phase 3.1 (4,477 of hundreds of thousands of requested cells placed); root cause likely probability maps with too few non-zero values to support the demanded volume; phase diagnoses and remediates
 - Phase 3.5 inserted after Phase 3 (2026-06-22): Reduce the allocation memory floor — (a) lazy per-transition Parquet predictor reads to cut the ~80GB preload floor to ~10–20GB (memory-bound → core-bound), and (b) threaded ranger prediction using spare cores. Multi-scenario node packing (S2) folded into Phase 4's goal + success criteria. (Replaces the briefly-added Phase 5, which was split: Goals 2+3 → Phase 3.5, Goal 1 → Phase 4.)
 
-Progress: [████████░░] 81%
+Progress: [█████████░] 86%
 
 - Phase 03.6 inserted after Phase 3: Complete single-scenario end-to-end run (all regions x all timesteps) (URGENT)
 
@@ -66,6 +66,7 @@ Progress: [████████░░] 81%
 - Trend: Phase 1.1 gap-closure fully executed across Plans 05–07; H8 root cause (circular singleton init in libBase.so) confirmed after 6 diagnostic iterations and fixed via LD_PRELOAD interceptor; live smoke exits 0.
 
 *Updated after each plan completion*
+| Phase 03.6 P01 | 6 min | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,9 @@ Recent decisions affecting current work:
 - Init: Pre-compute neighbourhood rasters in parent and pass file paths to workers (not SpatRaster objects).
 - Phase 1: `get_stage7_runtime_paths()` is the single resolver for HPC-specific paths; all env overrides flow through it.
 - Phase 1: `DINAMICA_EGO_8_HOME` is treated as absolute path to the external `.sif` on Euler (not a wrapper).
+- [Phase 03.6]: Phase 03.6 (03.6-01): allocation driver builds timestep pairs from simulation_year_steps (10 steps to 2060), not step_length seq() (9 steps to 2058) — Rate CSVs were generated against simulation_year_steps; step_length seq() requests year_ant tables that do not exist
+- [Phase 03.6]: Phase 03.6 (03.6-01): single-region (length(region_inputs)==1) allocation runs chain on their own region posterior and skip the national mosaic write; mosaic moves to post-hoc Plan 03 assembler — Under per-region parallel jobs (D-01) concurrent regions would clobber the shared posterior_<year>.tif and chain on a single-region-extended mosaic
+- [Phase 03.6]: Phase 03.6 (03.6-01): Dinamica-written posterior.tif (dinamica_utils.r:861) left unwrapped for atomic writes — written by exec_dinamica subprocess, not R; only R-side anterior + national mosaic writes use write_raster_atomic — Dinamica contract is out of scope per CONTEXT; no R terra::writeRaster exists at that site
 
 ### Pending Todos
 
@@ -104,6 +108,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-25T06:02:56.106Z
-Stopped at: Phase 03.6 context gathered
-Resume file: .planning/phases/03.6-complete-single-scenario-end-to-end-run/03.6-CONTEXT.md
+Last session: 2026-06-25T07:06:31.308Z
+Stopped at: Completed 03.6-01-PLAN.md
+Resume file: None
