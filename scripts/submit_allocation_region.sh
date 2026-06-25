@@ -1,0 +1,132 @@
+#!/bin/bash
+#SBATCH --job-name=alloc-region
+#SBATCH --partition=highmem
+#SBATCH --exclusive
+#SBATCH --mem=0
+#SBATCH --cpus-per-task=40
+#SBATCH --time=24:00:00
+#SBATCH --output=logs/alloc-region-%j.out
+#SBATCH --error=logs/alloc-region-%j.err
+#SBATCH --profile=task
+
+# Phase 3.6 single-region allocation job body (plan 03.6-02, D-01/D-02).
+#
+# Runs ONE region's full serial timestep chain (2022->2060) under
+# ALLOCATION_REGION_FILTER. This is the per-region unit the launcher
+# (scripts/submit_allocation_scenario.sh) submits once per region; regions run
+# concurrently (one region per node), timesteps stay serial within a region.
+#
+# Why highmem and NOT bare sbatch (D-02): andes peaked peak_rss=129481.2MB for a
+# SINGLE timestep post-3.5 (andes-lazy-threads-573721.out). A bare `sbatch`
+# defaults to the ~93GB compute partition and OOMs. --partition=highmem
+# --exclusive --mem=0 reserves the whole node (~188GB+) with ample headroom;
+# the operator can override to a fat node on submit:
+#   sbatch --partition=fat --export=ALL,ALLOC_REGION=selva_andina scripts/submit_allocation_region.sh
+# or the launcher passes an explicit per-region --partition/--mem.
+#
+# Why this is safe to run concurrently with sibling regions (Plan 01 D-05): a
+# single-region run (length(region_inputs)==1) chains on its OWN
+# region_<suffix>/posterior.tif and skips the shared national mosaic write, so
+# concurrent per-region jobs never clobber posterior_<year>.tif. The national
+# mosaic is produced post-hoc by the afterok assembly job (Plan 03).
+#
+# Inputs (set by the launcher via --export=ALL,...):
+#   ALLOC_REGION              region label (-> ALLOCATION_REGION_FILTER). REQUIRED.
+#   ALLOC_SCENARIO            scenario (default BAU; -> ALLOCATION_PROFILE_SCENARIO).
+#   ALLOCATION_YEAR_POST_FILTER  resume year (left as exported by the launcher;
+#                             unset => the full chain runs from 2022).
+# Pass-throughs (same defaults as submit_allocation_smoke.sh):
+#   ALLOCATION_PREDICT_BATCH_ROWS  batches the 26M-cell from-class predict (andes
+#                             needs it). ALLOCATION_PREDICTOR_LAZY,
+#                             ALLOCATION_PREDICT_NUM_THREADS likewise pass through.
+
+set -uo pipefail
+
+if [ -n "${SLURM_SUBMIT_DIR:-}" ]; then
+    SCRIPT_DIR="$SLURM_SUBMIT_DIR/scripts"
+else
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+source "$SCRIPT_DIR/hpc_common.sh"
+
+# Project root: prefer SLURM_SUBMIT_DIR (sbatch), else the parent of scripts/.
+if [ -n "${SLURM_SUBMIT_DIR:-}" ]; then
+    PROJECT_ROOT="$SLURM_SUBMIT_DIR"
+else
+    PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
+export PROJECT_ROOT
+cd "$PROJECT_ROOT" || { echo "ERROR: cannot cd to PROJECT_ROOT: $PROJECT_ROOT"; exit 1; }
+
+ENV_NAME="allocation_env"
+ENV_PATH="$ENV_BASE_PATH/$ENV_NAME"
+
+# Resolve the region: ALLOC_REGION is set by the launcher. Fail closed if absent
+# (a bare sbatch with no region would silently run ALL regions in one job, which
+# defeats the per-region decomposition and would OOM).
+ALLOC_REGION="${ALLOC_REGION:-}"
+if [ -z "$ALLOC_REGION" ]; then
+    echo "ERROR: ALLOC_REGION is unset. This job body runs ONE region's chain and"
+    echo "       must be submitted with --export=ALL,ALLOC_REGION=<label> (the"
+    echo "       launcher scripts/submit_allocation_scenario.sh does this per region)."
+    exit 2
+fi
+ALLOC_SCENARIO="${ALLOC_SCENARIO:-BAU}"
+
+echo "========================================="
+echo "Job: Phase 3.6 Single-Region Allocation"
+echo "========================================="
+echo "Region: $ALLOC_REGION"
+echo "Scenario: $ALLOC_SCENARIO"
+echo "Environment: $ENV_NAME"
+echo "Path: $ENV_PATH"
+echo "Node: $(hostname -s 2>/dev/null || echo '?')  cpus-per-task=${SLURM_CPUS_PER_TASK:-?}"
+echo
+
+setup_common_env
+activate_env "$ENV_PATH"
+echo
+
+RSCRIPT_BIN=$(verify_rscript "$ENV_PATH")
+if [ $? -ne 0 ]; then
+    exit 1
+fi
+echo
+
+R_SCRIPT="$PROJECT_ROOT/scripts/run_allocation.r"
+if [ ! -f "$R_SCRIPT" ]; then
+    echo "ERROR: run_allocation.r not found at: $R_SCRIPT"
+    exit 1
+fi
+
+# Scope the run to this single region (D-01). Do NOT hardcode
+# ALLOCATION_YEAR_POST_FILTER here: leave it as whatever the launcher exported
+# (a resume year, or unset => full chain).
+export ALLOCATION_REGION_FILTER="$ALLOC_REGION"
+export ALLOCATION_PROFILE_SCENARIO="$ALLOC_SCENARIO"
+export ALLOCATION_PROFILE=TRUE
+export ALLOCATION_NUM_WORKERS=${SLURM_CPUS_PER_TASK:-40}
+# Pass-throughs (left as whatever the launcher/operator exported; same defaults
+# as submit_allocation_smoke.sh). ALLOCATION_PREDICT_BATCH_ROWS is needed on
+# andes for the 26M-cell from-class predict.
+export ALLOCATION_PREDICT_BATCH_ROWS=${ALLOCATION_PREDICT_BATCH_ROWS:-}
+export ALLOCATION_PREDICTOR_LAZY=${ALLOCATION_PREDICTOR_LAZY:-}
+export ALLOCATION_PREDICT_NUM_THREADS=${ALLOCATION_PREDICT_NUM_THREADS:-}
+
+echo "ALLOCATION_REGION_FILTER=$ALLOCATION_REGION_FILTER"
+echo "ALLOCATION_PROFILE_SCENARIO=$ALLOCATION_PROFILE_SCENARIO"
+echo "ALLOCATION_PROFILE=$ALLOCATION_PROFILE"
+echo "ALLOCATION_NUM_WORKERS=$ALLOCATION_NUM_WORKERS"
+echo "ALLOCATION_YEAR_POST_FILTER=${ALLOCATION_YEAR_POST_FILTER:-<unset: full chain from start>}"
+echo "ALLOCATION_PREDICT_BATCH_ROWS=${ALLOCATION_PREDICT_BATCH_ROWS:-<unset: single-shot>}"
+echo "ALLOCATION_PREDICTOR_LAZY=${ALLOCATION_PREDICTOR_LAZY:-<unset: lazy per-from-class ON>}"
+echo "ALLOCATION_PREDICT_NUM_THREADS=${ALLOCATION_PREDICT_NUM_THREADS:-<unset: auto cores/workers>}"
+echo
+
+"$RSCRIPT_BIN" --vanilla "$R_SCRIPT"
+EXIT_CODE=$?
+
+echo
+echo "Rscript exit code: $EXIT_CODE"
+echo "Region $ALLOC_REGION (scenario $ALLOC_SCENARIO) chain complete (exit=$EXIT_CODE)."
+exit $EXIT_CODE
