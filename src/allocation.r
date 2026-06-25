@@ -1476,9 +1476,40 @@ run_allocation_for_scenario <- function(
   current_lulc_path <- initial_lulc_file[1]
   message(sprintf("Initial LULC: %s", current_lulc_path))
 
-  # Build timestep pairs
-  year_starts <- seq(start_year, end_year - step_length, by = step_length)
-  year_ends <- year_starts + step_length
+  # Build timestep pairs from the authoritative explicit schedule (D-11).
+  # The rate CSVs (BAU-<region>-trans_rates-<year_ant>.csv) were generated
+  # against config[["simulation_year_steps"]] via src/simulation_trans_rates_prep.r,
+  # so the allocation loop MUST adopt the same pairs or it will request rate
+  # tables for years that were never generated. The validation block below is
+  # ported verbatim from src/simulation_trans_rates_prep.r:307-330 (same stop()
+  # wording) so a malformed schedule fails fast with the same diagnostic. The
+  # scalar step_length read above is retained only as an unused fallback — it is
+  # NOT used to construct the pairs (it ends at 2058/9 steps, never reaches 2060).
+  year_steps <- config[["simulation_year_steps"]]
+  if (is.null(year_steps) || length(year_steps) == 0) {
+    stop("config[[\"simulation_year_steps\"]] is missing or empty. Add an explicit ordered list to your config YAML — see 03.2-CONTEXT.md D-01.")
+  }
+  if (year_steps[1] != start_year) {
+    stop(sprintf(
+      "simulation_year_steps[1] is %d but simulation_start_year is %d — update one to match the other before continuing.",
+      year_steps[1], start_year
+    ))
+  }
+  if (tail(year_steps, 1) != end_year) {
+    stop(sprintf(
+      "simulation_year_steps ends at %d but simulation_end_year is %d — update one to match the other before continuing.",
+      tail(year_steps, 1), end_year
+    ))
+  }
+  if (!all(diff(year_steps) > 0)) {
+    stop(sprintf(
+      "simulation_year_steps must be strictly increasing — observed diffs: %s",
+      paste(diff(year_steps), collapse = ", ")
+    ))
+  }
+
+  year_starts <- head(year_steps, -1)
+  year_ends <- tail(year_steps, -1)
   year_filters <- filter_allocation_timesteps(year_starts, year_ends, scenario)
   year_starts <- year_filters$year_starts
   year_ends <- year_filters$year_ends
