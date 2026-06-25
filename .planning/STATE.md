@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03.6-01-PLAN.md
-last_updated: "2026-06-25T07:06:45.498Z"
+stopped_at: Completed 03.6-02-PLAN.md
+last_updated: "2026-06-25T12:30:26.889Z"
 last_activity: 2026-06-25 -- Phase 03.6 execution started
 progress:
   total_phases: 11
   completed_phases: 8
   total_plans: 36
-  completed_plans: 31
+  completed_plans: 32
   percent: 73
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 ## Current Position
 
 Phase: 03.6 (complete-single-scenario-end-to-end-run) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Executing Phase 03.6
 Last activity: 2026-06-25 -- Phase 03.6 execution started
 
@@ -37,7 +37,7 @@ Last activity: 2026-06-25 -- Phase 03.6 execution started
 - Phase 3.3 inserted after Phase 3.2 (2026-05-26, URGENT): Dinamica allocation throughput observed at ~1% in Phase 3.1 (4,477 of hundreds of thousands of requested cells placed); root cause likely probability maps with too few non-zero values to support the demanded volume; phase diagnoses and remediates
 - Phase 3.5 inserted after Phase 3 (2026-06-22): Reduce the allocation memory floor — (a) lazy per-transition Parquet predictor reads to cut the ~80GB preload floor to ~10–20GB (memory-bound → core-bound), and (b) threaded ranger prediction using spare cores. Multi-scenario node packing (S2) folded into Phase 4's goal + success criteria. (Replaces the briefly-added Phase 5, which was split: Goals 2+3 → Phase 3.5, Goal 1 → Phase 4.)
 
-Progress: [█████████░] 86%
+Progress: [█████████░] 89%
 
 - Phase 03.6 inserted after Phase 3: Complete single-scenario end-to-end run (all regions x all timesteps) (URGENT)
 
@@ -67,6 +67,7 @@ Progress: [█████████░] 86%
 
 *Updated after each plan completion*
 | Phase 03.6 P01 | 6 min | 3 tasks | 1 files |
+| Phase 03.6 P02 | 4 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,8 @@ Recent decisions affecting current work:
 - [Phase 03.6]: Phase 03.6 (03.6-01): allocation driver builds timestep pairs from simulation_year_steps (10 steps to 2060), not step_length seq() (9 steps to 2058) — Rate CSVs were generated against simulation_year_steps; step_length seq() requests year_ant tables that do not exist
 - [Phase 03.6]: Phase 03.6 (03.6-01): single-region (length(region_inputs)==1) allocation runs chain on their own region posterior and skip the national mosaic write; mosaic moves to post-hoc Plan 03 assembler — Under per-region parallel jobs (D-01) concurrent regions would clobber the shared posterior_<year>.tif and chain on a single-region-extended mosaic
 - [Phase 03.6]: Phase 03.6 (03.6-01): Dinamica-written posterior.tif (dinamica_utils.r:861) left unwrapped for atomic writes — written by exec_dinamica subprocess, not R; only R-side anterior + national mosaic writes use write_raster_atomic — Dinamica contract is out of scope per CONTEXT; no R terra::writeRaster exists at that site
+- [Phase 03.6]: Phase 03.6 (03.6-02): per-region SLURM fan-out via an explicit bash loop (not --array) so per-region --partition/--mem can differ; region job ids colon-joined into a multi-parent afterok dependency for the national-mosaic-assembly job — An array can't express per-region partition/mem differences (forest-dominated regions need a fat node); master_pipeline.sh only ever chained single-parent afterok, so afterok:<id1>:<id2>:... is new in the repo
+- [Phase 03.6]: Phase 03.6 (03.6-02): timestep resume (D-09) scans region_<suffix>/posterior.tif over the posterior years (tail of simulation_year_steps) and exports ALLOCATION_YEAR_POST_FILTER for the first incomplete year; a fully-complete region is skipped — Each timestep writes posterior_<year_end>, so completeness is scanned over the year-ends; resume avoids re-running hours of completed timesteps and Plan 01 D-10 atomic writes guarantee the scan only sees fully-written posteriors
 
 ### Pending Todos
 
@@ -108,6 +111,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-25T07:06:31.308Z
-Stopped at: Completed 03.6-01-PLAN.md
+Last session: 2026-06-25T12:30:26.860Z
+Stopped at: Completed 03.6-02-PLAN.md
 Resume file: None
