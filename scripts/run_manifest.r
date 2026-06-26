@@ -19,9 +19,10 @@
 #'                                     Saturation NEVER gates the verdict.
 #'   4. PLAUSIBILITY (D-08b)        -- per-class LULC areas via terra::freq(): HARD
 #'                                     all-one-class degeneracy escalates to
-#'                                     INCOMPLETE; SOFT demand-mismatch vs
-#'                                     tools/simulation_lulc_areas_2060.csv is a
-#'                                     warning only.
+#'                                     INCOMPLETE. (The former SOFT demand-mismatch
+#'                                     vs simulation_lulc_areas_2060.csv was removed:
+#'                                     achieved areas legitimately differ from that
+#'                                     upstream Stage-4 demand input.)
 #'   5. NATIONAL MOSAICS (D-03)     -- confirms posterior_<year>.tif exists per timestep.
 #'
 #' It writes a manifest CSV
@@ -32,10 +33,9 @@
 #' shell (scripts/verify_allocation_run.sh) can gate on it.
 #'
 #' Usage:
-#'   Rscript scripts/run_manifest.r [<scenario>] [--scenario <name>] [--tolerance <frac>]
+#'   Rscript scripts/run_manifest.r [<scenario>] [--scenario <name>]
 #'
 #'   <scenario> / --scenario  Scenario name (default: BAU). Positional or flag.
-#'   --tolerance              Soft demand-mismatch tolerance fraction (default 0.20).
 
 # ---------------------------------------------------------------------------
 # Set working directory to project root (must happen before sourcing src/*.r).
@@ -82,17 +82,16 @@ cat("\n")
 
 usage <- paste(
   "Usage: Rscript scripts/run_manifest.r",
-  "[<scenario>] [--scenario <name>] [--tolerance <frac>]"
+  "[<scenario>] [--scenario <name>]"
 )
 
 # ---------------------------------------------------------------------------
-# Argument parsing: positional <scenario> + --scenario / --tolerance flags.
+# Argument parsing: positional <scenario> + --scenario flag.
 # Mirrors the positional + while-loop flag parser shape of
 # scripts/diagnose_allocation_saturation.r:63-87.
 # ---------------------------------------------------------------------------
 args <- commandArgs(trailingOnly = TRUE)
 scenario <- NULL
-demand_tolerance <- 0.20
 i <- 1L
 while (i <= length(args)) {
   arg <- args[[i]]
@@ -104,14 +103,6 @@ while (i <= length(args)) {
     i <- i + 1L
   } else if (startsWith(arg, "--scenario=")) {
     scenario <- sub("^--scenario=", "", arg)
-  } else if (identical(arg, "--tolerance")) {
-    if (i + 1L > length(args)) {
-      stop("--tolerance requires a fraction argument", call. = FALSE)
-    }
-    demand_tolerance <- as.numeric(args[[i + 1L]])
-    i <- i + 1L
-  } else if (startsWith(arg, "--tolerance=")) {
-    demand_tolerance <- as.numeric(sub("^--tolerance=", "", arg))
   } else if (startsWith(arg, "--")) {
     stop(sprintf("Unknown argument: %s\n%s", arg, usage), call. = FALSE)
   } else if (is.null(scenario)) {
@@ -124,9 +115,6 @@ while (i <= length(args)) {
   i <- i + 1L
 }
 if (is.null(scenario)) scenario <- "BAU"
-if (is.na(demand_tolerance) || demand_tolerance < 0) {
-  stop("--tolerance must be a non-negative fraction", call. = FALSE)
-}
 
 # ---------------------------------------------------------------------------
 # Resolve config-derived paths + schedule + region labels + saturation threshold.
@@ -175,10 +163,6 @@ saturation_threshold <-
   config[["simulation_trans_rates_params"]][["saturation_threshold"]]
 if (is.null(saturation_threshold)) saturation_threshold <- 0.90
 
-# Demand table for the D-08b SOFT mismatch check (authoritative on HPC scratch).
-# Missing => soft check is skipped (logged), never an INCOMPLETE.
-demand_csv <- file.path("tools", "simulation_lulc_areas_2060.csv")
-
 n_regions <- length(region_suffixes)
 n_timesteps <- length(posterior_years)
 expected_cells <- n_regions * n_timesteps
@@ -186,10 +170,10 @@ expected_cells <- n_regions * n_timesteps
 log_msg(sprintf(
   paste(
     "STATE manifest stage=start scenario=%s regions=%d timesteps=%d",
-    "expected_cells=%d threshold=%.2f tolerance=%.2f"
+    "expected_cells=%d threshold=%.2f"
   ),
   scenario, n_regions, n_timesteps, expected_cells,
-  saturation_threshold, demand_tolerance
+  saturation_threshold
 ))
 
 # ---------------------------------------------------------------------------
@@ -303,10 +287,6 @@ aggregate_saturation <- function(work_dir, scenario, region_label, year) {
 manifest_rows <- list()
 row_i <- 1L
 
-# National per-class area roll-up at the FINAL posterior year (D-08b soft check).
-final_year <- posterior_years[length(posterior_years)]
-final_year_class_area <- list()  # value -> cumulative cell count across regions
-
 for (idx in seq_along(region_suffixes)) {
   region_label <- region_labels[[idx]]
   region_suffix <- region_suffixes[[idx]]
@@ -334,17 +314,6 @@ for (idx in seq_along(region_suffixes)) {
 
     # Saturation roll-up (D-07, report-only). Never affects the verdict.
     sat <- aggregate_saturation(work_dir, scenario, region_label, year)
-
-    # Contribute to the national final-year class-area roll-up (D-08b soft check).
-    if (identical(as.integer(year), as.integer(final_year)) &&
-      !is.null(cell$freq) && nrow(cell$freq) > 0L) {
-      for (k in seq_len(nrow(cell$freq))) {
-        v <- as.character(cell$freq$value[[k]])
-        cnt <- as.numeric(cell$freq$count[[k]])
-        prev <- final_year_class_area[[v]]
-        final_year_class_area[[v]] <- if (is.null(prev)) cnt else prev + cnt
-      }
-    }
 
     manifest_rows[[row_i]] <- data.frame(
       scenario = scenario,
@@ -388,83 +357,15 @@ for (year in posterior_years) {
 }
 
 # ---------------------------------------------------------------------------
-# D-08b SOFT demand-mismatch check (WARNING only -- never INCOMPLETE).
-# Compare national final-year per-class areas against the demand table.
+# D-08b demand-vs-achieved plausibility check REMOVED (operator decision).
+# The scenario_area_mods demand table (tools/simulation_lulc_areas_2060.csv) is an
+# UPSTREAM Stage-4 input (src/old/simulation_trans_tables_prep.r) already baked into
+# the rate tables, NOT an allocation criterion. The achieved 2060 per-class areas
+# legitimately differ from it (what the model can place != demand), so the manifest
+# no longer compares against it. The remaining checks (existence, valid GeoTIFF,
+# differs-from-anterior D-06, degeneracy, national mosaic presence) are unaffected.
 # ---------------------------------------------------------------------------
 demand_warnings <- 0L
-if (file.exists(demand_csv) && length(final_year_class_area) > 0L) {
-  demand_df <- tryCatch(
-    utils::read.csv(demand_csv, check.names = FALSE),
-    error = function(e) NULL
-  )
-  if (!is.null(demand_df)) {
-    # Inspect columns defensively: find a class/lulc id column and an area column.
-    cn <- tolower(colnames(demand_df))
-    class_col <- which(cn %in% c("lulc", "class", "lulc_class", "value", "id", "to", "to*"))
-    area_col <- which(grepl("area|cells|count|demand", cn))
-    if (length(class_col) >= 1L && length(area_col) >= 1L) {
-      class_col <- class_col[[1L]]
-      area_col <- area_col[[1L]]
-      # WR-03: final_year_class_area is keyed by integer LULC code (terra::freq value).
-      # If the demand table's class column uses a DISJOINT key space (e.g. class names
-      # like "forest"), every lookup below misses, obs_frac collapses to 0, and a
-      # spurious demand_mismatch is reported for every class. Detect that up front:
-      # count how many demand rows resolve against the observed key space; if none do,
-      # the comparison is meaningless — emit one explicit key-space-mismatch line and
-      # skip the per-class loop rather than flooding misleading warnings.
-      demand_keys <- as.character(demand_df[[class_col]])
-      matched_keys <- sum(vapply(
-        demand_keys,
-        function(c) !is.null(final_year_class_area[[c]]),
-        logical(1)
-      ))
-      if (matched_keys == 0L) {
-        log_msg(sprintf(
-          paste(
-            "AUDIT stage=plausibility scenario=%s year=%d status=demand_key_space_mismatch",
-            "demand_classes=%d observed_classes=%d",
-            "note=demand_class_column_does_not_match_integer_lulc_codes"
-          ),
-          scenario, as.integer(final_year),
-          length(demand_keys), length(final_year_class_area)
-        ))
-      } else {
-        total_obs <- sum(unlist(final_year_class_area))
-        total_dem <- sum(suppressWarnings(as.numeric(demand_df[[area_col]])), na.rm = TRUE)
-        for (k in seq_len(nrow(demand_df))) {
-          cls <- as.character(demand_df[[class_col]][[k]])
-          dem <- suppressWarnings(as.numeric(demand_df[[area_col]][[k]]))
-          if (is.na(dem) || total_dem <= 0 || total_obs <= 0) next
-          dem_frac <- dem / total_dem
-          obs <- final_year_class_area[[cls]]
-          obs_frac <- if (is.null(obs)) 0 else as.numeric(obs) / total_obs
-          rel_dev <- abs(obs_frac - dem_frac)
-          if (rel_dev > demand_tolerance) {
-            demand_warnings <- demand_warnings + 1L
-            log_msg(sprintf(
-              paste(
-                "AUDIT stage=plausibility scenario=%s year=%d class=%s",
-                "obs_frac=%.4f demand_frac=%.4f dev=%.4f tolerance=%.2f status=demand_mismatch"
-              ),
-              scenario, as.integer(final_year), cls,
-              obs_frac, dem_frac, rel_dev, demand_tolerance
-            ))
-          }
-        }
-      }
-    } else {
-      log_msg(sprintf(
-        "AUDIT stage=plausibility scenario=%s status=demand_columns_unrecognised file=%s",
-        scenario, demand_csv
-      ))
-    }
-  }
-} else {
-  log_msg(sprintf(
-    "AUDIT stage=plausibility scenario=%s status=demand_table_absent file=%s",
-    scenario, demand_csv
-  ))
-}
 
 # ---------------------------------------------------------------------------
 # Write the manifest CSV.
