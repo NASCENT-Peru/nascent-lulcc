@@ -3,7 +3,7 @@
 # Phase 3.6 capstone launcher (plan 03.6-02, D-04/D-09).
 #
 # This is NOT itself an SBATCH job — run it from the project root on a login/submit
-# node; it CALLS sbatch. It fans out one per-region highmem job
+# node; it CALLS sbatch. It fans out one per-region fat-node job
 # (scripts/submit_allocation_region.sh) per region (D-01/D-02), implements
 # timestep-level resume (D-09), and queues a dependent (afterok) national-mosaic
 # assembly job (scripts/submit_assemble_mosaic.sh, the Plan 03 target) that runs
@@ -45,16 +45,18 @@ SCENARIO="${ALLOC_SCENARIO:-BAU}"
 REGION_JOB="$SCRIPT_DIR/submit_allocation_region.sh"
 MOSAIC_JOB="$SCRIPT_DIR/submit_assemble_mosaic.sh"   # Plan 03 target (co-delivered this phase)
 
-# Per-region SLURM partition override map (Claude's Discretion, D-02). Default is
-# highmem; forest-dominated regions peak higher (cuenca_del_amazonas / selva_andina
-# preload ~80GB and spike >128GB on the big forest->* transition) so route them to
-# a fat node when one exists. Override the default partition with ALLOC_PARTITION.
-DEFAULT_PARTITION="${ALLOC_PARTITION:-highmem}"
+# SLURM partition map (D-02). ALL regions route to fat-exclusive (~1.5TB): andes
+# peaks ~206-216GB and OOMs a highmem node (188GB), and the forest-dominated regions
+# (cuenca_del_amazonas, selva_andina) spike >128GB — so fat is the guaranteed-safe
+# node for the whole set. With limited fat nodes the per-region jobs simply queue and
+# run as fat frees up (the afterok mosaic waits for all). Override globally with
+# ALLOC_PARTITION=highmem (e.g. if you instead bound peak RAM via
+# ALLOCATION_PREDICT_BATCH_ROWS to fit the big regions on highmem).
+DEFAULT_PARTITION="${ALLOC_PARTITION:-fat}"
 partition_for_region() {
-    case "$1" in
-        cuenca_del_amazonas|selva_andina) echo "${ALLOC_FAT_PARTITION:-fat}" ;;
-        *) echo "$DEFAULT_PARTITION" ;;
-    esac
+    # All regions -> DEFAULT_PARTITION (fat). Kept as a function so a per-region
+    # override can be reintroduced later without touching the dispatch loop.
+    echo "$DEFAULT_PARTITION"
 }
 
 echo "========================================="
