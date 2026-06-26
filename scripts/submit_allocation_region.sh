@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=alloc-region
-#SBATCH --partition=highmem
+#SBATCH --partition=fat
 #SBATCH --exclusive
 #SBATCH --mem=0
-#SBATCH --cpus-per-task=40
+#SBATCH --cpus-per-task=160
 #SBATCH --time=24:00:00
 #SBATCH --output=logs/alloc-region-%j.out
 #SBATCH --error=logs/alloc-region-%j.err
@@ -16,13 +16,18 @@
 # (scripts/submit_allocation_scenario.sh) submits once per region; regions run
 # concurrently (one region per node), timesteps stay serial within a region.
 #
-# Why highmem and NOT bare sbatch (D-02): andes peaked peak_rss=129481.2MB for a
-# SINGLE timestep post-3.5 (andes-lazy-threads-573721.out). A bare `sbatch`
-# defaults to the ~93GB compute partition and OOMs. --partition=highmem
-# --exclusive --mem=0 reserves the whole node (~188GB+) with ample headroom;
-# the operator can override to a fat node on submit:
-#   sbatch --partition=fat --export=ALL,ALLOC_REGION=selva_andina scripts/submit_allocation_region.sh
-# or the launcher passes an explicit per-region --partition/--mem.
+# Why fat + 160 cores (D-02): andes peaks ~206-216GB (the 26M-cell from-class
+# predict) and OOMs compute(93GB)/highmem(188GB) — it runs clean only on fat(~1.5TB);
+# a bare `sbatch` also defaults to the ~93GB compute partition and OOMs. So reserve a
+# whole fat node: --partition=fat --exclusive --mem=0 --cpus-per-task=160.
+# This is a SINGLE-region job (one region, timesteps serial), so there is NO
+# region-level parallelism to spread across furrr workers. ALLOCATION_PARALLEL_STRATEGY
+# =sequential (set below) collapses to one worker and hands ALL cores to the ranger
+# predict (the dominant cost) — matching the smoke script's fast ~160-thread predict.
+# Without sequential, the default multicore plan forks NUM_WORKERS workers for the
+# lone region (rest idle) AND predict threads = cores/NUM_WORKERS = 1 (single-threaded
+# predict). Override on submit to run elsewhere (e.g. --partition=highmem
+# --cpus-per-task=80, optionally with ALLOCATION_PREDICT_BATCH_ROWS to bound peak RAM).
 #
 # Why this is safe to run concurrently with sibling regions (Plan 01 D-05): a
 # single-region run (length(region_inputs)==1) chains on its OWN
@@ -111,7 +116,12 @@ fi
 export ALLOCATION_REGION_FILTER="$ALLOC_REGION"
 export ALLOCATION_PROFILE_SCENARIO="$ALLOC_SCENARIO"
 export ALLOCATION_PROFILE=TRUE
-export ALLOCATION_NUM_WORKERS=${SLURM_CPUS_PER_TASK:-40}
+# Single region per job => sequential strategy: one furrr worker (no NUM_WORKERS-way
+# fork for a lone region) and effective_workers=1 in get_allocation_predict_num_threads,
+# so the ranger predict gets ALL cores (SLURM_CPUS_PER_TASK). Without it the default
+# multicore plan makes predict threads = cores/NUM_WORKERS = 1 (single-threaded).
+export ALLOCATION_PARALLEL_STRATEGY=${ALLOCATION_PARALLEL_STRATEGY:-sequential}
+export ALLOCATION_NUM_WORKERS=${SLURM_CPUS_PER_TASK:-160}
 # Pass-throughs (left as whatever the launcher/operator exported; same defaults
 # as submit_allocation_smoke.sh). ALLOCATION_PREDICT_BATCH_ROWS is needed on
 # andes for the 26M-cell from-class predict.
@@ -122,7 +132,8 @@ export ALLOCATION_PREDICT_NUM_THREADS=${ALLOCATION_PREDICT_NUM_THREADS:-}
 echo "ALLOCATION_REGION_FILTER=$ALLOCATION_REGION_FILTER"
 echo "ALLOCATION_PROFILE_SCENARIO=$ALLOCATION_PROFILE_SCENARIO"
 echo "ALLOCATION_PROFILE=$ALLOCATION_PROFILE"
-echo "ALLOCATION_NUM_WORKERS=$ALLOCATION_NUM_WORKERS"
+echo "ALLOCATION_PARALLEL_STRATEGY=$ALLOCATION_PARALLEL_STRATEGY"
+echo "ALLOCATION_NUM_WORKERS=$ALLOCATION_NUM_WORKERS  (moot under sequential; predict uses all $((${SLURM_CPUS_PER_TASK:-160})) cores)"
 echo "ALLOCATION_YEAR_POST_FILTER=${ALLOCATION_YEAR_POST_FILTER:-<unset: driver self-resumes>}"
 echo "ALLOCATION_PREDICT_BATCH_ROWS=${ALLOCATION_PREDICT_BATCH_ROWS:-<unset: single-shot>}"
 echo "ALLOCATION_PREDICTOR_LAZY=${ALLOCATION_PREDICTOR_LAZY:-<unset: lazy per-from-class ON>}"
