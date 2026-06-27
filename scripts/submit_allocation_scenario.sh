@@ -9,7 +9,7 @@
 # assembly job (scripts/submit_assemble_mosaic.sh, the Plan 03 target) that runs
 # only after every region job succeeds.
 #
-# Usage (BAU now; scenario-parameterised for Phase 4 S2 reuse):
+# Usage (defaults to NAT; scenario-parameterised for the BAU/NAT/CUL/SOC sweep):
 #   bash scripts/submit_allocation_scenario.sh
 #   ALLOC_SCENARIO=BAU bash scripts/submit_allocation_scenario.sh
 #
@@ -41,22 +41,39 @@ source "$SCRIPT_DIR/hpc_common.sh"
 ENV_NAME="allocation_env"
 ENV_PATH="$ENV_BASE_PATH/$ENV_NAME"
 
-SCENARIO="${ALLOC_SCENARIO:-BAU}"
+SCENARIO="${ALLOC_SCENARIO:-NAT}"
 REGION_JOB="$SCRIPT_DIR/submit_allocation_region.sh"
 MOSAIC_JOB="$SCRIPT_DIR/submit_assemble_mosaic.sh"   # Plan 03 target (co-delivered this phase)
 
-# SLURM partition map (D-02). ALL regions route to fat-exclusive (~1.5TB): andes
-# peaks ~206-216GB and OOMs a highmem node (188GB), and the forest-dominated regions
-# (cuenca_del_amazonas, selva_andina) spike >128GB — so fat is the guaranteed-safe
-# node for the whole set. With limited fat nodes the per-region jobs simply queue and
-# run as fat frees up (the afterok mosaic waits for all). Override globally with
-# ALLOC_PARTITION=highmem (e.g. if you instead bound peak RAM via
-# ALLOCATION_PREDICT_BATCH_ROWS to fit the big regions on highmem).
-DEFAULT_PARTITION="${ALLOC_PARTITION:-fat}"
+# Per-region SLURM partition + core map (D-02), sized from measured peak RSS of the
+# 160-thread fat run (logs/alloc-region-5741*.out):
+#   cuenca_del_amazonas ~341GB  -> fat (must; far over highmem's 188GB)
+#   andes               ~208GB  -> fat (must)
+#   selva_andina        ~167GB  -> highmem (fits 188GB; lower still at 80 cores)
+#   costa_peruana       ~110GB  -> highmem (comfortable)
+# Routing the two smaller regions to highmem lets all four run concurrently
+# (2 fat + 2 highmem) instead of queuing on the two fat nodes. cpus-per-task tracks
+# the node so the sequential-strategy predict uses the whole node: fat=160, highmem=80
+# (only two fat nodes exist; highmem nodes have 80 vCores). Force one partition for
+# every region with ALLOC_PARTITION (and ALLOC_CPUS); tune per-tier with
+# ALLOC_FAT_PARTITION/ALLOC_HIGHMEM_PARTITION and ALLOC_FAT_CPUS/ALLOC_HIGHMEM_CPUS.
+FAT_PARTITION="${ALLOC_FAT_PARTITION:-fat}"
+HIGHMEM_PARTITION="${ALLOC_HIGHMEM_PARTITION:-highmem}"
+FAT_CPUS="${ALLOC_FAT_CPUS:-160}"
+HIGHMEM_CPUS="${ALLOC_HIGHMEM_CPUS:-80}"
 partition_for_region() {
-    # All regions -> DEFAULT_PARTITION (fat). Kept as a function so a per-region
-    # override can be reintroduced later without touching the dispatch loop.
-    echo "$DEFAULT_PARTITION"
+    if [ -n "${ALLOC_PARTITION:-}" ]; then echo "$ALLOC_PARTITION"; return; fi
+    case "$1" in
+        andes|cuenca_del_amazonas) echo "$FAT_PARTITION" ;;
+        *)                         echo "$HIGHMEM_PARTITION" ;;  # costa_peruana, selva_andina
+    esac
+}
+cpus_for_region() {
+    if [ -n "${ALLOC_CPUS:-}" ]; then echo "$ALLOC_CPUS"; return; fi
+    case "$1" in
+        andes|cuenca_del_amazonas) echo "$FAT_CPUS" ;;
+        *)                         echo "$HIGHMEM_CPUS" ;;
+    esac
 }
 
 echo "========================================="
@@ -163,12 +180,17 @@ for REGION in "${REGIONS[@]}"; do
     fi
 
     PARTITION="$(partition_for_region "$REGION_SUFFIX")"
+    CPUS="$(cpus_for_region "$REGION_SUFFIX")"
 
     # Driver self-resumes; do NOT set ALLOCATION_YEAR_POST_FILTER (smoke filter).
+    # --cpus-per-task is set per-region here so it tracks the node tier (fat=160,
+    # highmem=80) and overrides the region job's #SBATCH default; the sequential
+    # predict then uses the whole node.
     EXPORT="ALL,ALLOC_REGION=$REGION,ALLOC_SCENARIO=$SCENARIO"
 
     JOB_ID=$(sbatch --parsable \
         --partition="$PARTITION" \
+        --cpus-per-task="$CPUS" \
         --export="$EXPORT" \
         "$REGION_JOB")
     RC=$?
@@ -177,8 +199,8 @@ for REGION in "${REGIONS[@]}"; do
         exit 1
     fi
 
-    echo "  [$REGION] submitted job $JOB_ID on partition $PARTITION (driver self-resumes from first gap)."
-    SUBMIT_SUMMARY+=("$REGION -> $JOB_ID (partition=$PARTITION)")
+    echo "  [$REGION] submitted job $JOB_ID on partition $PARTITION (${CPUS} cores; driver self-resumes from first gap)."
+    SUBMIT_SUMMARY+=("$REGION -> $JOB_ID (partition=$PARTITION cpus=$CPUS)")
     if [ -z "$ID_LIST" ]; then ID_LIST="$JOB_ID"; else ID_LIST="$ID_LIST:$JOB_ID"; fi
 done
 
