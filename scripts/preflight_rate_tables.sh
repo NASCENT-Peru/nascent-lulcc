@@ -53,7 +53,7 @@ export PROJECT_ROOT
 cd "$PROJECT_ROOT" || { echo "ERROR: cannot cd to PROJECT_ROOT: $PROJECT_ROOT" >&2; exit 1; }
 
 # Scenario: positional arg wins, else ALLOC_SCENARIO, else BAU.
-SCENARIO="${1:-${ALLOC_SCENARIO:-BAU}}"
+SCENARIO="${1:-${ALLOC_SCENARIO:-NAT}}"
 
 # Stage-4 re-run remediation, surfaced verbatim on any missing rate CSV (PIPE-08).
 REMEDIATION="regenerate via scripts/submit_simulation_trans_rates_estimation.sh — Stage-4 re-run prerequisite, see Phase 3.4 / PIPE-08"

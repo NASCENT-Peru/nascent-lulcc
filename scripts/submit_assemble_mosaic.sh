@@ -48,7 +48,7 @@ ENV_NAME="allocation_env"
 ENV_PATH="$ENV_BASE_PATH/$ENV_NAME"
 
 # Scenario: ALLOC_SCENARIO is set by the launcher's --export; default BAU.
-ALLOC_SCENARIO="${ALLOC_SCENARIO:-BAU}"
+ALLOC_SCENARIO="${ALLOC_SCENARIO:-NAT}"
 
 echo "========================================="
 echo "Job: Phase 3.6 National Mosaic Assembly"

@@ -111,7 +111,7 @@ while (i <= length(args)) {
   }
   i <- i + 1L
 }
-if (is.null(scenario)) scenario <- "BAU"
+if (is.null(scenario)) scenario <- "NAT"
 if (!is.null(single_year) && is.na(single_year)) {
   stop("--year must be an integer year", call. = FALSE)
 }

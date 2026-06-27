@@ -78,7 +78,7 @@ if [ -z "$ALLOC_REGION" ]; then
     echo "       launcher scripts/submit_allocation_scenario.sh does this per region)."
     exit 2
 fi
-ALLOC_SCENARIO="${ALLOC_SCENARIO:-BAU}"
+ALLOC_SCENARIO="${ALLOC_SCENARIO:-NAT}"
 
 echo "========================================="
 echo "Job: Phase 3.6 Single-Region Allocation"

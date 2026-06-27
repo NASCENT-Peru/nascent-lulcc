@@ -114,7 +114,7 @@ while (i <= length(args)) {
   }
   i <- i + 1L
 }
-if (is.null(scenario)) scenario <- "BAU"
+if (is.null(scenario)) scenario <- "NAT"
 
 # ---------------------------------------------------------------------------
 # Resolve config-derived paths + schedule + region labels + saturation threshold.

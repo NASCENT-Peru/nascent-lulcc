@@ -29,7 +29,7 @@ export PROJECT_ROOT
 cd "$PROJECT_ROOT" || { echo "ERROR: cannot cd to PROJECT_ROOT: $PROJECT_ROOT" >&2; exit 1; }
 
 # Scenario: positional arg wins, else ALLOC_SCENARIO, else BAU.
-SCENARIO="${1:-${ALLOC_SCENARIO:-BAU}}"
+SCENARIO="${1:-${ALLOC_SCENARIO:-NAT}}"
 
 R_SCRIPT="$PROJECT_ROOT/scripts/run_manifest.r"
 if [ ! -f "$R_SCRIPT" ]; then
