@@ -67,6 +67,48 @@ write_raster_atomic <- function(raster, final_path, wopt) {
 }
 
 # ---------------------------------------------------------------------------
+# Defensive parquet-dataset open (guard rail).
+# arrow::open_dataset() recursively treats EVERY file under the root as a parquet
+# fragment (it only auto-ignores names beginning with "." or "_"). A stray
+# non-parquet file accidentally written into the dataset tree — e.g. a QA
+# `na_counts_*.rds` left in parquet_data/dynamic/<year>/ — makes arrow try to read
+# it as parquet and abort with an opaque, furrr-masked error ("In index: 1") deep
+# in the predict. This guard scans the tree FIRST and stops with a clear, actionable
+# message naming the offending file(s) before arrow ever sees them; on a clean tree
+# it falls through to the normal directory-based open (partition inference unchanged).
+open_parquet_dataset_guarded <- function(path, partitioning, log_file = NULL) {
+  if (!dir.exists(path)) {
+    msg <- sprintf("Parquet dataset directory does not exist: %s", path)
+    log_msg(msg, log_file)
+    stop(msg, call. = FALSE)
+  }
+  all_files <- list.files(path, recursive = TRUE, full.names = TRUE)
+  all_files <- all_files[!dir.exists(all_files)] # keep files, drop dirs
+  is_parquet <- grepl("\\.parquet$", all_files, ignore.case = TRUE)
+  is_ignored <- grepl("^[._]", basename(all_files)) # arrow auto-ignores . / _
+  stray <- all_files[!is_parquet & !is_ignored]
+  if (length(stray) > 0L) {
+    msg <- sprintf(
+      paste0(
+        "Stray non-parquet file(s) in parquet dataset '%s': %s. arrow::open_dataset ",
+        "would try to read these as parquet and fail with an opaque error. Move or ",
+        "remove them (or prefix the name with '_') so the directory holds only ",
+        ".parquet files under the partition sub-dirs."
+      ),
+      path, paste(stray, collapse = ", ")
+    )
+    log_msg(msg, log_file)
+    stop(msg, call. = FALSE)
+  }
+  if (!any(is_parquet)) {
+    msg <- sprintf("No .parquet files found under '%s' — cannot open dataset.", path)
+    log_msg(msg, log_file)
+    stop(msg, call. = FALSE)
+  }
+  arrow::open_dataset(path, format = "parquet", partitioning = partitioning)
+}
+
+# ---------------------------------------------------------------------------
 # Profiling helpers (opt-in via ALLOCATION_PROFILE env var).
 # When the env var is unset/FALSE, prof_tic() returns NULL and prof_toc() is a
 # no-op — no Sys.time() call, no log line, zero overhead beyond a single
@@ -2584,18 +2626,18 @@ generate_probability_maps <- function(
     "dynamic",
     year_ant
   )
-  ds_static <- arrow::open_dataset(
+  ds_static <- open_parquet_dataset_guarded(
     static_preds_pq_path,
-    format = "parquet",
-    partitioning = arrow::hive_partition(region = arrow::int32())
+    partitioning = arrow::hive_partition(region = arrow::int32()),
+    log_file = log_file
   )
-  ds_dynamic <- arrow::open_dataset(
+  ds_dynamic <- open_parquet_dataset_guarded(
     dynamic_preds_pq_path,
-    format = "parquet",
     partitioning = arrow::hive_partition(
       scenario = arrow::utf8(),
       region = arrow::int32()
-    )
+    ),
+    log_file = log_file
   )
 
   log_msg(
