@@ -64,14 +64,14 @@ HIGHMEM_CPUS="${ALLOC_HIGHMEM_CPUS:-80}"
 partition_for_region() {
     if [ -n "${ALLOC_PARTITION:-}" ]; then echo "$ALLOC_PARTITION"; return; fi
     case "$1" in
-        andes|cuenca_del_amazonas) echo "$FAT_PARTITION" ;;
-        *)                         echo "$HIGHMEM_PARTITION" ;;  # costa_peruana, selva_andina
+        andes|cuenca_del_amazonas|selva_andina) echo "$FAT_PARTITION" ;;
+        *)                         echo "$HIGHMEM_PARTITION" ;;  # costa_peruana
     esac
 }
 cpus_for_region() {
     if [ -n "${ALLOC_CPUS:-}" ]; then echo "$ALLOC_CPUS"; return; fi
     case "$1" in
-        andes|cuenca_del_amazonas) echo "$FAT_CPUS" ;;
+        andes|cuenca_del_amazonas|selva_andina) echo "$FAT_CPUS" ;;
         *)                         echo "$HIGHMEM_CPUS" ;;
     esac
 }
