@@ -22,7 +22,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3.4: Stale Pipeline Artifact Re-run** *(INSERTED 2005-05-29; completed 2026-06-24 — UAT 1-3 pass; Test-4 float32-cube Expander blocker fixed (int32 cast) and confirmed by andes posterior.tif)* - Regenerate simulation trans_rates CSVs and alloc_params on HPC with Phase 3.2-corrected code; unblocks Phase 3.3 operator gate. Root cause: rate CSVs were generated before `forbidden_from_classes` config key and `load_unmodelled_transitions()` were active, so id_trans=34 (mining→high_intensity_agricultural) survived into the active set and triggered the ALLOC-08 hard stop.
 - [x] **Phase 3.5: Reduce Allocation Memory Floor** *(INSERTED 2026-06-22)* - Cut the ~80GB per-region predictor-preload floor via lazy per-transition Parquet reads (target ~10–20GB) and let large-transition ranger prediction use spare cores (`num.threads>1`); flips allocation from memory-bound to core-bound so cheaper/more nodes can each run a region. (Split from the removed Phase 5; multi-scenario node packing merged into Phase 4.)
  (completed 2026-06-24)
-- [ ] **Phase 3.6: Complete Single-Scenario End-to-End Run** *(INSERTED 2026-06-24)* - A single scenario (BAU) runs to completion across all regions and all timesteps, producing posterior rasters for every region/timestep — capstone proof of the Phase 3 machinery at scale.
+- [x] **Phase 3.6: Complete Single-Scenario End-to-End Run** *(INSERTED 2026-06-24)* (completed 2026-06-28) - A single scenario (NAT) runs to completion across all regions and all timesteps, producing posterior rasters for every region/timestep — capstone proof of the Phase 3 machinery at scale.
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port; parallelise the full scenario sweep across Rundeck nodes (S2 multi-scenario packing)
 
 ## Phase Details
@@ -278,6 +278,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 3.3. Probability Map Saturation & Allocation Throughput | 5/5 | Complete — operator gate met by andes full run (saturation 22/24 ≥0.90); ALLOC-06..10 in REQUIREMENTS | 2026-06-24 |
 | 3.4. Stale Pipeline Artifact Re-run | 1/1 | Complete — UAT 1-3 pass (all 4 regions); float32-cube Expander blocker fixed (int32 cast), confirmed by andes posterior.tif | 2026-06-24 |
 | 3.5. Reduce Allocation Memory Floor | 3/3 | Complete   | 2026-06-24 |
-| 3.6. Complete Single-Scenario End-to-End Run | 4/5 | In Progress|  |
+| 3.6. Complete Single-Scenario End-to-End Run | 5/5 | Complete — NAT capstone run verdict=PASS (40/40 cells, 10/10 national mosaics); RUN-01..06 | 2026-06-28 |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
 
