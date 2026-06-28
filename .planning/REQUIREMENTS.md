@@ -58,7 +58,7 @@
 - [x] **RUN-03**: Per-region parallel jobs are decoupled — each region chains each timestep on its OWN `region_<suffix>/posterior.tif` (never the shared national mosaic), so concurrent region jobs cannot clobber a shared path; one highmem/fat node per region with adequate `--mem` (never bare sbatch onto the ~93GB compute partition)
 - [x] **RUN-04**: The national `posterior_<year>.tif` series is assembled post-hoc for every timestep from per-region posteriors (sole writer of the national path under parallel jobs), byte-comparable to the inline writer it replaces
 - [x] **RUN-05**: Every (region, timestep) posterior DIFFERS from its anterior (rules out the degenerate "nothing happened" case); saturation is aggregated and reported but does NOT gate completion; trajectory plausibility QA flags hard all-one-class degeneracy (→ INCOMPLETE) and soft demand-mismatch (→ warning)
-- [ ] **RUN-06**: Per-timestep posterior/mosaic writes are atomic (`<name>.tmp.tif` → `file.rename()`) so a job killed mid-write cannot leave a half-written posterior; on restart the launcher resumes each region from the next incomplete timestep (timestep-level resume) rather than re-running completed work
+- [x] **RUN-06**: Per-timestep posterior/mosaic writes are atomic (`<name>.tmp.tif` → `file.rename()`) so a job killed mid-write cannot leave a half-written posterior; on restart the launcher resumes each region from the next incomplete timestep (timestep-level resume) rather than re-running completed work
 
 ## v2 Requirements
 
@@ -121,7 +121,7 @@ Updated during roadmap creation.
 | RUN-03 | Phase 3.6 | Complete |
 | RUN-04 | Phase 3.6 | Complete |
 | RUN-05 | Phase 3.6 | Complete |
-| RUN-06 | Phase 3.6 | Pending |
+| RUN-06 | Phase 3.6 | Complete |
 
 **Coverage:**
 - v1 requirements: 28 total

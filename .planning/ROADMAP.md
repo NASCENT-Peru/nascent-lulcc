@@ -145,7 +145,7 @@ Plans:
 - [x] 03.6-04-PLAN.md — Run manifest: full region×timestep completeness + differs-from-anterior bar + saturation roll-up + plausibility QA → PASS/INCOMPLETE (D-06/D-07/D-08/D-08b)
 
 **Wave 3** *(blocked on Waves 1+2; operator-gated)*
-- [ ] 03.6-05-PLAN.md — Blocking rate-table pre-flight gate (D-11 prereq / PIPE-08/09) + live HPC BAU run + manifest PASS verification (D-01/D-06)
+- [x] 03.6-05-PLAN.md — Blocking rate-table pre-flight gate (D-11 prereq / PIPE-08/09) + live HPC BAU run + manifest PASS verification (D-01/D-06)
 
 ### Phase 3.1: Allocation Correctness & Dinamica Integration *(INSERTED 2005-05-22)*
 **Goal**: The first end-to-end allocation that includes Dinamica running under apptainer produces a real posterior.tif (not an anterior copy), model loading is bounded to only the transitions active in the current scenario/year, and the probability map save writes exactly the TIFs that were predicted (no phantom NA-prob placeholders).

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 03.6-04-PLAN.md
-last_updated: "2026-06-25T13:23:39.138Z"
+status: ready_to_plan
+stopped_at: Phase 03.6 complete (5/5) — ready to discuss Phase 4
+last_updated: 2026-06-28T17:13:26.874Z
 last_activity: 2026-06-25 -- Phase 03.6 execution started
 progress:
   total_phases: 11
   completed_phases: 8
   total_plans: 36
-  completed_plans: 34
+  completed_plans: 35
   percent: 73
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** allocation.r completes reliably for all scenarios × regions × timesteps, producing simulated LULC maps without crashing.
-**Current focus:** Phase 03.6 — complete-single-scenario-end-to-end-run
+**Current focus:** Phase 4 — end to end correctness & performance
 
 ## Current Position
 
-Phase: 03.6 (complete-single-scenario-end-to-end-run) — EXECUTING
-Plan: 5 of 5
-Status: Executing Phase 03.6
-Last activity: 2026-06-25 -- Phase 03.6 execution started
+Phase: 4
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-06-28
 
 ### Roadmap Evolution
 
@@ -45,7 +45,7 @@ Progress: [█████████░] 94%
 
 **Velocity:**
 
-- Total plans completed: 15
+- Total plans completed: 20
 - Average duration: ~13 min/plan (across Phases 1, 1.1, 2)
 - Total execution time: ~2.6 hours
 
@@ -59,6 +59,7 @@ Progress: [█████████░] 94%
 | 3. Parallelism & Memory Architecture | 0 | — | — |
 | 4. End-to-End Correctness & Performance | 0 | — | — |
 | 03.5 | 3 | - | - |
+| 03.6 | 5 | - | - |
 
 **Recent Trend:**
 
