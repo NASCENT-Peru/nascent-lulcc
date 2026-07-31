@@ -122,29 +122,28 @@ bash scripts/hpc_common.sh --check-stage7-contract
 ## Allocation stage memory profile
 
 The allocation stage (`scripts/run_allocation.r` via `src/allocation.r`) is the
-most memory-intensive part of the pipeline, and it is **single-threaded per region**
-(default `ALLOCATION_PARALLEL_STRATEGY=sequential`, with native BLAS/data.table
-threads pinned to 1). Its peak memory is dominated by two things:
+most memory-intensive part of the pipeline. Production runs use one region per
+node (`ALLOCATION_PARALLEL_STRATEGY=sequential`, submitted per region by
+`scripts/submit_allocation_scenario.sh`), which hands **all node cores to the
+threaded ranger predict** — the dominant cost. Peak memory is dominated by:
 
-- **Predictor preload floor.** Each region loads its full predictor table into
-  memory once. For the largest region (cuenca_del_amazonas: ~68M cells × ~38 cols)
-  this is **~80 GB resident** and stays resident for the whole region run.
-- **Large "from"-class transitions.** Forest-dominated regions
-  (`cuenca_del_amazonas`, `selva_andina`) have transitions *from* forest that are
-  viable across tens of millions of cells. Predicting one of those (e.g. ~62M rows)
-  pushes peak RSS **above 128 GB** and OOM-kills the job on smaller nodes.
+- **Per-from-class predictor reads.** Predictors are read lazily per from-class
+  from the Parquet dataset (Phase 3.5); the old ~80 GB whole-region preload
+  floor is gone, but the biggest from-class tables are still tens of GB.
+- **Large "from"-class transitions.** Forest-dominated regions have transitions
+  *from* forest viable across tens of millions of cells; predicting one (e.g.
+  ~62M rows × 160 threads) drives the measured node peaks below.
 
 ### Node mapping for allocation
 
-| Region(s) | Recommended node | Why |
-|-----------|------------------|-----|
-| `cuenca_del_amazonas`, `selva_andina` | `fat-exclusive` (1.5 TB), or `highmem-exclusive` (188 GB) with batching on | ~80 GB floor + a >128 GB peak on the big forest transition |
-| `andes`, `costa_peruana` | `highmem-exclusive` (188 GB); `compute-exclusive` (93 GB) usually fits | far fewer forest cells, lower peak |
+Measured peak RSS from the 160-thread fat-node runs (`logs/alloc-region-5741*.out`);
+this is exactly the routing `submit_allocation_scenario.sh` applies:
 
-`compute-exclusive` (93 GB) is **not** viable for the two big regions — the ~80 GB
-preload floor alone leaves no headroom. Because each region run is single-threaded,
-on the fat node you can run **all four regions concurrently** in separate SSH shells
-(scope each with `ALLOCATION_REGION_FILTER`) to use the cores.
+| Region | Measured peak | Partition (cores) |
+|--------|--------------|-------------------|
+| `cuenca_del_amazonas` | ~341 GB | `fat` (160) — must |
+| `andes` | ~208 GB | `fat` (160) — must; OOMs highmem |
+| `selva_andina` | ~167 GB | `fat` (160) — fits highmem on
 
 ### Allocation tuning knobs (environment variables)
 

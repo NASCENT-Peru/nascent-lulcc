@@ -45,35 +45,45 @@ SCENARIO="${ALLOC_SCENARIO:-NAT}"
 REGION_JOB="$SCRIPT_DIR/submit_allocation_region.sh"
 MOSAIC_JOB="$SCRIPT_DIR/submit_assemble_mosaic.sh"   # Plan 03 target (co-delivered this phase)
 
-# Per-region SLURM partition + core map (D-02), sized from measured peak RSS of the
-# 160-thread fat run (logs/alloc-region-5741*.out):
-#   cuenca_del_amazonas ~341GB  -> fat (must; far over highmem's 188GB)
-#   andes               ~208GB  -> fat (must)
-#   selva_andina        ~167GB  -> highmem (fits 188GB; lower still at 80 cores)
-#   costa_peruana       ~110GB  -> highmem (comfortable)
-# Routing the two smaller regions to highmem lets all four run concurrently
-# (2 fat + 2 highmem) instead of queuing on the two fat nodes. cpus-per-task tracks
-# the node so the sequential-strategy predict uses the whole node: fat=160, highmem=80
-# (only two fat nodes exist; highmem nodes have 80 vCores). Force one partition for
-# every region with ALLOC_PARTITION (and ALLOC_CPUS); tune per-tier with
-# ALLOC_FAT_PARTITION/ALLOC_HIGHMEM_PARTITION and ALLOC_FAT_CPUS/ALLOC_HIGHMEM_CPUS.
+# Per-region SLURM partition + core map (D-02). The region->tier assignment
+# lives in config (hpc_config.yaml: allocation_fat_regions /
+# allocation_highmem_regions, keyed by region suffix, sized from measured peak
+# RSS) and is probed below alongside the schedule — so adding or renaming a
+# region in regions.json is routed by editing config, not this script. A region
+# in NEITHER list routes to fat with a warning: the fail-safe default (a small
+# region on fat merely queues; a big region on highmem OOMs). cpus-per-task
+# tracks the node so the sequential-strategy predict uses the whole node:
+# fat=160, highmem=80 (only two fat nodes exist; highmem nodes have 80 vCores).
+# Force one partition for every region with ALLOC_PARTITION (and ALLOC_CPUS);
+# tune per-tier with ALLOC_FAT_PARTITION/ALLOC_HIGHMEM_PARTITION and
+# ALLOC_FAT_CPUS/ALLOC_HIGHMEM_CPUS.
 FAT_PARTITION="${ALLOC_FAT_PARTITION:-fat}"
 HIGHMEM_PARTITION="${ALLOC_HIGHMEM_PARTITION:-highmem}"
 FAT_CPUS="${ALLOC_FAT_CPUS:-160}"
 HIGHMEM_CPUS="${ALLOC_HIGHMEM_CPUS:-80}"
+region_in_list() {  # <needle> <items...>
+    local needle="$1" item
+    shift
+    for item in "$@"; do
+        if [ "$item" = "$needle" ]; then return 0; fi
+    done
+    return 1
+}
 partition_for_region() {
     if [ -n "${ALLOC_PARTITION:-}" ]; then echo "$ALLOC_PARTITION"; return; fi
-    case "$1" in
-        andes|cuenca_del_amazonas|selva_andina) echo "$FAT_PARTITION" ;;
-        *)                         echo "$HIGHMEM_PARTITION" ;;  # costa_peruana
-    esac
+    if region_in_list "$1" ${HIGHMEM_REGIONS[@]+"${HIGHMEM_REGIONS[@]}"}; then
+        echo "$HIGHMEM_PARTITION"
+    else
+        echo "$FAT_PARTITION"
+    fi
 }
 cpus_for_region() {
     if [ -n "${ALLOC_CPUS:-}" ]; then echo "$ALLOC_CPUS"; return; fi
-    case "$1" in
-        andes|cuenca_del_amazonas|selva_andina) echo "$FAT_CPUS" ;;
-        *)                         echo "$HIGHMEM_CPUS" ;;
-    esac
+    if region_in_list "$1" ${HIGHMEM_REGIONS[@]+"${HIGHMEM_REGIONS[@]}"}; then
+        echo "$HIGHMEM_CPUS"
+    else
+        echo "$FAT_CPUS"
+    fi
 }
 
 echo "========================================="
@@ -98,18 +108,9 @@ fi
 echo
 
 # --- Resolve region labels from regions.json (config[["reg_dir"]]) ----------
-# Reuses the inline get_config() probe shape from submit_allocation_smoke.sh:70 /
-# verify_phase3_smoke.sh:51. Region labels come ONLY from this trusted probe
-# (never free operator text) — T-036-04 mitigation.
-readarray -t REGIONS < <("$RSCRIPT_BIN" --vanilla -e "
-  setwd(Sys.getenv('PROJECT_ROOT')); source('src/setup.r'); cfg <- get_config();
-  rj <- file.path(cfg[['reg_dir']], 'regions.json');
-  if (!file.exists(rj)) quit(status = 0);
-  regions <- jsonlite::fromJSON(rj);
-  labs <- regions[['label']];
-  labs <- labs[!is.na(labs) & nzchar(labs)];
-  cat(labs, sep = '\n')
-" 2>/dev/null)
+# Shared trusted probe (hpc_common.sh): region labels come ONLY from
+# regions.json via get_config(), never free operator text — T-036-04 mitigation.
+readarray -t REGIONS < <(probe_region_labels "$RSCRIPT_BIN")
 
 # Fail closed (T-036-04): an empty region list means regions.json is missing/empty
 # (the repo checkout) — the schedule is authoritative only on HPC scratch.
@@ -120,16 +121,20 @@ if [ "${#REGIONS[@]}" -eq 0 ]; then
     exit 1
 fi
 
-# --- Resolve the timestep schedule + output dir -----------------------------
+# --- Resolve the timestep schedule + output dir + partition routing ---------
 readarray -t SCHEDULE_INFO < <("$RSCRIPT_BIN" --vanilla -e "
   setwd(Sys.getenv('PROJECT_ROOT')); source('src/setup.r'); cfg <- get_config();
   ys <- cfg[['simulation_year_steps']];
   cat(cfg[['simulation_output_dir']], '\n');
-  cat(paste(ys, collapse = ' '), '\n')
+  cat(paste(ys, collapse = ' '), '\n');
+  cat(paste(cfg[['allocation_fat_regions']], collapse = ' '), '\n');
+  cat(paste(cfg[['allocation_highmem_regions']], collapse = ' '), '\n')
 " 2>/dev/null)
 SIM_OUT="${SCHEDULE_INFO[0]:-}"
 SIM_OUT="$(echo "$SIM_OUT" | xargs)"   # trim
 read -r -a YEAR_STEPS <<< "${SCHEDULE_INFO[1]:-}"
+read -r -a FAT_REGIONS <<< "${SCHEDULE_INFO[2]:-}"
+read -r -a HIGHMEM_REGIONS <<< "${SCHEDULE_INFO[3]:-}"
 
 if [ -z "$SIM_OUT" ] || [ "${#YEAR_STEPS[@]}" -lt 2 ]; then
     echo "ERROR: could not resolve simulation_output_dir / simulation_year_steps from get_config()." >&2
@@ -143,6 +148,7 @@ echo "Regions (${#REGIONS[@]}): ${REGIONS[*]}"
 echo "Schedule (${#YEAR_STEPS[@]} boundaries): ${YEAR_STEPS[*]}"
 echo "Posterior years (${#POSTERIOR_YEARS[@]}): ${POSTERIOR_YEARS[*]}"
 echo "Output dir: $SIM_OUT"
+echo "Routing (config): fat=[${FAT_REGIONS[*]:-}] highmem=[${HIGHMEM_REGIONS[*]:-}] (unlisted -> fat)"
 echo
 
 mkdir -p logs
@@ -152,7 +158,8 @@ ID_LIST=""              # colon-joined region job ids for the afterok dependency
 declare -a SUBMIT_SUMMARY=()
 
 for REGION in "${REGIONS[@]}"; do
-    # region_suffix == gsub(" ","_",tolower()) in allocation.r:862 / run_andes_validation.sh:72
+    # region_suffix rule: gsub(" ","_",tolower(label)) — must match src/allocation.r
+    # (load_allocation_models / prepare_region_worker_inputs) and run_manifest.r.
     REGION_SUFFIX="$(echo "$REGION" | tr ' ' '_' | tr '[:upper:]' '[:lower:]')"
 
     # Skip-complete optimisation (file-presence, D-09): if EVERY posterior year
@@ -179,6 +186,13 @@ for REGION in "${REGIONS[@]}"; do
         continue
     fi
 
+    if ! region_in_list "$REGION_SUFFIX" \
+        ${FAT_REGIONS[@]+"${FAT_REGIONS[@]}"} \
+        ${HIGHMEM_REGIONS[@]+"${HIGHMEM_REGIONS[@]}"}; then
+        echo "  WARNING: [$REGION] suffix '$REGION_SUFFIX' is in neither" \
+             "allocation_fat_regions nor allocation_highmem_regions (hpc_config.yaml)" \
+             "— defaulting to the fat tier. Add it to config to route it explicitly." >&2
+    fi
     PARTITION="$(partition_for_region "$REGION_SUFFIX")"
     CPUS="$(cpus_for_region "$REGION_SUFFIX")"
 

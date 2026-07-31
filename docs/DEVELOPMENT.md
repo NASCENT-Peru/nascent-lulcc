@@ -131,7 +131,7 @@ Every pipeline stage has a paired run script and SLURM submit script. The table 
 | 4. Allocation param calibration | `run_calibrate_allocation_parameters.r` | `submit_calibrate_allocation_parameters.sh` | `allocation_params_env` | 4 | 28 GB/CPU | 6 h |
 | 5. Transition rate prep | `run_simulation_trans_rates_prep.r` | `submit_simulation_trans_rates_estimation.sh` | `trans_rate_estimation_env` | 6 | 16 GB/CPU | 4 h |
 | 6. Spatial interventions prep | `run_spatial_interventions_prep.r` | `submit_spatial_interventions_prep.sh` | `transition_model_env` | 4 | 16 GB/CPU | 4 h |
-| 7. Allocation simulations | `run_allocation.r` | `submit_allocation.sh` | `allocation_env` | 8 | 8 GB/CPU | 48 h |
+| 7. Allocation simulations | `run_allocation.r` | `submit_allocation_scenario.sh` (bash launcher → one `submit_allocation_region.sh` per region + `afterok` mosaic) | `allocation_env` | 160 (fat) / 80 (highmem) | whole node | 24 h/region |
 | 7. Dinamica simulations | `run_dinamica_simulations.r` | `submit_dinamica_simulations.sh` | `allocation_env` | 8 | 8 GB/CPU | 48 h |
 
 Additional helper scripts in `scripts/`:
@@ -142,6 +142,10 @@ Additional helper scripts in `scripts/`:
 | `hpc_common.sh` | Shared HPC functions: `find_micromamba()`, `setup_common_env()`, `activate_env()`, `check_stage7_contract()` |
 | `setup_environments.sh` | Creates or updates all conda environments from `environments/*.yml` |
 | `install_micromamba_simple.sh` | Bootstraps the micromamba binary into `~/.local/bin/micromamba` |
+| `submit_allocation_scenario.sh` | Production Stage 7 launcher: per-region fat/highmem fan-out, skip-complete resume, `afterok` mosaic job |
+| `submit_allocation_all_scenarios.sh` | Full scenario sweep (BAU/NAT/CUL/SOC) via one `submit_allocation_scenario.sh` call per scenario |
+| `submit_allocation_region.sh` / `submit_assemble_mosaic.sh` | Job bodies submitted by the scenario launcher (single-region chain / national mosaic) |
+| `run_manifest.r` | Post-run completeness manifest (region×timestep → PASS/INCOMPLETE) |
 | `submit_allocation_profile.sh` | Allocation with `ALLOCATION_PROFILE=TRUE` for performance profiling |
 | `submit_allocation_smoke.sh` | Smoke-test allocation run (single region, short time window) |
 | `smoke_test_dinamica.sh` | Verifies Dinamica EGO binary/container is reachable |

@@ -224,8 +224,11 @@ sbatch scripts/submit_lulc_data_prep.sh
 # Stage 3 — transition modelling (depends on stage 2 completing)
 sbatch --dependency=afterok:JOBID scripts/submit_transition_modelling.sh
 
-# Stage 7 — Dinamica simulations
-sbatch scripts/submit_allocation.sh
+# Stage 7 — allocation / Dinamica simulations (bash launcher, not sbatch:
+# it fans out one SLURM job per region and queues the mosaic job afterok)
+ALLOC_SCENARIO=NAT bash scripts/submit_allocation_scenario.sh
+# or all four scenarios:
+bash scripts/submit_allocation_all_scenarios.sh
 ```
 
 ### Run interactively (local)

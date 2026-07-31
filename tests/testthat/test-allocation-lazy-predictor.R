@@ -1,8 +1,9 @@
 # Phase 3.5 Plan 02: lazy per-from-class predictor read (Goal 1). Covers
-# load_from_class_predictor_data() — the per-from-class analogue of
-# preload_region_predictor_data() that reads predictors lazily, scoped to a
+# load_from_class_predictor_data() — the sole predictor read path, scoped to a
 # from-class's sparse cell keys + the columns its transitions need, via an
-# arrow inner_join against a key table (NOT cell_id %in% big_vector).
+# arrow inner_join against a key table (NOT cell_id %in% big_vector). The
+# eager full-region preload it was validated against has been removed; the
+# equivalence assertion below computes that reference semantic inline.
 #
 # Contract (from 03.5-02-PLAN.md <behavior> + 03.5-RESEARCH.md Pattern 1):
 #   - load_from_class_predictor_data(ds_static, ds_dynamic, cols, region_value,
@@ -10,9 +11,9 @@
 #     cell_id.
 #   - Static cols filtered by region only; dynamic cols by region + scenario;
 #     merged by cell_id (all = TRUE), exactly like the eager merge.
-#   - Output rows/columns for the given keys are IDENTICAL to
-#     preload_region_predictor_data() restricted to those keys/cols
-#     (cell_id setequal + per-column all.equal).
+#   - Output rows/columns for the given keys are IDENTICAL to the historical
+#     eager full-region read restricted to those keys/cols (cell_id setequal +
+#     per-column all.equal; reference computed inline).
 #   - Cells outside the key set are NOT returned (column projection + key
 #     scoping).
 #   - A per-from-class cache reads each distinct from_val at most once (a second
@@ -165,10 +166,24 @@ test_that("lazy read is row/column-equivalent to the eager preload", {
     ref_cell_keys = keys
   )
 
-  eager_full <- preload_region_predictor_data(
-    ds$ds_static, ds$ds_dynamic,
-    preds = cols, region_value = region_value, scenario = scenario
-  )
+  # Reference: the historical eager full-region semantic computed inline —
+  # static cols filtered by region only, dynamic cols by region + scenario,
+  # merged by cell_id with all = TRUE, keyed, then restricted to the same keys.
+  # (preload_region_predictor_data() itself was removed once the lazy path
+  # became the sole read path; this preserves the equivalence contract it
+  # defined.)
+  static_ref <- ds$ds_static |>
+    dplyr::filter(region == 1L) |>
+    dplyr::select(cell_id, stat_a, stat_b) |>
+    dplyr::collect() |>
+    data.table::as.data.table()
+  dyn_ref <- ds$ds_dynamic |>
+    dplyr::filter(region == 1L, scenario == "baseline") |>
+    dplyr::select(cell_id, dyn_x) |>
+    dplyr::collect() |>
+    data.table::as.data.table()
+  eager_full <- merge(static_ref, dyn_ref, by = "cell_id", all = TRUE)
+  data.table::setkeyv(eager_full, "cell_id")
   eager <- eager_full[J(keys), nomatch = NA]
 
   expect_s3_class(lazy, "data.table")

@@ -98,11 +98,16 @@ find_micromamba() {
 activate_env() {
     local ENV_PATH="$1"
 
-    # Find micromamba
-    export MAMBA_EXE=$(find_micromamba)
+    # Find micromamba. Assign then export separately: `export VAR=$(cmd)` makes
+    # `$?` reflect the `export` builtin (always 0), masking a find_micromamba
+    # failure and letting the script fall through to `micromamba shell hook`
+    # with an empty MAMBA_EXE.
+    local MAMBA_EXE_LOCAL
+    MAMBA_EXE_LOCAL=$(find_micromamba)
     if [ $? -ne 0 ]; then
         exit 1
     fi
+    export MAMBA_EXE="$MAMBA_EXE_LOCAL"
 
     # Initialize micromamba
     eval "$($MAMBA_EXE shell hook -s bash)"
@@ -170,6 +175,52 @@ verify_rscript() {
     echo "Using Rscript at: $RSCRIPT_BIN" >&2
     echo "$RSCRIPT_BIN"
     return 0
+}
+
+# ----------------------------------------------------------
+# Lenient Rscript resolution (verifier / pre-flight scripts)
+# ----------------------------------------------------------
+# resolve_rscript_lenient: prefer the allocation_env interpreter under
+# ENV_BASE_PATH, else fall back to a plain Rscript on PATH. For OPERATOR-FACING
+# verifier/pre-flight scripts (verify_allocation_run.sh,
+# preflight_rate_tables.sh) that must also work on a login node where the env
+# is already active or the scratch contract is not configured. Submit scripts
+# keep the strict setup_common_env/activate_env/verify_rscript path.
+resolve_rscript_lenient() {
+    if [ -n "${ENV_BASE_PATH:-}" ] && [ -x "$ENV_BASE_PATH/allocation_env/bin/Rscript" ]; then
+        echo "$ENV_BASE_PATH/allocation_env/bin/Rscript"
+        return 0
+    fi
+    if command -v Rscript >/dev/null 2>&1; then
+        command -v Rscript
+        return 0
+    fi
+    echo "ERROR: no Rscript found (allocation_env not present and Rscript not on PATH)." >&2
+    echo "       Activate the allocation_env or add Rscript to PATH, then re-run." >&2
+    return 2
+}
+
+# ----------------------------------------------------------
+# Trusted get_config() probes
+# ----------------------------------------------------------
+# probe_region_labels <rscript_bin>: print one region label per line from
+# regions.json under config[["reg_dir"]]. Region labels come ONLY from this
+# trusted probe, never free operator text (T-036-04). Empty output means
+# regions.json is missing/empty (the repo checkout) — it is authoritative only
+# on HPC scratch, so callers MUST fail closed on an empty result. Requires
+# PROJECT_ROOT to be set (exported to the child explicitly).
+probe_region_labels() {
+    local rscript_bin="$1"
+    PROJECT_ROOT="${PROJECT_ROOT:?probe_region_labels requires PROJECT_ROOT}" \
+    "$rscript_bin" --vanilla -e "
+  setwd(Sys.getenv('PROJECT_ROOT')); source('src/setup.r'); cfg <- get_config();
+  rj <- file.path(cfg[['reg_dir']], 'regions.json');
+  if (!file.exists(rj)) quit(status = 0);
+  regions <- jsonlite::fromJSON(rj);
+  labs <- regions[['label']];
+  labs <- labs[!is.na(labs) & nzchar(labs)];
+  cat(labs, sep = '\n')
+" 2>/dev/null
 }
 
 # ----------------------------------------------------------

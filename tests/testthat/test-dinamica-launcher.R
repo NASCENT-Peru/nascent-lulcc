@@ -191,7 +191,8 @@ test_that("resolve_dinamica_launch() HPC creates staged-home + staged-tmp idempo
   expect_true(file.exists(conf_path),
     info = ".dinamica_ego_8.conf must be seeded in staged-home (D-105).")
 
-  # Verify exact content.
+  # Verify exact content (GdalToolsData added when the in-container GDAL data
+  # path was wired up; keep in sync with resolve_dinamica_launch()'s seed).
   conf_lines <- readLines(conf_path)
   expect_identical(
     conf_lines,
@@ -199,7 +200,8 @@ test_that("resolve_dinamica_launch() HPC creates staged-home + staged-tmp idempo
       'AlternativePathForR = "/usr/local/bin/Rscript"',
       'ClConfig = "0"',
       'MemoryAllocationPolicy = "1"',
-      'RCranMirror = "https://cloud.r-project.org/"'
+      'RCranMirror = "https://cloud.r-project.org/"',
+      'GdalToolsData = "/opt/dinamica/usr/bin/Data/GDAL"'
     )
   )
 

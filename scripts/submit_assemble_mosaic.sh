@@ -23,7 +23,7 @@
 # can override --partition on submit if highmem is unavailable.
 #
 # Inputs (set by the launcher via --export=ALL,...):
-#   ALLOC_SCENARIO   scenario to assemble (default BAU), matching the launcher's
+#   ALLOC_SCENARIO   scenario to assemble (default NAT), matching the launcher's
 #                    --export. Passed positionally to the assembler.
 
 set -uo pipefail

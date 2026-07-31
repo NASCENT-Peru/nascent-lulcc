@@ -37,15 +37,15 @@
 #
 # Inputs (set by the launcher via --export=ALL,...):
 #   ALLOC_REGION              region label (-> ALLOCATION_REGION_FILTER). REQUIRED.
-#   ALLOC_SCENARIO            scenario (default BAU; -> ALLOCATION_PROFILE_SCENARIO).
+#   ALLOC_SCENARIO            scenario (default NAT; -> ALLOCATION_PROFILE_SCENARIO).
 #   ALLOCATION_YEAR_POST_FILTER  OPTIONAL single-timestep SMOKE filter (one posterior
 #                             year). NOT a resume control — resume is driver-side and
 #                             automatic (run_allocation_for_scenario self-resumes from
 #                             the first gap). Normally unset for production runs.
 # Pass-throughs (same defaults as submit_allocation_smoke.sh):
 #   ALLOCATION_PREDICT_BATCH_ROWS  batches the 26M-cell from-class predict (andes
-#                             needs it). ALLOCATION_PREDICTOR_LAZY,
-#                             ALLOCATION_PREDICT_NUM_THREADS likewise pass through.
+#                             needs it). ALLOCATION_PREDICT_NUM_THREADS likewise
+#                             passes through.
 
 set -uo pipefail
 
@@ -126,7 +126,6 @@ export ALLOCATION_NUM_WORKERS=${SLURM_CPUS_PER_TASK:-160}
 # as submit_allocation_smoke.sh). ALLOCATION_PREDICT_BATCH_ROWS is needed on
 # andes for the 26M-cell from-class predict.
 export ALLOCATION_PREDICT_BATCH_ROWS=${ALLOCATION_PREDICT_BATCH_ROWS:-}
-export ALLOCATION_PREDICTOR_LAZY=${ALLOCATION_PREDICTOR_LAZY:-}
 export ALLOCATION_PREDICT_NUM_THREADS=${ALLOCATION_PREDICT_NUM_THREADS:-}
 
 echo "ALLOCATION_REGION_FILTER=$ALLOCATION_REGION_FILTER"
@@ -136,7 +135,6 @@ echo "ALLOCATION_PARALLEL_STRATEGY=$ALLOCATION_PARALLEL_STRATEGY"
 echo "ALLOCATION_NUM_WORKERS=$ALLOCATION_NUM_WORKERS  (moot under sequential; predict uses all $((${SLURM_CPUS_PER_TASK:-160})) cores)"
 echo "ALLOCATION_YEAR_POST_FILTER=${ALLOCATION_YEAR_POST_FILTER:-<unset: driver self-resumes>}"
 echo "ALLOCATION_PREDICT_BATCH_ROWS=${ALLOCATION_PREDICT_BATCH_ROWS:-<unset: single-shot>}"
-echo "ALLOCATION_PREDICTOR_LAZY=${ALLOCATION_PREDICTOR_LAZY:-<unset: lazy per-from-class ON>}"
 echo "ALLOCATION_PREDICT_NUM_THREADS=${ALLOCATION_PREDICT_NUM_THREADS:-<unset: auto cores/workers>}"
 echo
 

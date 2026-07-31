@@ -158,22 +158,62 @@ find_project_root <- function() {
 
 #' Detect current environment (local vs HPC)
 #'
+#' Signals are checked in order of reliability so this stays in lockstep with
+#' the shell layer (`scripts/setup_environments.sh`, `scripts/hpc_common.sh`),
+#' which decide "on HPC" the same way:
+#'   1. `HPC_SCRATCH_ROOT` set — the authoritative, mount-/host-agnostic path
+#'      contract every HPC stage already requires (sourced from `.env`). This is
+#'      what the shell uses; keeping R aligned prevents the two layers from
+#'      disagreeing on a login node (where the launcher runs the region probe
+#'      BEFORE any SLURM job exists).
+#'   2. Scheduler job context (`SLURM_JOB_ID` / `SLURM_CLUSTER_NAME` /
+#'      `PBS_JOBID`) — set inside a job (SLURM_CLUSTER_NAME is often present in
+#'      the login shell too).
+#'   3. Scratch-mount presence and hostname pattern — last-resort heuristics for
+#'      a bare login shell with none of the above set. Both are configurable so
+#'      a new cluster needs no code change: `HPC_MOUNT_HINTS` (colon-separated
+#'      dir list; default covers ZALF `/beegfs` plus common roots) and
+#'      `HPC_HOSTNAME_PATTERN` (regex; default matches ETH Euler). Note mount
+#'      probes are unreliable on login nodes with auto-mounted parallel
+#'      filesystems — prefer setting `HPC_SCRATCH_ROOT`.
+#'
+#' Override entirely with `get_config(force_environment = "hpc" | "local")`.
+#'
 #' @return character string: "local" or "hpc"
 detect_environment <- function() {
-  # Check for HPC-specific indicators
-  hpc_indicators <- c(
-    file.exists(""), # Common HPC mount point
-    Sys.getenv("SLURM_JOB_ID") != "", # SLURM job environment
-    Sys.getenv("PBS_JOBID") != "", # PBS job environment
-    grepl("euler", Sys.getenv("HOSTNAME"), ignore.case = TRUE), # Euler hostname
-    grepl("eu-", Sys.info()["nodename"], ignore.case = TRUE) # Euler node pattern
-  )
-
-  if (any(hpc_indicators)) {
+  # 1. Authoritative contract variable (matches the shell layer).
+  if (nzchar(Sys.getenv("HPC_SCRATCH_ROOT"))) {
     return("hpc")
-  } else {
-    return("local")
   }
+
+  # 2. Scheduler job context.
+  scheduler_vars <- c("SLURM_JOB_ID", "SLURM_CLUSTER_NAME", "PBS_JOBID")
+  if (any(nzchar(Sys.getenv(scheduler_vars)))) {
+    return("hpc")
+  }
+
+  # 3a. Known scratch mount roots (configurable; default is ZALF /beegfs + the
+  # common parallel-filesystem roots).
+  mount_hints <- strsplit(
+    Sys.getenv("HPC_MOUNT_HINTS", unset = "/beegfs:/cluster:/lustre:/gpfs"),
+    ":",
+    fixed = TRUE
+  )[[1L]]
+  mount_hints <- mount_hints[nzchar(mount_hints)]
+  if (length(mount_hints) && any(dir.exists(mount_hints))) {
+    return("hpc")
+  }
+
+  # 3b. Hostname pattern (configurable; default matches ETH Euler login/compute
+  # nodes).
+  host_pattern <- Sys.getenv("HPC_HOSTNAME_PATTERN", unset = "euler|eu-")
+  host_strings <- c(Sys.getenv("HOSTNAME"), Sys.info()[["nodename"]])
+  if (nzchar(host_pattern) &&
+    any(grepl(host_pattern, host_strings, ignore.case = TRUE))) {
+    return("hpc")
+  }
+
+  "local"
 }
 
 #' Expand `${VAR}` placeholders in a string using environment variables

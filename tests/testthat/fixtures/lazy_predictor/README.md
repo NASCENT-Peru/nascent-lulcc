@@ -13,8 +13,9 @@ in sync with the production datasets opened in
 ## Why these shapes
 
 The fixture mirrors the production Arrow datasets **exactly**, so that
-`load_from_class_predictor_data()` (lazy) and `preload_region_predictor_data()`
-(eager) are exercised against the same partitioning the real pipeline uses:
+`load_from_class_predictor_data()` (and the inline eager-reference computation
+in the equivalence test) are exercised against the same partitioning the real
+pipeline uses:
 
 - **static** dataset: `arrow::hive_partition(region = arrow::int32())`
 - **dynamic** dataset: `arrow::hive_partition(scenario = arrow::utf8(), region = arrow::int32())`

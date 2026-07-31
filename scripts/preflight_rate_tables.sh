@@ -65,44 +65,18 @@ echo "Scenario:     $SCENARIO"
 echo "Project root: $PROJECT_ROOT"
 echo
 
-# --- Resolve an Rscript binary ----------------------------------------------
-# Prefer the project's allocation_env (the way submit_* scripts do via
-# hpc_common.sh), but fall back to a plain `Rscript` on PATH when the env is
-# already active. Modelled on verify_allocation_run.sh:46-63.
-RSCRIPT_BIN=""
-if [ -f "$SCRIPT_DIR/hpc_common.sh" ]; then
-    # shellcheck source=/dev/null
-    if source "$SCRIPT_DIR/hpc_common.sh" 2>/dev/null \
-        && [ -n "${ENV_BASE_PATH:-}" ] \
-        && [ -x "$ENV_BASE_PATH/allocation_env/bin/Rscript" ]; then
-        RSCRIPT_BIN="$ENV_BASE_PATH/allocation_env/bin/Rscript"
-    fi
-fi
-if [ -z "$RSCRIPT_BIN" ]; then
-    if command -v Rscript >/dev/null 2>&1; then
-        RSCRIPT_BIN="$(command -v Rscript)"
-    else
-        echo "ERROR: no Rscript found (allocation_env not present and Rscript not on PATH)." >&2
-        echo "       Activate the allocation_env or add Rscript to PATH, then re-run." >&2
-        exit 2
-    fi
-fi
+# --- Resolve an Rscript binary (shared helper, hpc_common.sh) ----------------
+# Lenient: prefer allocation_env under ENV_BASE_PATH, else Rscript on PATH.
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/hpc_common.sh"
+RSCRIPT_BIN="$(resolve_rscript_lenient)" || exit 2
 echo "Rscript:      $RSCRIPT_BIN"
 echo
 
 # --- Resolve region labels from regions.json (config[["reg_dir"]]) ----------
-# Reuses the inline get_config() probe shape from submit_allocation_scenario.sh:79
-# / submit_allocation_smoke.sh:70. Region labels come ONLY from this trusted probe
-# (never free operator text) — T-036-04 mitigation.
-readarray -t REGIONS < <("$RSCRIPT_BIN" --vanilla -e "
-  setwd(Sys.getenv('PROJECT_ROOT')); source('src/setup.r'); cfg <- get_config();
-  rj <- file.path(cfg[['reg_dir']], 'regions.json');
-  if (!file.exists(rj)) quit(status = 0);
-  regions <- jsonlite::fromJSON(rj);
-  labs <- regions[['label']];
-  labs <- labs[!is.na(labs) & nzchar(labs)];
-  cat(labs, sep = '\n')
-" 2>/dev/null)
+# Shared trusted probe (hpc_common.sh): region labels come ONLY from
+# regions.json via get_config(), never free operator text — T-036-04 mitigation.
+readarray -t REGIONS < <(probe_region_labels "$RSCRIPT_BIN")
 
 # Fail closed (T-036-04): an empty region list means regions.json is missing/empty
 # (the repo checkout) — the schedule is authoritative only on HPC scratch.

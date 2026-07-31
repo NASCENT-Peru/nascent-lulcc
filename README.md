@@ -107,7 +107,7 @@ The pipeline consists of 7 sequential stages with SLURM `afterok` dependency cha
 | 4. Allocation Parameter Calibration | `submit_calibrate_allocation_parameters.sh` | 2–4 h | Monte-Carlo calibration of Dinamica patch parameters |
 | 5. Scenario Preparation | `submit_simulation_trans_rates_estimation.sh` | 4–8 h | CVXR-optimised transition rate tables per scenario |
 | 6. Spatial Interventions | `submit_spatial_interventions_prep.sh` | 2–4 h | Per-SSP spatial probability perturbation layer assembly |
-| 7. Dinamica Simulations | `submit_allocation.sh` / `submit_dinamica_simulations.sh` | 12–48 h | Spatially-explicit LULC simulation 2022–2060 |
+| 7. Dinamica Simulations | `submit_allocation_scenario.sh` (per-region fan-out; `submit_allocation_all_scenarios.sh` for the full sweep) | 12–48 h | Spatially-explicit LULC simulation 2022–2060 |
 
 ## Usage
 
@@ -131,8 +131,9 @@ sbatch scripts/submit_lulc_data_prep.sh
 # Submit with explicit dependency (wait for job 12345)
 sbatch --dependency=afterok:12345 scripts/submit_feature_selection.sh
 
-# Run allocation stage
-sbatch scripts/submit_allocation.sh
+# Run allocation stage (bash launcher: fans out one SLURM job per region,
+# then queues the national-mosaic assembly job afterok)
+ALLOC_SCENARIO=NAT bash scripts/submit_allocation_scenario.sh
 ```
 
 ### Local Development

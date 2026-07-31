@@ -311,38 +311,64 @@ under `outputs/simulations/<scenario>/<year>/region_<region>/`. `sbatch` writes
 `logs/lulc-allocation-smoke-<jobid>.{out,err}`. To cover all four regions, submit one
 job per region (they run one at a time under `--exclusive`), or run the real step.
 
-### Real allocation step
+### Real allocation step (production: per-region fan-out)
 
-`scripts/submit_allocation.sh` runs the **full** allocation: every scenario in
-`config[["scenario_names"]]`, every region, every timestep. Scenarios run
-sequentially; within a scenario, regions are processed in parallel via
-`furrr::future_map` (multicore), with the worker count taken from
-`ALLOCATION_NUM_WORKERS` (defaults to `SLURM_CPUS_PER_TASK`, else 4).
+`scripts/submit_allocation_scenario.sh` is the production launcher for **one
+scenario**. Run it with `bash` from the repo root on a login/submit node — it is
+not itself an SBATCH job; it calls `sbatch`. It:
 
-**Memory implication:** peak ≈ (number of concurrent region workers) × (per-region
-peak). With the big regions exceeding 128 GB each, running several in parallel only
-fits on `fat-exclusive`. To run on `highmem-exclusive`, serialise the regions with
-`ALLOCATION_PARALLEL_STRATEGY=sequential`.
+1. probes the region list (`regions.json`) and timestep schedule
+   (`simulation_year_steps`) from `get_config()` — nothing hardcoded;
+2. submits one whole-node job per **incomplete** region
+   (`scripts/submit_allocation_region.sh`): `fat` (160 cores) for `andes`,
+   `cuenca_del_amazonas`, `selva_andina`; `highmem` (80 cores) for
+   `costa_peruana`. Regions whose posteriors all exist are skipped; partial
+   regions self-resume driver-side from the first missing posterior;
+3. queues `scripts/submit_assemble_mosaic.sh` with `--dependency=afterok` on
+   all region jobs to write the national `posterior_<year>.tif` mosaics.
 
 ```bash
-# All regions in parallel (default multicore) — reserve fat-exclusive (1.5 TB):
-sbatch --export=ALL,ALLOCATION_PREDICT_BATCH_ROWS=5000000 scripts/submit_allocation.sh
+# One scenario (defaults to NAT):
+bash scripts/submit_allocation_scenario.sh
+ALLOC_SCENARIO=BAU bash scripts/submit_allocation_scenario.sh
 
-# One region at a time — reserve highmem-exclusive (188 GB):
-sbatch --export=ALL,ALLOCATION_PARALLEL_STRATEGY=sequential,ALLOCATION_PREDICT_BATCH_ROWS=5000000 \
-  scripts/submit_allocation.sh
+# Full sweep — all four scenarios (BAU NAT CUL SOC), one launcher call each:
+bash scripts/submit_allocation_all_scenarios.sh
+ALLOC_SCENARIOS="BAU CUL" bash scripts/submit_allocation_all_scenarios.sh
 ```
 
-(The worker count comes from `ALLOCATION_NUM_WORKERS`, which the script sets from
-`SLURM_CPUS_PER_TASK`; with only four regions the default already runs them all in
-parallel. Use `ALLOCATION_PARALLEL_STRATEGY=sequential` to force one at a time.)
+Both launchers are **idempotent**: re-running them after a failure resubmits
+only incomplete regions and never re-does finished work (atomic posterior
+writes guarantee an existing `posterior.tif` is complete).
 
-`sbatch` writes `logs/lulc-allocation-<jobid>.{out,err}` and requests 48 h; the real
-wall time depends on region count, scenario count, and concurrency.
+**Node usage:** each scenario submits 3 fat-node jobs + 1 highmem job. Only two
+fat nodes exist, so the 4-scenario sweep queues 12 fat jobs and SLURM drains
+them as nodes free up; there is no cross-scenario dependency. Override routing
+with `ALLOC_PARTITION`/`ALLOC_CPUS` (all regions) or
+`ALLOC_FAT_PARTITION`/`ALLOC_HIGHMEM_PARTITION` +
+`ALLOC_FAT_CPUS`/`ALLOC_HIGHMEM_CPUS` (per tier).
+`ALLOCATION_PREDICT_BATCH_ROWS` and the other allocation knobs pass through to
+the region jobs.
+
+Region jobs write `logs/alloc-region-<jobid>.{out,err}`; the mosaic job writes
+`logs/assemble-mosaic-<jobid>.{out,err}`. Verify a finished scenario with
+`scripts/run_manifest.r` (region×timestep completeness → PASS/INCOMPLETE).
 
 **Monitoring:** watch resident memory with `top`/`htop` on the reserved node. Under
 SLURM, `sacct -j JOBID --format=JobID,State,ExitCode,MaxRSS` gives the authoritative
 peak (it captures the Dinamica child process that R-side RSS logging does not).
+
+<details>
+<summary>Legacy: monolithic <code>scripts/submit_allocation.sh</code> (superseded)</summary>
+
+`scripts/submit_allocation.sh` runs every scenario × region × timestep in a
+single job (regions parallel via `furrr` multicore, scenarios sequential). It
+predates the per-region fan-out and is kept as a fallback; peak RSS ≈
+concurrent-region-workers × per-region peak, so it only fits on
+`fat-exclusive`, and a node failure loses the whole sweep's progress since the
+last completed timestep. Prefer the scenario launcher above.
+
+</details>
 
 ## Files Overview
 
@@ -368,7 +394,10 @@ node (they can also run directly with `bash` as a fallback).
 - `setup_environments.sh` — create/update conda environments
 - `hpc_common.sh` — shared helpers + the Stage 7 path-contract check
 - `master_pipeline.sh` — submit the **full** pipeline as a SLURM `sbatch` dependency chain
-- `submit_allocation_smoke.sh` / `submit_allocation.sh` — allocation smoke / real step (see above)
+- `submit_allocation_scenario.sh` — production Stage 7 launcher: per-region fan-out + afterok mosaic (see above)
+- `submit_allocation_all_scenarios.sh` — full BAU/NAT/CUL/SOC sweep (one scenario-launcher call each)
+- `submit_allocation_region.sh` / `submit_assemble_mosaic.sh` — job bodies the scenario launcher submits
+- `submit_allocation_smoke.sh` / `submit_allocation.sh` — allocation smoke / legacy monolithic step (see above)
 - `submit_<stage>.sh`, `run_<stage>.r` — individual pipeline stages
 
 For the full ordered stage list see

@@ -262,8 +262,11 @@ sbatch --dependency=afterok:<alloc_param_job_id> scripts/submit_simulation_trans
 # Stage 6: Spatial interventions preparation
 sbatch --dependency=afterok:<trans_rates_job_id> scripts/submit_spatial_interventions_prep.sh
 
-# Stage 7: Allocation / Dinamica simulations
-sbatch --dependency=afterok:<spatial_int_job_id> scripts/submit_allocation.sh
+# Stage 7: Allocation / Dinamica simulations — run the launcher with bash once
+# Stage 6 has finished (it is not an SBATCH job itself; it probes the region list
+# and calls sbatch per region, then queues the national-mosaic job afterok):
+ALLOC_SCENARIO=NAT bash scripts/submit_allocation_scenario.sh   # one scenario
+bash scripts/submit_allocation_all_scenarios.sh                 # all four scenarios
 ```
 
 ### Allocation Smoke Run (Stage 7 validation)
@@ -306,8 +309,10 @@ Resource directives are defined per stage in each `submit_*.sh` script. Adjust
 | Alloc. param. calibration | `submit_calibrate_allocation_parameters.sh` | 4 | 28 G | 6 h |
 | Sim. transition rates prep | `submit_simulation_trans_rates_estimation.sh` | 6 | 16 G | 4 h |
 | Spatial interventions prep | `submit_spatial_interventions_prep.sh` | 4 | 16 G | 4 h |
-| Allocation / Dinamica | `submit_allocation.sh` | 8 | 8 G | 48 h |
+| Allocation region job (per region) | `submit_allocation_region.sh` (via `submit_allocation_scenario.sh`) | 160 (fat) / 80 (highmem) | whole node (`--exclusive --mem=0`) | 24 h |
+| National mosaic assembly | `submit_assemble_mosaic.sh` (queued `afterok` by the launcher) | 4 | node default | 4 h |
 | Allocation smoke | `submit_allocation_smoke.sh` | 4 | 16 G | 12 h |
+| Allocation monolithic (legacy) | `submit_allocation.sh` | 8 | 8 G | 48 h |
 | Dinamica simulations | `submit_dinamica_simulations.sh` | 8 | 8 G | 48 h |
 
 Log files for each job are written to `logs/<job-name>-<JOBID>.{out,err}`.
@@ -364,8 +369,12 @@ To rerun a failed or incorrect stage:
 4. If downstream stages have already consumed corrupt outputs, delete those outputs too and
    resubmit the full chain from the failed stage onwards.
 
-For Stage 7 specifically: resubmitting `submit_allocation.sh` with `ALLOCATION_YEAR_POST_FILTER`
-set to the first corrupt timestep will run a partial rerun without reprocessing all years.
+For Stage 7 specifically: delete the corrupt `posterior.tif` files and re-run
+`bash scripts/submit_allocation_scenario.sh` — resume is driver-side and automatic. The
+launcher skips regions whose posteriors are all present; for any region with a gap, the
+driver resumes at the first missing posterior and re-runs the remaining timesteps
+(overwriting stale downstream posteriors). Do **not** use `ALLOCATION_YEAR_POST_FILTER`
+for resume — it is the single-timestep smoke filter and would run exactly one step.
 
 ---
 
@@ -395,7 +404,7 @@ in `.env` and re-source before submitting:
 ```bash
 export DINAMICA_EGO_8_HOME=/path/to/dinamica-ego-8.sif
 source .env
-sbatch scripts/submit_allocation.sh
+bash scripts/submit_allocation_scenario.sh
 ```
 
 ### HPC_SCRATCH_ROOT unset on HPC

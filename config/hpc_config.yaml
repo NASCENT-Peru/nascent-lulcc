@@ -77,6 +77,15 @@ configuration_settings:
   simulation_year_steps: [2022, 2024, 2028, 2032, 2036, 2040, 2044, 2048, 2052, 2056, 2060]  # explicit list — see 03.2-CONTEXT.md D-01
   selected_scalar: 9.0
   max_training_rows: 1000000  # Higher threshold on HPC nodes; operator should tune to actual node RAM (Phase 2, D-11)
+  # Stage 7 per-region SLURM routing, probed by submit_allocation_scenario.sh.
+  # Entries are region SUFFIXES (label lowercased, spaces -> underscores),
+  # sized from measured peak RSS of the 160-thread fat runs:
+  #   cuenca_del_amazonas ~341GB, andes ~208GB, selva_andina ~167GB -> fat;
+  #   costa_peruana ~110GB -> highmem (188GB).
+  # A region listed in NEITHER tier routes to fat — the fail-safe default (a
+  # small region on fat merely queues; a big region on highmem OOMs).
+  allocation_fat_regions: ["andes", "cuenca_del_amazonas", "selva_andina"]
+  allocation_highmem_regions: ["costa_peruana"]
 
 # Simulation transition rates preparation configuration
 simulation_trans_rates_params:

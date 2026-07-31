@@ -217,7 +217,7 @@ if (profile_enabled) {
 
 # Set up parallel processing — but ONLY after run_allocation()'s pre-flight
 # would otherwise pass. We run the gate explicitly here so an early failure
-# does not leak into future::plan(). run_allocation() will run it again
+# does not leak into the future plan setup below. run_allocation() will run it again
 # (idempotent) before any region work; the redundant call is intentional so
 # that direct callers of run_allocation() (e.g. tests) still get gated.
 preflight_exit <- run_preflight_and_print(config = config)

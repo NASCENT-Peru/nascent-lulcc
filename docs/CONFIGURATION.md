@@ -37,6 +37,7 @@ These three variables are validated at job submission time by `scripts/hpc_commo
 |---|---|---|---|
 | `DINAMICA_EGO_8_HOME` | **Required (both)** | _(none)_ | On HPC: absolute path to the built Dinamica EGO 8 `.sif` Apptainer image (e.g., `/project/<project>/containers/dinamica-ego-8.sif`). Locally: absolute path to the Dinamica EGO 8 installation directory. See `docs/README_HPC.md` for details. |
 | `DINAMICA_BACKEND` | Optional | `auto` | Backend selection hint consumed by `exec_dinamica()` in `src/dinamica_utils.r`. One of `auto` (detected from environment), `local`, or `hpc`. |
+| `DINAMICA_DISABLE_PARALLEL_STEPS` | Optional | `1` (flag passed) | Whether the allocation step passes `-disable-parallel-steps` to DinamicaConsole. Set `0` to allow Dinamica's step-level parallelism (A/B against `PROFILE stage=dinamica` timings). Dinamica's worker thread count is set separately via `-processors=$SLURM_CPUS_PER_TASK` (automatic). |
 
 ### Project Path Variables (HPC)
 
@@ -83,8 +84,10 @@ These variables tune allocation parallelism without requiring a config file edit
 |---|---|---|---|
 | `ALLOCATION_NUM_WORKERS` | Optional | auto (`parallelly::availableCores()`) | Override the number of parallel workers used during allocation. |
 | `ALLOCATION_PARALLEL_STRATEGY` | Optional | auto | Force parallel strategy: `sequential`, `multicore`, or `multisession`. |
-| `ALLOCATION_YEAR_POST_FILTER` | Optional | _(none)_ | Run allocation only up to this posterior year (integer). Useful for partial reruns. |
-| `ALLOCATION_WORKER_RSS_BUDGET_MB` | Optional | _(none)_ | Per-worker RSS memory budget (MB) for adaptive parallel scheduling. |
+| `ALLOCATION_YEAR_POST_FILTER` | Optional | _(none)_ | Single-timestep **smoke** filter: run allocation for exactly this one posterior year. Not a resume control — production resume is driver-side and automatic; do not set this for full/resumed runs. |
+| `ALLOCATION_WORKER_RSS_BUDGET_MB` | Optional | _(none)_ | Post-run RSS verification threshold consumed by `verify_phase3_smoke.sh` (MB). It does **not** bound, chunk, or gate anything at runtime — allocation only logs it as a breadcrumb. Use `ALLOCATION_PREDICT_BATCH_ROWS` to actually cap prediction-time peak RSS. |
+| `ALLOCATION_PREDICT_BATCH_ROWS` | Optional | _(none / single-shot)_ | Batch large-transition ranger prediction into row-chunks of this size to bound prediction-time peak RSS (e.g. `5000000` for the big forest regions). |
+| `ALLOCATION_PREDICT_NUM_THREADS` | Optional | auto (`cores / effective_workers`) | Override ranger `num.threads` for the large-transition predict. |
 | `ALLOCATION_PROFILE` | Optional | `FALSE` | Enable profiling output (`TRUE`/`FALSE`). When enabled, emits `PROFILE … elapsed=…s rss_before=…MB rss_after=…MB` lines via the job log. |
 
 ---

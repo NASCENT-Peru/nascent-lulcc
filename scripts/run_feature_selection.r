@@ -178,13 +178,21 @@ results <- tryCatch(
 end_time <- Sys.time()
 elapsed <- difftime(end_time, start_time, units = "mins")
 
+# transition_feature_selection() returns invisible(NULL) and writes its results
+# (viable_transitions_lists.csv) to feature_selection_dir; it does not return a
+# per-transition status table, so the summary reports completion + the artifact
+# location rather than fabricated success/failure counts.
+viable_file <- file.path(
+  config[["feature_selection_dir"]],
+  "viable_transitions_lists.csv"
+)
+
 cat("\n========================================\n")
 cat("Pipeline Completed Successfully\n")
 cat("========================================\n")
 cat(sprintf("Total runtime: %.2f minutes\n", as.numeric(elapsed)))
-cat(sprintf("Results: %d rows\n", nrow(results)))
-cat(sprintf("Successful: %d\n", sum(results$status == "success")))
-cat(sprintf("Failed: %d\n", sum(results$status != "success")))
+cat(sprintf("Viable transitions written: %s\n", viable_file))
+cat(sprintf("  exists: %s\n", file.exists(viable_file)))
 
 # Save summary statistics
 summary_file <- file.path(
@@ -197,11 +205,8 @@ cat(sprintf("Job ID: %s\n", Sys.getenv("SLURM_JOB_ID", unset = "local")))
 cat(sprintf("Start time: %s\n", start_time))
 cat(sprintf("End time: %s\n", end_time))
 cat(sprintf("Runtime: %.2f minutes\n", as.numeric(elapsed)))
-cat(sprintf("Total transitions: %d\n", nrow(results)))
-cat(sprintf("Successful: %d\n", sum(results$status == "success")))
-cat(sprintf("Failed: %d\n", sum(results$status != "success")))
-cat("\nStatus breakdown:\n")
-print(table(results$status))
+cat(sprintf("Viable transitions file: %s\n", viable_file))
+cat(sprintf("Viable transitions file exists: %s\n", file.exists(viable_file)))
 sink()
 
 cat(sprintf("\nSummary saved to: %s\n", summary_file))
