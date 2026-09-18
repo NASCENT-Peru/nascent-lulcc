@@ -29,5 +29,22 @@ inst/doc
 *.log
 *.tif
 
+# allow diagnostic evidence logs under .planning/ (committed as part of debug records)
+!.planning/**/*.log
+
 renv*
 .claude/settings.local.json
+Agent-tool-input-(l9orum).txt
+allocation_step_integration_plan.md
+.claude/settings.json
+scripts/temp_add_id_trans.r
+scripts/temp_add_id_trans_to_allocation_params.r
+scripts/temp_add_id_trans_to_trans_rates.r
+integrate_consistent_trans_ids.md
+TODO.md
+PLAN_filter_unmodelled_transitions.md
+.planning/HANDOFF.json
+.planning/config.json
+.planning/HANDOFF.json
+.planning/config.json
+.planning/HANDOFF.json

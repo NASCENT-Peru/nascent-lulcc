@@ -26,10 +26,10 @@ dir.create(monthly_out, recursive = TRUE, showWarnings = FALSE)
 dir.create(yearly_out , recursive = TRUE, showWarnings = FALSE)
 
 # --------------------------- Runtime / IO -------------------------------------
-# Use a per-job temp folder on the large /cluster/scratch (avoid node-local /scratch).
+# Use a per-job temp folder on the large /beegfs (avoid node-local /beegfs).
 user_scratch <- Sys.getenv("SCRATCH")
 if (!nzchar(user_scratch)) {
-  user_scratch <- file.path("/cluster/scratch", Sys.getenv("USER", "user"))
+  user_scratch <- file.path("/beegfs", Sys.getenv("USER", "user"))
 }
 
 job_id  <- Sys.getenv("SLURM_JOB_ID", as.character(Sys.getpid()))
@@ -124,8 +124,8 @@ purge_job_tmp <- function(path) {
   # Adds a tiny delay after writes to let GDAL close handles.
   try(terra::deleteTemp(), silent = TRUE)
   Sys.sleep(0.2)
-  # Extra safety: only purge if under /cluster/scratch
-  if (!startsWith(normalizePath(path, winslash = "/", mustWork = FALSE), "/cluster/scratch/")) return(invisible())
+  # Extra safety: only purge if under /beegfs
+  if (!startsWith(normalizePath(path, winslash = "/", mustWork = FALSE), "/beegfs/")) return(invisible())
   # List direct children and nuke them recursively
   kids <- tryCatch(list.files(path, all.files = TRUE, full.names = TRUE, recursive = FALSE, include.dirs = TRUE), error = function(e) character(0))
   if (length(kids)) {

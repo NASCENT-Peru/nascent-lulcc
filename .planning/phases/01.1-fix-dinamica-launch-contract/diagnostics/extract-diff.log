@@ -1,0 +1,99 @@
+1,2c1
+< squashfs-root
+< squashfs-root/usr
+---
+> /opt/dinamica/usr
+5a5
+> PREFIX/bin/cl/clProbDist/private
+6a7
+> PREFIX/bin/cl/clRNG/private
+8a10,12
+> PREFIX/bin/Data/GDAL/3.20
+> PREFIX/bin/Data/GDAL/packages
+> PREFIX/bin/Data/GDAL/thirdparty
+13a18,20
+> PREFIX/bin/jre/conf/management
+> PREFIX/bin/jre/conf/sdp
+> PREFIX/bin/jre/conf/security
+14a22
+> PREFIX/bin/jre/include/linux
+15a24,92
+> PREFIX/bin/jre/legal/java.base
+> PREFIX/bin/jre/legal/java.compiler
+> PREFIX/bin/jre/legal/java.datatransfer
+> PREFIX/bin/jre/legal/java.desktop
+> PREFIX/bin/jre/legal/java.instrument
+> PREFIX/bin/jre/legal/java.logging
+> PREFIX/bin/jre/legal/java.management
+> PREFIX/bin/jre/legal/java.management.rmi
+> PREFIX/bin/jre/legal/java.naming
+> PREFIX/bin/jre/legal/java.net.http
+> PREFIX/bin/jre/legal/java.prefs
+> PREFIX/bin/jre/legal/java.rmi
+> PREFIX/bin/jre/legal/java.scripting
+> PREFIX/bin/jre/legal/java.se
+> PREFIX/bin/jre/legal/java.security.jgss
+> PREFIX/bin/jre/legal/java.security.sasl
+> PREFIX/bin/jre/legal/java.smartcardio
+> PREFIX/bin/jre/legal/java.sql
+> PREFIX/bin/jre/legal/java.sql.rowset
+> PREFIX/bin/jre/legal/java.transaction.xa
+> PREFIX/bin/jre/legal/java.xml
+> PREFIX/bin/jre/legal/java.xml.crypto
+> PREFIX/bin/jre/legal/jdk.accessibility
+> PREFIX/bin/jre/legal/jdk.attach
+> PREFIX/bin/jre/legal/jdk.charsets
+> PREFIX/bin/jre/legal/jdk.compiler
+> PREFIX/bin/jre/legal/jdk.crypto.cryptoki
+> PREFIX/bin/jre/legal/jdk.crypto.ec
+> PREFIX/bin/jre/legal/jdk.dynalink
+> PREFIX/bin/jre/legal/jdk.editpad
+> PREFIX/bin/jre/legal/jdk.hotspot.agent
+> PREFIX/bin/jre/legal/jdk.httpserver
+> PREFIX/bin/jre/legal/jdk.incubator.vector
+> PREFIX/bin/jre/legal/jdk.internal.ed
+> PREFIX/bin/jre/legal/jdk.internal.jvmstat
+> PREFIX/bin/jre/legal/jdk.internal.le
+> PREFIX/bin/jre/legal/jdk.internal.opt
+> PREFIX/bin/jre/legal/jdk.internal.vm.ci
+> PREFIX/bin/jre/legal/jdk.internal.vm.compiler
+> PREFIX/bin/jre/legal/jdk.internal.vm.compiler.management
+> PREFIX/bin/jre/legal/jdk.jartool
+> PREFIX/bin/jre/legal/jdk.javadoc
+> PREFIX/bin/jre/legal/jdk.jcmd
+> PREFIX/bin/jre/legal/jdk.jconsole
+> PREFIX/bin/jre/legal/jdk.jdeps
+> PREFIX/bin/jre/legal/jdk.jdi
+> PREFIX/bin/jre/legal/jdk.jdwp.agent
+> PREFIX/bin/jre/legal/jdk.jfr
+> PREFIX/bin/jre/legal/jdk.jlink
+> PREFIX/bin/jre/legal/jdk.jpackage
+> PREFIX/bin/jre/legal/jdk.jshell
+> PREFIX/bin/jre/legal/jdk.jsobject
+> PREFIX/bin/jre/legal/jdk.jstatd
+> PREFIX/bin/jre/legal/jdk.localedata
+> PREFIX/bin/jre/legal/jdk.management
+> PREFIX/bin/jre/legal/jdk.management.agent
+> PREFIX/bin/jre/legal/jdk.management.jfr
+> PREFIX/bin/jre/legal/jdk.naming.dns
+> PREFIX/bin/jre/legal/jdk.naming.rmi
+> PREFIX/bin/jre/legal/jdk.net
+> PREFIX/bin/jre/legal/jdk.nio.mapmode
+> PREFIX/bin/jre/legal/jdk.random
+> PREFIX/bin/jre/legal/jdk.sctp
+> PREFIX/bin/jre/legal/jdk.security.auth
+> PREFIX/bin/jre/legal/jdk.security.jgss
+> PREFIX/bin/jre/legal/jdk.unsupported
+> PREFIX/bin/jre/legal/jdk.unsupported.desktop
+> PREFIX/bin/jre/legal/jdk.xml.dom
+> PREFIX/bin/jre/legal/jdk.zipfs
+16a94,96
+> PREFIX/bin/jre/lib/jfr
+> PREFIX/bin/jre/lib/security
+> PREFIX/bin/jre/lib/server
+17a98
+> PREFIX/bin/jre/man/man1
+20a102
+> PREFIX/bin/PyEnvironment/bin/python3
+21a104
+> PREFIX/bin/PyEnvironment/lib/python3.12

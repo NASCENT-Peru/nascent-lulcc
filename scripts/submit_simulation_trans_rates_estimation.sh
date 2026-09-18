@@ -1,8 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=sim-trans-rates-prep
+# Reserve the whole Rundeck node: --exclusive + --mem=0 give the job all cores and
+# all RAM on the reserved node. No --partition: the Rundeck reservation places the job.
 #SBATCH --time=04:00:00
+#SBATCH --exclusive
+#SBATCH --mem=0
 #SBATCH --cpus-per-task=6
-#SBATCH --mem-per-cpu=16G
 #SBATCH --output=logs/sim-trans-rates-prep-%j.out
 #SBATCH --error=logs/sim-trans-rates-prep-%j.err
 #SBATCH --profile=task

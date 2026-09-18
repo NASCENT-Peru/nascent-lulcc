@@ -279,6 +279,25 @@ calculate_allocation_params_for_periods <- function(
     nrow(transitions_all)
   ))
 
+  # Join id_trans from viable_transitions_lists
+  message("Loading id_trans from viable_transitions_lists...")
+  viable_trans_path <- config[["viable_transitions_lists"]]
+  if (!file.exists(viable_trans_path)) {
+    stop("viable_transitions_lists CSV not found: ", viable_trans_path)
+  }
+  id_trans_lookup <- read.csv(viable_trans_path) %>%
+    dplyr::select(From., To., id_trans) %>%
+    dplyr::distinct()
+
+  transitions <- transitions %>%
+    dplyr::left_join(id_trans_lookup, by = c("From.", "To."))
+
+  message(sprintf(
+    "  ✓ Joined id_trans: %d transitions with IDs, %d NA (persistence)",
+    sum(!is.na(transitions$id_trans)),
+    sum(is.na(transitions$id_trans))
+  ))
+
   # check that transition parquet directory exists
   transitions_dir <- file.path(
     config[["trans_dataset_dir"]],
@@ -684,10 +703,17 @@ combine_region_params_to_csv <- function(
   observed_params <- lapply(rds_files, readRDS) |>
     dplyr::bind_rows()
 
-  # Create complete transition list with From* and To* values
+  # Create complete transition list with From*, To*, and id_trans
+  # Read from viable_transitions_lists for id_trans
+  viable_trans_path <- config[["viable_transitions_lists"]]
+  id_trans_lookup <- read.csv(viable_trans_path) %>%
+    dplyr::select(From., To., id_trans) %>%
+    dplyr::distinct()
+
   all_transitions <- transitions |>
     dplyr::select(`From.`, `To.`) |>
-    dplyr::distinct()
+    dplyr::distinct() |>
+    dplyr::left_join(id_trans_lookup, by = c("From.", "To."))
 
   # Left join to get all transitions, filling missing with 0s
   complete_params <- all_transitions |>
@@ -701,8 +727,11 @@ combine_region_params_to_csv <- function(
       `Patch_Size_Variance` = dplyr::coalesce(`Patch_Size_Variance`, 0),
       `Patch_Isometry` = dplyr::coalesce(`Patch_Isometry`, 0),
       `Perc_expander` = dplyr::coalesce(`Perc_expander`, 0),
-      `Perc_patcher` = dplyr::coalesce(`Perc_patcher`, 0)
+      `Perc_patcher` = dplyr::coalesce(`Perc_patcher`, 0),
+      # Preserve id_trans from the join (will be NA for persistence rows)
+      id_trans = dplyr::coalesce(id_trans.x, id_trans.y)
     ) |>
+    dplyr::select(-id_trans.x, -id_trans.y) |>
     dplyr::rename(
       `From*` = `From.`,
       `To*` = `To.`
@@ -1149,6 +1178,7 @@ calculate_single_transition_params <- function(
     Region = region_label,
     "From*" = from_val,
     "To*" = to_val,
+    id_trans = region_transitions[["id_trans"]][i],
     " Mean_Patch_Size" = alloc_params$mean_patch_size,
     "Patch_Size_Variance" = alloc_params$patch_size_variance,
     "Patch_Isometry" = alloc_params$patch_isometry,

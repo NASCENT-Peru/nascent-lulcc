@@ -1,0 +1,239 @@
+Bootstrap: docker
+From: rocker/r-ver:4.5.3
+
+# -----------------------------------------------------------------------------
+# Apptainer / Singularity definition file for the external Dinamica EGO 8
+# image used by Stage 7 on Euler.
+#
+# Phase 1.1 - Rewrite per D-101, D-102, D-103.
+# Phase 1.1 gap-closure (Plan 07): H8 CONFIRMED — circular singleton init bug in
+# DFF::LogManager::Instance() (libBase.so). Fix: LD_PRELOAD interceptor compiled
+# in Stage 6 and exported in %environment. All prior hypotheses H1–H7 FALSIFIED.
+# QT_PLUGIN_PATH / QT_QPA_PLATFORM retained from H6 investigation — harmless.
+# See diagnostics/FINDINGS.md H8 for full diagnostic chain and fix rationale.
+#
+# Provenance
+# ----------
+# This definition inlines the upstream `ethzplus/rocker-geospatial-dinamica`
+# Dockerfile's install steps verbatim in %post, bootstrapping from the
+# publicly-pullable rocker/r-ver:4.5.3 base image instead of a GHCR-published
+# composite image (D-101 - the upstream repo is Dockerfile-only because
+# Dinamica's license forbids redistribution).
+#
+# Pinned versions (D-102 - rebuild trigger conditions documented below):
+#   - rocker/r-ver:4.5.3
+#   - Dinamica EGO 8.11.2.20260408 via https://dinamicaego.com/nui_download/1960/
+#     (URL serves the current release, not a pinned version — version as of 2026-05-18)
+#
+# When to rebuild:
+#   - Upstream Dinamica EGO version bumps -> update the download URL number if
+#     the URL changes, AND update @version in both smoketest.ego + smoketest.ego-decoded,
+#     AND update the Pinned versions comment above.
+#   - rocker/r-ver bumps to 4.6+ -> update the `From` tag here.
+#   - Otherwise, the .sif is byte-reproducible from this .def.
+#
+# Build flow (operators only)
+# ---------------------------
+# IMPORTANT: Build directly to $DINAMICA_EGO_8_HOME (project or scratch
+# filesystem). Do NOT use a relative path — the output .sif is ~1 GB and
+# a relative path resolves to $REPO_ROOT which lives under $HOME on Euler.
+# Euler home quotas (~15-50 GB) cannot accommodate the SIF file.
+#
+# Apptainer (preferred on Euler):
+#   apptainer build "$DINAMICA_EGO_8_HOME" \
+#       dinamica/container/rocker-geospatial-dinamica.def
+#
+# Singularity (fallback spelling):
+#   singularity build "$DINAMICA_EGO_8_HOME" \
+#       dinamica/container/rocker-geospatial-dinamica.def
+#
+# $DINAMICA_EGO_8_HOME should point to the external artifact path, e.g.:
+#   /project/<project>/containers/dinamica-ego-8.sif
+# or, if project filesystem is unavailable:
+#   $HPC_SCRATCH_ROOT/containers/dinamica-ego-8.sif
+#
+# The fallback `docker save -> docker-archive://` workstation transfer (D-114)
+# is documented in dinamica/container/README.md as a fallback note ONLY,
+# not the canonical path.
+#
+# See dinamica/container/README.md for the full operator-facing build flow.
+# See docs/README_HPC.md for the DINAMICA_EGO_8_HOME contract and the
+# apptainer launch command shape (D-104).
+# -----------------------------------------------------------------------------
+
+%labels
+    org.opencontainers.image.title         "nascent-lulcc Dinamica EGO 8 runtime"
+    org.opencontainers.image.source        "https://github.com/ethzplus/rocker-geospatial-dinamica"
+    org.opencontainers.image.description   "External SIF for Stage 7 allocation; consumed by exec_dinamica() via apptainer/singularity exec with --home + --env DINAMICA_EGO_8_TEMP_DIR (D-104, D-105)."
+    nascent-lulcc.requirement              "INFRA-01"
+    nascent-lulcc.contract.env             "DINAMICA_EGO_8_HOME=/absolute/path/to/dinamica.sif"
+    nascent-lulcc.upstream                 "ethzplus/rocker-geospatial-dinamica"
+    nascent-lulcc.phase                    "1.1"
+
+%post -c /bin/bash
+    # `-c /bin/bash` selects bash as the script interpreter. Apptainer defaults
+    # to /bin/sh (dash on Debian-derived images), which does not support
+    # `set -o pipefail`. The build aborts at line 1 otherwise. The body
+    # contains no pipelines today, but `pipefail` stays for defence-in-depth
+    # against future edits that introduce them.
+    set -euo pipefail
+    export DEBIAN_FRONTEND=noninteractive
+    export DINAMICA_TARGET_DIR=/opt/dinamica
+    export DINAMICA_EGO_DOWNLOAD_URL=https://dinamicaego.com/nui_download/1960/
+
+    # Stage 1 - apt geospatial deps (verbatim from upstream install_geospatial.sh)
+    apt-get update && apt-get install -y --no-install-recommends \
+        cmake gdal-bin g++ lbzip2 libabsl-dev libfftw3-dev libgdal-dev libgeos-dev \
+        libgsl0-dev libhdf4-alt-dev libhdf5-dev libnetcdf-dev libproj-dev \
+        libprotobuf-dev libsqlite3-dev libssl-dev libudunits2-dev netcdf-bin \
+        pkg-config protobuf-compiler sqlite3 curl ca-certificates \
+        && rm -rf /var/lib/apt/lists/*
+
+    # Stage 2 - R geospatial packages (matches upstream install_geospatial.sh tail)
+    install2.r --error sf stars terra
+
+    # Stage 3 - Dinamica AppImage download + extract
+    mkdir -p "$DINAMICA_TARGET_DIR"
+    curl -fSL "$DINAMICA_EGO_DOWNLOAD_URL" -o "$DINAMICA_TARGET_DIR/DinamicaEGO.AppImage"
+    chmod +x "$DINAMICA_TARGET_DIR/DinamicaEGO.AppImage"
+    cd "$DINAMICA_TARGET_DIR"
+    ./DinamicaEGO.AppImage --appimage-extract
+    cp -a squashfs-root/. .
+    rm -rf squashfs-root DinamicaEGO.AppImage
+
+    # Stage 4 - Dinamica R package install from extracted tarball
+    R -e "install.packages('remotes', repos='https://cloud.r-project.org/'); \
+          remotes::install_local(list.files( \
+            file.path(Sys.getenv('DINAMICA_TARGET_DIR'), 'usr', 'bin', 'Data', 'R'), \
+            pattern = 'Dinamica_.*\\\\.tar\\\\.gz', recursive = TRUE, full.names = TRUE))"
+
+    # Stage 5 - seed /root/.dinamica_ego_8.conf (D-105 - replicated at runtime
+    # via apptainer --home <staged-home>)
+    # Phase 1.1 gap-closure (Plan 06): add data-path conf keys — see diagnostics/FINDINGS.md.
+    cat > /root/.dinamica_ego_8.conf <<'CONF'
+AlternativePathForR = "/usr/local/bin/Rscript"
+ClConfig = "0"
+MemoryAllocationPolicy = "1"
+RCranMirror = "https://cloud.r-project.org/"
+GdalToolsData = "/opt/dinamica/usr/bin/Data/GDAL"
+CONF
+    # Dinamica requires a system-level conf file to exist at startup even if
+    # it is empty (surfaced during %test with Plan 07 LD_PRELOAD fix active).
+    # Also replicated at runtime via the staged-home seeding in smoke_test_dinamica.sh
+    # and resolve_dinamica_launch().
+    touch /root/.dinamica_ego_8_system.conf
+
+    # Ensure the in-image staging dir for DINAMICA_EGO_8_TEMP_DIR exists; the
+    # runtime override via apptainer --env may point elsewhere, but the
+    # default /tmp/dinamica path must be present so DinamicaConsole startup
+    # does not abort when no --env is passed (used by %test below).
+    mkdir -p /tmp/dinamica
+
+    # Stage 6 - compile circular-init LD_PRELOAD fix (H8 — diagnostics/FINDINGS.md)
+    # Source inlined as heredoc (portable — no %files CWD-relative path dependency;
+    # canonical source also committed at dinamica/container/dinamica_init_fix.cpp).
+    # Intercepts DFF::LogManager::Instance() + DFF::getContextualLog() to break the
+    # recursive init cycle in libBase.so that causes __gnu_cxx::recursive_init_error.
+    cat > /tmp/dinamica_init_fix.cpp <<'CPPEOF'
+// LD_PRELOAD fix for Dinamica EGO 8 libBase.so circular singleton init bug.
+// Root cause: DFF::LogManager::Instance() init -> LogHub -> FilesystemHelper ->
+// getNewTemporaryDirectory -> getContextualLog -> LogManager::Instance() [RECURSIVE]
+// -> __gnu_cxx::recursive_init_error.
+// See: .planning/phases/01.1-fix-dinamica-launch-contract/diagnostics/FINDINGS.md H8
+#define _GNU_SOURCE
+#include <dlfcn.h>
+#include <cstdio>
+
+typedef void* (*VoidFunc)();
+static __thread int logmanager_in_init = 0;
+
+extern "C" {
+
+void* _ZN3DFF10LogManager8InstanceEv() {
+    static VoidFunc real = nullptr;
+    if (!real) {
+        real = reinterpret_cast<VoidFunc>(
+            dlsym(RTLD_NEXT, "_ZN3DFF10LogManager8InstanceEv"));
+        if (!real) return nullptr;
+    }
+    if (logmanager_in_init) return nullptr;
+    logmanager_in_init = 1;
+    void* result;
+    try { result = real(); } catch (...) { logmanager_in_init = 0; throw; }
+    logmanager_in_init = 0;
+    return result;
+}
+
+void* _ZN3DFF16getContextualLogEv() {
+    if (logmanager_in_init) return nullptr;
+    static VoidFunc real = nullptr;
+    if (!real) {
+        real = reinterpret_cast<VoidFunc>(
+            dlsym(RTLD_NEXT, "_ZN3DFF16getContextualLogEv"));
+        if (!real) return nullptr;
+    }
+    return real();
+}
+
+} // extern "C"
+CPPEOF
+    g++ -shared -fPIC -std=c++17 -O2 \
+        -o /usr/local/lib/dinamica_init_fix.so \
+        /tmp/dinamica_init_fix.cpp -ldl
+    rm /tmp/dinamica_init_fix.cpp
+
+%environment
+    export LD_LIBRARY_PATH=/opt/dinamica/usr/lib:$LD_LIBRARY_PATH
+    export PATH=$PATH:/opt/dinamica/usr/bin
+    export DINAMICA_EGO_8_INSTALLATION_DIRECTORY=/opt/dinamica/usr/bin
+    export DINAMICA_EGO_8_HOME_DIR=/opt/dinamica
+    export APPDIR=/opt/dinamica
+    export DINAMICA_EGO_8_GDAL_DATA=/opt/dinamica/usr/bin/Data/GDAL
+    export DINAMICA_EGO_8_LOG_PATH=/tmp/dinamica
+    # AppRun sets QT_PLUGIN_PATH / QT_QPA_PLATFORM before launching the binary.
+    # H6 hypothesis (Qt plugin crash) was FALSIFIED (ldd shows no Qt in DinamicaConsole);
+    # these vars are harmless and retained for defence-in-depth on any Qt-linked helper.
+    export QT_PLUGIN_PATH=/opt/dinamica/usr/plugins
+    export QT_QPA_PLATFORM=offscreen
+    # Phase 1.1 gap-closure (Plan 07): LD_PRELOAD interceptor for H8 circular init
+    # bug in libBase.so. Compiled by Stage 6 above; transparent to all callers
+    # including %test, D-104 apptainer exec launch, and DinamicaEGO.sh wrapper.
+    export LD_PRELOAD=/usr/local/lib/dinamica_init_fix.so
+    # NOTE: DINAMICA_EGO_8_TEMP_DIR is NOT exported here - apptainer --env
+    # overrides it at runtime per D-105.
+
+%test
+    # Apptainer runs %test under /bin/sh (dash on Debian-derived images) and
+    # does NOT honor the `-c /bin/bash` section flag the way %post does
+    # (verified against Euler Apptainer 1.x). Stick to POSIX-sh constructs
+    # only — no `set -o pipefail`, no `[[ ]]`, no arrays. Body has no
+    # pipelines so `set -eu` is functionally equivalent here.
+    set -eu
+    # Lightweight build-time verification: the entrypoint binaries exist.
+    # The real end-to-end smoke runs from outside the container via
+    # scripts/smoke_test_dinamica.sh --live against this .sif.
+    command -v DinamicaConsole >/dev/null 2>&1
+    test -x /opt/dinamica/usr/bin/DinamicaEGO.sh
+    DinamicaConsole -version || true
+
+%help
+    # Phase 1.1 launch contract (D-104):
+    #   apptainer exec \
+    #       --home   "$HPC_SCRATCH_ROOT/dinamica-home" \
+    #       --bind   "$HPC_SCRATCH_ROOT/dinamica-tmp:$HPC_SCRATCH_ROOT/dinamica-tmp" \
+    #       --env    DINAMICA_EGO_8_TEMP_DIR="$HPC_SCRATCH_ROOT/dinamica-tmp" \
+    #       "$DINAMICA_EGO_8_HOME" \
+    #       bash -c 'cd /opt/dinamica/usr && bin/DinamicaEGO.sh /abs/path/to/model.ego'
+    #
+    # Build:
+    #   apptainer build dinamica-ego-8.sif \
+    #       dinamica/container/rocker-geospatial-dinamica.def
+    #
+    # Live smoke test (after building and exporting DINAMICA_EGO_8_HOME +
+    # HPC_SCRATCH_ROOT):
+    #   bash scripts/smoke_test_dinamica.sh --live --runtime auto \
+    #       --artifact "$DINAMICA_EGO_8_HOME" \
+    #       --ego     dinamica/dinamica_model/smoketest.ego \
+    #       --require-log-under logs
+    #
+    # See dinamica/container/README.md and docs/README_HPC.md.

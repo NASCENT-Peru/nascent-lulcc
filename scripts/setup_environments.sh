@@ -1,137 +1,226 @@
 #!/bin/bash
 # setup_environments.sh
-# Script to create conda environments for LULCC modelling pipeline
+# Create / update conda environments for the LULCC modelling pipeline.
+#
+# Stage 7 contract (Phase 1, PIPE-04, D-12..D-15):
+#   - Env install root is derived from the HPC_SCRATCH_ROOT contract variable,
+#     never from a hardcoded user-specific literal. On local/Windows where
+#     HPC_SCRATCH_ROOT is unset we fall back to <repo>/.envs, but only when
+#     the user hasn't asked for an HPC-style setup explicitly.
+#   - This script is the canonical bootstrap path for the Stage 7 allocation
+#     environment (`allocation_env`). Later Phase 1 R verification steps
+#     (`Rscript`-based smoke tests, pre-flight, etc.) MUST be runnable after
+#     `bash scripts/setup_environments.sh --env allocation_env --non-interactive`
+#     against a fresh checkout, so we expose a single-env, noninteractive
+#     entrypoint that reuses the same micromamba probing logic as the
+#     submit-time helpers in hpc_common.sh.
+#   - Failures yield exactly one actionable message: install micromamba via
+#     scripts/install_micromamba.sh, or set MAMBA_EXE_CUSTOM.
+
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 ENVS_DIR="$PROJECT_ROOT/environments"
 
-echo "========================================="
-echo "Setting up LULCC modelling Environments"
-echo "========================================="
-echo "Environments directory: $ENVS_DIR"
-echo
+# Source helper for find_micromamba() and ENV_BASE_PATH derivation. We do NOT
+# call setup_common_env here — env creation does not require a SLURM-style
+# Stage 7 contract; only the install root must be derivable.
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/hpc_common.sh"
 
-# Check if micromamba is available
-# Try multiple possible locations
-MAMBA_EXE=""
-POSSIBLE_LOCATIONS=(
-    "$HOME/.local/bin/micromamba"
-    "/cluster/home/bblack/.local/bin/micromamba"
-    "$MAMBA_EXE_CUSTOM"  # Allow override via environment variable
-)
+# ---------------------------------------------------------------------------
+# CLI parsing
+# ---------------------------------------------------------------------------
+ENV_FILTER=""
+NON_INTERACTIVE="false"
+FORCE_HPC="${FORCE_HPC:-false}"
 
-for loc in "${POSSIBLE_LOCATIONS[@]}"; do
-    if [ -f "$loc" ]; then
-        MAMBA_EXE="$loc"
-        echo "Found micromamba at: $MAMBA_EXE"
-        break
-    fi
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --env)
+            ENV_FILTER="${2:-}"
+            shift 2
+            ;;
+        --non-interactive)
+            NON_INTERACTIVE="true"
+            shift
+            ;;
+        --hpc)
+            FORCE_HPC="true"
+            shift
+            ;;
+        --help|-h)
+            cat <<EOF
+Usage: bash scripts/setup_environments.sh [--env NAME] [--non-interactive] [--hpc]
+
+  --env NAME          Provision only the named environment (e.g.
+                      allocation_env). When omitted, all environments listed
+                      in environments/ are provisioned.
+  --non-interactive   Do not prompt for confirmation. If a target env already
+                      exists it is removed and recreated.
+  --hpc               Force HPC-detection on (overrides automatic signals).
+                      Use when running setup on a node that does not have
+                      /scratch and is not under SLURM, but you want
+                      HPC-style installation.
+EOF
+            exit 0
+            ;;
+        *)
+            echo "ERROR: unknown argument: $1" >&2
+            exit 2
+            ;;
+    esac
 done
 
-if [ -z "$MAMBA_EXE" ] || [ ! -f "$MAMBA_EXE" ]; then
-    echo "ERROR: micromamba not found in any expected location"
-    echo "Tried locations:"
-    for loc in "${POSSIBLE_LOCATIONS[@]}"; do
-        echo "  - $loc"
-    done
-    echo
-    echo "Please install micromamba using: bash scripts/install_micromamba.sh"
-    echo "Or set MAMBA_EXE_CUSTOM environment variable to point to your micromamba"
-    exit 1
-fi
+echo "========================================="
+echo "Setting up LULCC modelling environments"
+echo "========================================="
+echo "Environments directory: $ENVS_DIR"
+[ -n "$ENV_FILTER" ] && echo "Target environment       : $ENV_FILTER (single-env mode)"
+echo "Non-interactive          : $NON_INTERACTIVE"
+echo
 
+# ---------------------------------------------------------------------------
+# Locate micromamba via the shared helper (no hardcoded user paths)
+# ---------------------------------------------------------------------------
+MAMBA_EXE=$(find_micromamba) || exit 1
 eval "$($MAMBA_EXE shell hook -s bash)"
 
-# Create base environments directory
-ENV_BASE_PATH="/cluster/scratch/bblack/micromamba/envs"
-mkdir -p "$ENV_BASE_PATH"
+# ---------------------------------------------------------------------------
+# Resolve env install root (Phase 1.1 — D-112 / PIPE-04)
+# ---------------------------------------------------------------------------
+# The Stage 7 contract variable HPC_SCRATCH_ROOT is authoritative: whenever it
+# is set we install under it, regardless of what the host probes report. The
+# probes below exist ONLY for the safety case — recognising that we are clearly
+# on an HPC node so we can REFUSE to fall back to $PROJECT_ROOT/.envs (which
+# fills the $HOME quota) when the operator forgot to set or source it.
+#
+# Probe signals (any one => "on HPC"):
+#   1. SLURM_JOB_ID or SLURM_CLUSTER_NAME set
+#   2. a known scratch filesystem root exists (ZALF: /beegfs)
+#   3. --hpc flag or FORCE_HPC=true environment variable
+# NOTE: probe 2 is unreliable on login nodes where the parallel filesystem is
+# auto-mounted (a bare `[ -d /beegfs ]` can be false there) — which is exactly
+# why HPC_SCRATCH_ROOT, not the probe, decides the install location.
+on_hpc=false
+hpc_signal=""
+if [ -n "${SLURM_JOB_ID:-}" ] || [ -n "${SLURM_CLUSTER_NAME:-}" ]; then
+    on_hpc=true; hpc_signal="SLURM env var"
+elif [ -d /beegfs ]; then
+    on_hpc=true; hpc_signal="scratch filesystem present"
+elif [ "${FORCE_HPC:-false}" = "true" ]; then
+    on_hpc=true; hpc_signal="--hpc flag"
+fi
 
-# Function to create environment
+if [ -n "${HPC_SCRATCH_ROOT:-}" ]; then
+    # Contract variable wins outright (normal HPC path once .env is sourced).
+    ENV_BASE_PATH="$HPC_SCRATCH_ROOT/micromamba/envs"
+    echo "Env install root (HPC_SCRATCH_ROOT): $ENV_BASE_PATH"
+elif [ "$on_hpc" = "true" ]; then
+    echo "ERROR: HPC context detected ($hpc_signal) but HPC_SCRATCH_ROOT is unset." >&2
+    echo "       Refusing to install conda envs under \$HOME (home filesystem quota)." >&2
+    echo "       Source the project .env first, or run:" >&2
+    echo "         export HPC_SCRATCH_ROOT=/beegfs/\$USER/nascent-lulcc" >&2
+    exit 1
+else
+    ENV_BASE_PATH="$PROJECT_ROOT/.envs"
+    echo "Env install root (local fallback, no HPC signals): $ENV_BASE_PATH"
+fi
+mkdir -p "$ENV_BASE_PATH"
+echo
+
+# ---------------------------------------------------------------------------
+# Single-env provisioning function
+# ---------------------------------------------------------------------------
 create_env() {
     local env_file="$1"
     local env_name="$2"
-    
+    local env_path="$ENV_BASE_PATH/$env_name"
+
     echo "Creating environment: $env_name"
-    echo "  From file: $env_file"
-    echo "  Target path: $ENV_BASE_PATH/$env_name"
-    
-    if [ -d "$ENV_BASE_PATH/$env_name" ]; then
-        echo "  Environment already exists. Removing first..."
-        micromamba env remove -n "$env_name" -y
+    echo "  From file   : $env_file"
+    echo "  Target path : $env_path"
+
+    if [ -d "$env_path" ]; then
+        if [ "$NON_INTERACTIVE" = "true" ]; then
+            echo "  Environment already exists. Removing first (non-interactive)..."
+            micromamba env remove -p "$env_path" -y || true
+        else
+            echo "  Environment already exists. Removing first..."
+            micromamba env remove -p "$env_path" -y || true
+        fi
     fi
-    
-    micromamba env create -f "$env_file" -p "$ENV_BASE_PATH/$env_name"
-    
-    if [ $? -eq 0 ]; then
-        echo "  ✓ Successfully created $env_name"
+
+    if [ "$NON_INTERACTIVE" = "true" ]; then
+        micromamba create -y -f "$env_file" -p "$env_path"
     else
-        echo "  ✗ Failed to create $env_name"
+        micromamba create -f "$env_file" -p "$env_path"
+    fi
+
+    if [ $? -eq 0 ]; then
+        echo "  Successfully created $env_name"
+    else
+        echo "  Failed to create $env_name" >&2
         exit 1
     fi
     echo
 }
 
-# Create feature selection environment
-if [ -f "$ENVS_DIR/feat_select_env.yaml" ]; then
-    create_env "$ENVS_DIR/feat_select_env.yaml" "feat_select_env"
-else
-    echo "ERROR: feat_select_env.yaml not found"
-    exit 1
-fi
+# ---------------------------------------------------------------------------
+# Default env list (in dependency / usage order)
+# ---------------------------------------------------------------------------
+declare -a DEFAULT_ENVS=(
+    "feat_select_env|$ENVS_DIR/feat_select_env.yaml"
+    "transition_model_env|$ENVS_DIR/transition_model_env.yml"
+    "allocation_params_env|$ENVS_DIR/allocation_params_env.yml"
+    "dist_calc_env|$ENVS_DIR/dist_calc_env.yml"
+    "data_prep_env|$ENVS_DIR/data_prep_env.yml"
+    "allocation_env|$ENVS_DIR/allocation_env.yml"
+    "clim_data_env|$ENVS_DIR/clim_data_env.yml"
+    "trans_rate_estimation_env|$ENVS_DIR/trans_rate_estimation_env.yml"
+)
 
-# Create transition modelling environment
-if [ -f "$ENVS_DIR/transition_model_env.yml" ]; then
-    create_env "$ENVS_DIR/transition_model_env.yml" "transition_model_env"
-else
-    echo "ERROR: transition_model_env.yml not found"
-    exit 1
-fi
+# ---------------------------------------------------------------------------
+# Provision selected envs
+# ---------------------------------------------------------------------------
+provision_one() {
+    local entry="$1"
+    local env_name="${entry%%|*}"
+    local env_file="${entry##*|}"
+    if [ -f "$env_file" ]; then
+        create_env "$env_file" "$env_name"
+    else
+        echo "WARNING: $env_file not found, skipping $env_name"
+    fi
+}
 
-# Create allocation parameters environment
-if [ -f "$ENVS_DIR/allocation_params_env.yml" ]; then
-    create_env "$ENVS_DIR/allocation_params_env.yml" "allocation_params_env"
+if [ -n "$ENV_FILTER" ]; then
+    matched="false"
+    for entry in "${DEFAULT_ENVS[@]}"; do
+        env_name="${entry%%|*}"
+        if [ "$env_name" = "$ENV_FILTER" ]; then
+            provision_one "$entry"
+            matched="true"
+            break
+        fi
+    done
+    if [ "$matched" != "true" ]; then
+        echo "ERROR: --env $ENV_FILTER does not match any known environment" >&2
+        exit 1
+    fi
 else
-    echo "ERROR: allocation_params_env.yml not found"
-    exit 1
-fi
-
-# Create distance calculation environment
-if [ -f "$ENVS_DIR/dist_calc_env.yml" ]; then
-    create_env "$ENVS_DIR/dist_calc_env.yml" "dist_calc_env"
-else
-    echo "ERROR: dist_calc_env.yml not found"
-    exit 1
-fi
-
-# Create data preparation environment
-if [ -f "$ENVS_DIR/data_prep_env.yml" ]; then
-    create_env "$ENVS_DIR/data_prep_env.yml" "data_prep_env"
-else
-    echo "ERROR: data_prep_env.yml not found"
-    exit 1
-fi
-
-# Create climate data environment (if exists)
-if [ -f "$ENVS_DIR/clim_data_env.yml" ]; then
-    create_env "$ENVS_DIR/clim_data_env.yml" "clim_data_env"
-else
-    echo "WARNING: clim_data_env.yml not found, skipping"
+    for entry in "${DEFAULT_ENVS[@]}"; do
+        provision_one "$entry"
+    done
 fi
 
 echo "========================================="
 echo "Environment Setup Complete"
 echo "========================================="
-echo "Available environments:"
-micromamba env list
+echo "Available environments under $ENV_BASE_PATH:"
+ls -1 "$ENV_BASE_PATH" 2>/dev/null || true
 echo
-
-echo "To activate an environment, use:"
-echo "  micromamba activate $ENV_BASE_PATH/feat_select_env"
-echo "  micromamba activate $ENV_BASE_PATH/transition_model_env"
-echo "  micromamba activate $ENV_BASE_PATH/allocation_params_env"
-echo "  micromamba activate $ENV_BASE_PATH/dist_calc_env"
-echo "  micromamba activate $ENV_BASE_PATH/data_prep_env"
+echo "Activate with: micromamba activate $ENV_BASE_PATH/<env_name>"
 echo
-
 echo "Done!"

@@ -91,112 +91,42 @@ for (p in required_pkgs) {
 
 cat("All required packages loaded successfully.\n\n")
 
-# Source setup script
-# Try multiple possible paths for setup.r
-setup_paths <- c(
-  "../src/setup.r", # Expected path when run from scripts/
-  "src/setup.r", # If run from project root
-  file.path(dirname(dirname(getwd())), "src", "setup.r"), # Alternative
-  file.path(Sys.getenv("SLURM_SUBMIT_DIR", "."), "src", "setup.r") # Using SLURM submit dir
-)
-
-setup_found <- FALSE
-for (setup_path in setup_paths) {
-  if (file.exists(setup_path)) {
-    cat(sprintf("Sourcing %s...\n", setup_path))
-    tryCatch(
-      {
-        source(setup_path)
-        cat("setup.r sourced successfully.\n\n")
-        setup_found <- TRUE
-        break
-      },
-      error = function(e) {
-        cat(sprintf("ERROR sourcing %s: %s\n", setup_path, e$message))
-      }
-    )
+# Set working directory to project root
+script_path <- commandArgs(trailingOnly = FALSE)
+script_path <- script_path[grepl("--file=", script_path)]
+if (length(script_path) > 0) {
+  script_dir <- dirname(sub("--file=", "", script_path))
+  project_root <- dirname(script_dir)
+} else {
+  project_root <- getwd()
+  if (basename(project_root) == "scripts") {
+    project_root <- dirname(project_root)
   }
 }
+setwd(project_root)
+cat(sprintf("Working directory set to: %s\n", getwd()))
 
-if (!setup_found) {
-  cat("ERROR: Could not find or source setup.r in any expected location.\n")
-  cat("Working directory:", getwd(), "\n")
-  cat("SLURM_SUBMIT_DIR:", Sys.getenv("SLURM_SUBMIT_DIR", "not set"), "\n")
-  quit(status = 1)
-}
-
-# Source utils.r (optional, may not exist)
-utils_paths <- c(
-  "../src/utils.r",
+# Source all required functions from src/
+src_files <- c(
+  "src/setup.r",
   "src/utils.r",
-  file.path(dirname(dirname(getwd())), "src", "utils.r"),
-  file.path(Sys.getenv("SLURM_SUBMIT_DIR", "."), "src", "utils.r")
+  "src/simulation_trans_rates_prep.r"
 )
 
-utils_found <- FALSE
-for (utils_path in utils_paths) {
-  if (file.exists(utils_path)) {
-    cat(sprintf("Sourcing %s...\n", utils_path))
-    tryCatch(
-      {
-        source(utils_path)
-        cat("utils.r sourced successfully.\n\n")
-        utils_found <- TRUE
-        break
-      },
-      error = function(e) {
-        cat(sprintf("WARNING sourcing utils.r: %s\n", e$message))
-      }
-    )
-  }
-}
-
-if (!utils_found) {
-  cat("utils.r not found in any expected location (skipping)\n\n")
-}
-
-# Source simulation transition rates preparation functions
-sim_trans_paths <- c(
-  "../src/simulation_trans_rates_prep.r",
-  "src/simulation_trans_rates_prep.r",
-  file.path(
-    dirname(dirname(getwd())),
-    "src",
-    "simulation_trans_rates_prep.r"
-  ),
-  file.path(
-    Sys.getenv("SLURM_SUBMIT_DIR", "."),
-    "src",
-    "simulation_trans_rates_prep.r"
+for (src_file in src_files) {
+  cat(sprintf("Sourcing %s...\n", src_file))
+  tryCatch(
+    {
+      source(src_file)
+      cat(sprintf("%s sourced successfully.\n", src_file))
+    },
+    error = function(e) {
+      cat(sprintf("ERROR sourcing %s: %s\n", src_file, e$message))
+      quit(status = 1)
+    }
   )
-)
-
-sim_trans_found <- FALSE
-for (sim_trans_path in sim_trans_paths) {
-  if (file.exists(sim_trans_path)) {
-    cat(sprintf("Sourcing %s...\n", sim_trans_path))
-    tryCatch(
-      {
-        source(sim_trans_path)
-        cat("simulation_trans_rates_prep.r sourced successfully.\n\n")
-        sim_trans_found <- TRUE
-        break
-      },
-      error = function(e) {
-        cat(sprintf("ERROR sourcing %s: %s\n", sim_trans_path, e$message))
-      }
-    )
-  }
 }
-
-if (!sim_trans_found) {
-  cat(
-    "ERROR: Could not find or source simulation_trans_rates_prep.r in any expected location.\n"
-  )
-  cat("Working directory:", getwd(), "\n")
-  cat("SLURM_SUBMIT_DIR:", Sys.getenv("SLURM_SUBMIT_DIR", "not set"), "\n")
-  quit(status = 1)
-}
+cat("\n")
 
 # Get configuration
 cat("Loading configuration...\n")

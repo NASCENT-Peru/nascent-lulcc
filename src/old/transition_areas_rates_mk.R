@@ -12,7 +12,7 @@ terraOptions(threads = 8, parallel = TRUE, memfrac = 0.8, progress = 1)
 # terraOptions(tempdir = "D:/terra_tmp")  # optional SSD scratch
 
 # --------------------------- Paths --------------------------------------------
-lulc_dir <- "C:/Users/mankurma/Scratch/Peru/LULC"
+lulc_dir <- "C:/Users/mankurma/beegfs/Peru/LULC"
 shp_path <- "Workshop-regions.shp" # must contain attribute 'Workshop_r'
 attr_col <- "Workshop_r"
 

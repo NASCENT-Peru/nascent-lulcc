@@ -1,11 +1,3 @@
-# library(tidymodels)
-# library(ranger)
-# library(glmnet)
-# library(xgboost)
-# library(purrr)
-# library(dplyr)
-# library(yardstick)
-
 #' Transition modelling for Land Use Land Cover Change
 #' @param config A list containing configuration parameters
 #' @param refresh_cache Logical, whether to refresh cached datasets and overwrite existing model files
@@ -27,12 +19,40 @@
 transition_modelling <- function(
   config = get_config(),
   refresh_cache = FALSE,
-  model_dir = config[["transition_model_dir"]],
-  eval_dir = config[["transition_model_eval_dir"]],
-  use_regions = config[["regionalization"]],
-  model_specs_path = config[["model_specs_path"]],
-  periods_to_process = config[["data_periods"]]
+  model_dir = NULL,
+  eval_dir = NULL,
+  use_regions = NULL,
+  model_specs_path = NULL,
+  periods_to_process = NULL
 ) {
+  # Extract values from config if not provided (keys are flattened by build_full_config)
+  if (is.null(model_dir)) {
+    model_dir <- config[["transition_model_dir"]]
+    message(sprintf("Model directory set to: %s", model_dir))
+  }
+  if (is.null(eval_dir)) {
+    eval_dir <- config[["transition_model_eval_dir"]]
+    message(sprintf("Evaluation directory set to: %s", eval_dir))
+  }
+  if (is.null(use_regions)) {
+    use_regions <- config[["regionalization"]]
+    message(sprintf(
+      "Regionalization set to: %s",
+      ifelse(use_regions, "ENABLED", "DISABLED")
+    ))
+  }
+  if (is.null(model_specs_path)) {
+    model_specs_path <- config[["model_specs_path"]]
+    message(sprintf("Model specifications path set to: %s", model_specs_path))
+  }
+  if (is.null(periods_to_process)) {
+    periods_to_process <- config[["data_periods"]]
+    message(sprintf(
+      "Periods to process set to: %s",
+      paste(periods_to_process, collapse = ", ")
+    ))
+  }
+
   # create model and eval directories if they do not exist
   ensure_dir(model_dir)
   ensure_dir(eval_dir)
@@ -60,7 +80,8 @@ transition_modelling <- function(
         config = config,
         model_dir = model_dir,
         eval_dir = eval_dir,
-        refresh_cache = refresh_cache
+        refresh_cache = refresh_cache,
+        model_specs_path = model_specs_path
       )
     }
   )
@@ -71,11 +92,649 @@ transition_modelling <- function(
   # Save results
   output_path <- file.path(
     eval_dir,
-    "transition_modelling_evalaution_summary.rds"
+    "transition_modelling_evaluation_summary.rds"
   )
   saveRDS(final_summary, output_path)
 
   message("Transition modelling completed for all specified periods.")
+}
+
+#' Build the expected saved model path for a transition-region pair
+build_transition_model_path <- function(trans_name, region, model_dir) {
+  region_suffix <- ifelse(
+    is.null(region) || identical(region, "National extent"),
+    "national",
+    gsub(" ", "_", tolower(region))
+  )
+
+  file.path(model_dir, sprintf("%s_%s.qs", trans_name, region_suffix))
+}
+
+#' Build an mlr3 Learner for the given algorithm and parameters from model_specs.
+#' Detects single-value vs multi-value parameter grids to decide whether to use
+#' to_tune() (for AutoTuner) or direct assignment.
+build_mlr3_learner <- function(algo, params, predictor_count) {
+  if (algo == "glm") {
+    # classif.glmnet: regularised logistic regression matching current glmnet behaviour (D-03)
+    # No normalisation pipeline needed: classif.glmnet's L1/L2 regularisation is scale-invariant.
+    # step_normalize() from the tidymodels recipes stack is NOT replicated here.
+    alpha_vals <- params$alpha %||% c(1)
+    s_vals     <- params$s %||% c(0.01)
+    lrn_obj <- mlr3::lrn("classif.glmnet", predict_type = "prob")
+    if (length(alpha_vals) > 1L) {
+      lrn_obj$param_set$set_values(alpha = paradox::to_tune(min(alpha_vals), max(alpha_vals)))
+    } else {
+      lrn_obj$param_set$set_values(alpha = alpha_vals[[1]])
+    }
+    if (length(s_vals) > 1L) {
+      lrn_obj$param_set$set_values(s = paradox::to_tune(min(s_vals), max(s_vals), logscale = TRUE))
+    } else {
+      lrn_obj$param_set$set_values(s = s_vals[[1]])
+    }
+    return(lrn_obj)
+  }
+
+  if (algo == "rf") {
+    # classif.ranger: save.memory=TRUE and importance="none" are MANDATORY for <200MB files
+    num_trees_vals     <- params$num.trees %||% c(500L)
+    min_node_vals      <- params$min.node.size %||% c(5L)
+    mtry_vals          <- params$mtry %||% c(max(1L, floor(sqrt(predictor_count))))
+    lrn_obj <- mlr3::lrn("classif.ranger",
+      predict_type = "prob",
+      importance   = "none",    # suppresses importance vector (size reduction)
+      save.memory  = TRUE,      # suppresses OOB predictions matrix (primary size reduction)
+      num.threads  = 1L         # required for furrr parallel workers
+    )
+    if (length(num_trees_vals) > 1L) {
+      lrn_obj$param_set$set_values(num.trees = paradox::to_tune(
+        paradox::p_int(lower = min(num_trees_vals), upper = max(num_trees_vals))
+      ))
+    } else {
+      lrn_obj$param_set$set_values(num.trees = as.integer(num_trees_vals[[1]]))
+    }
+    if (length(min_node_vals) > 1L) {
+      lrn_obj$param_set$set_values(min.node.size = paradox::to_tune(
+        paradox::p_int(lower = min(min_node_vals), upper = max(min_node_vals))
+      ))
+    } else {
+      lrn_obj$param_set$set_values(min.node.size = as.integer(min_node_vals[[1]]))
+    }
+    if (length(mtry_vals) > 1L) {
+      lrn_obj$param_set$set_values(mtry = paradox::to_tune(
+        paradox::p_int(lower = min(mtry_vals), upper = min(max(mtry_vals), predictor_count))
+      ))
+    } else {
+      lrn_obj$param_set$set_values(mtry = min(as.integer(mtry_vals[[1]]), predictor_count))
+    }
+    return(lrn_obj)
+  }
+
+  if (algo == "xgboost") {
+    nrounds_vals    <- params$nrounds %||% c(100L)
+    max_depth_vals  <- params$max_depth %||% c(6L)
+    eta_vals        <- params$eta %||% c(0.1)
+    min_cw_vals     <- params$min_child_weight %||% c(5L)
+    # colsample_bytree = mtry / length(predictor_names); clamp to [0.05, 1]
+    # (XGBoost's mtry in tidymodels was an integer count; classif.xgboost uses a fraction [0,1])
+    cbt_vals        <- params$colsample_bytree %||% c(0.8)
+    lrn_obj <- mlr3::lrn("classif.xgboost",
+      predict_type = "prob",
+      nthread      = 1L   # required for furrr parallel workers
+    )
+    # Set single-value params directly; multi-value params via to_tune()
+    set_single_or_tune <- function(lrn, param, vals, is_int = FALSE) {
+      val <- if (length(vals) > 1L) {
+        if (is_int) paradox::to_tune(paradox::p_int(min(vals), max(vals)))
+        else        paradox::to_tune(paradox::p_dbl(min(vals), max(vals)))
+      } else {
+        if (is_int) as.integer(vals[[1]]) else vals[[1]]
+      }
+      do.call(lrn$param_set$set_values, setNames(list(val), param))
+      lrn
+    }
+    lrn_obj <- set_single_or_tune(lrn_obj, "nrounds",          nrounds_vals,   is_int = TRUE)
+    lrn_obj <- set_single_or_tune(lrn_obj, "max_depth",        max_depth_vals, is_int = TRUE)
+    lrn_obj <- set_single_or_tune(lrn_obj, "eta",              eta_vals)
+    lrn_obj <- set_single_or_tune(lrn_obj, "min_child_weight", min_cw_vals,    is_int = TRUE)
+    lrn_obj <- set_single_or_tune(lrn_obj, "colsample_bytree", cbt_vals)
+    return(lrn_obj)
+  }
+
+  stop(sprintf("Unknown algorithm '%s' in build_mlr3_learner()", algo))
+}
+
+#' Train one transition model using mlr3, save it as a .qs file, and return
+#' a result list compatible with perform_transition_modelling()'s aggregation.
+#'
+#' Implements: D-01 (mlr3 replacement), D-05 (save format), D-09/D-10 (subsampling),
+#' D-12 (size gate), D-13 (sanity check).
+#'
+#' @param transition_data data.frame with factor column "response" ("0"/"1") + predictor columns
+#' @param predictor_names character vector of predictor column names
+#' @param trans_name character; name of this transition (for logging and return value)
+#' @param region character or NULL; region name (for return value)
+#' @param output_path character; .qs file path to write
+#' @param config list; full config from get_config()
+#' @param model_specs list; parsed model_specs.yaml content
+#' @param log_file character or NULL; path to log file
+#' @return named list compatible with perform_transition_modelling() result aggregation
+train_mlr3_transition <- function(
+  transition_data,
+  predictor_names,
+  trans_name,
+  region,
+  output_path,
+  config,
+  model_specs,
+  log_file = NULL
+) {
+  library(mlr3)
+  library(mlr3learners)
+  library(mlr3tuning)
+  library(paradox)
+
+  `%||%` <- function(x, y) if (is.null(x) || (is.atomic(x) && length(x) == 0L)) y else x
+
+  # Path injection guard (T-02-03): output_path must be within configured model dir
+  model_dir_norm <- tryCatch(
+    normalizePath(config[["transition_model_dir"]], mustWork = FALSE),
+    error = function(e) NULL
+  )
+  if (!is.null(model_dir_norm)) {
+    out_norm <- normalizePath(output_path, mustWork = FALSE)
+    if (!startsWith(out_norm, model_dir_norm)) {
+      stop(sprintf(
+        "output_path outside configured transition_model_dir (path injection guard T-02-03): %s",
+        output_path
+      ))
+    }
+  }
+
+  # 1. Subsampling fallback (D-09, D-10)
+  max_rows <- config[["max_training_rows"]] %||% 500000L
+  if (nrow(transition_data) > max_rows) {
+    log_msg(sprintf(
+      "  Subsampling: %d rows -> %d (max_training_rows=%d, D-09)",
+      nrow(transition_data), max_rows, max_rows
+    ), log_file)
+    response_tbl <- table(transition_data$response)
+    minority_cls <- names(which.min(response_tbl))
+    majority_cls <- names(which.max(response_tbl))
+    # Cap minority at max_rows/2 so n_majority is always non-negative
+    # (handles rare cases where transitions alone exceed max_training_rows)
+    n_minority   <- min(response_tbl[[minority_cls]], max_rows %/% 2L)
+    n_majority   <- min(max_rows - n_minority, response_tbl[[majority_cls]])
+    set.seed(config[["random_seed"]] %||% 123L)  # D-10: seed from config
+    min_rows <- transition_data[transition_data$response == minority_cls, ]
+    maj_rows <- transition_data[transition_data$response == majority_cls, ]
+    maj_rows <- maj_rows[sample(nrow(maj_rows), n_majority, replace = FALSE), ]
+    transition_data <- rbind(min_rows, maj_rows)
+    log_msg(sprintf("  After subsampling: %d rows", nrow(transition_data)), log_file)
+  }
+
+  # 2. Subset to predictor columns + response
+  task_data <- transition_data[, c(predictor_names, "response"), drop = FALSE]
+
+  # 2a. Drop rows with any NA in predictors (mlr3 learners do not impute by default;
+  #     mirrors step_naomit() in the old tidymodels recipe).
+  n_before <- nrow(task_data)
+  task_data <- task_data[stats::complete.cases(task_data), ]
+  n_dropped <- n_before - nrow(task_data)
+  if (n_dropped > 0L) {
+    log_msg(sprintf(
+      "  NA rows dropped: %d of %d (%.1f%%)",
+      n_dropped, n_before, 100 * n_dropped / n_before
+    ), log_file)
+  }
+  if (nrow(task_data) == 0L) {
+    log_msg("  SKIP: 0 rows remain after NA removal", log_file)
+    return(list(status = "skipped_all_na", predictor_names = predictor_names))
+  }
+
+  # 3. mlr3 Task creation (stratified on response for balanced CV folds)
+  task <- mlr3::as_task_classif(task_data, target = "response", positive = "1")
+  task$col_roles$stratum <- "response"  # stratified resampling (see RESEARCH §2)
+  log_msg(sprintf("  Task created: %d rows, %d features", task$nrow, task$ncol - 1L), log_file)
+
+  # 4. Train one learner per algorithm in model_specs$models
+  algo_results <- list()
+  trained_learners <- list()
+
+  for (algo in names(model_specs$models)) {
+    params <- model_specs$models[[algo]]$parameters
+    log_msg(sprintf("  Training %s learner...", algo), log_file)
+
+    lrn_spec <- build_mlr3_learner(algo, params, length(predictor_names))
+
+    # Detect single-value vs multi-value grid (Risk 2 in RESEARCH)
+    has_tunable <- any(sapply(params, function(v) length(v) > 1L))
+
+    if (has_tunable) {
+      n_combos <- prod(sapply(params, length))
+      at <- mlr3tuning::auto_tuner(
+        tuner      = mlr3tuning::tnr("grid_search"),
+        learner    = lrn_spec,
+        resampling = mlr3::rsmp("cv", folds = as.integer(model_specs$global$cv_folds %||% 3L)),
+        measure    = mlr3::msr("classif.auc"),
+        term_evals = as.integer(n_combos)
+      )
+      at$train(task)
+      lrn_fitted <- at$learner  # inner Learner only — NOT the AutoTuner (Pitfall 1)
+    } else {
+      # Single-value grid: train directly without AutoTuner overhead (Risk 2)
+      lrn_fitted <- lrn_spec$clone(deep = TRUE)  # clone before training (Risk 7)
+      lrn_fitted$train(task)
+    }
+
+    trained_learners[[algo]] <- lrn_fitted
+    log_msg(sprintf("  %s trained", algo), log_file)
+  }
+
+  # 5. Select best learner (by classif.auc on a holdout or use first trained)
+  # For single-value grids, all learners are comparably trained; pick RF if available,
+  # else the first algorithm. In future, add CV-based selection here.
+  best_algo <- if ("rf" %in% names(trained_learners)) "rf" else names(trained_learners)[[1L]]
+  lrn_final <- trained_learners[[best_algo]]
+  log_msg(sprintf("  Selected learner: %s (algo=%s)", class(lrn_final)[[1L]], best_algo), log_file)
+
+  # 6. Build save object (D-05 contract)
+  model_obj <- list(
+    model_type      = "mlr3",
+    predictor_names = task$feature_names,  # Task's view is authoritative (Risk 5)
+    response_levels = task$class_names,
+    learner         = lrn_final
+  )
+
+  # 7. Save
+  ensure_dir(dirname(output_path))
+  qs::qsave(model_obj, output_path)
+  log_msg(sprintf("  Saved model: %s", output_path), log_file)
+
+  # 8. Size gate (D-12) — warn only, do not stop
+  size_bytes <- file.size(output_path)
+  if (size_bytes > 200 * 1024^2) {
+    log_msg(sprintf(
+      "WARNING: model file exceeds 200MB: %.1f MB — %s",
+      size_bytes / 1024^2, output_path
+    ), log_file)
+  } else {
+    log_msg(sprintf("  Size OK: %.1f MB", size_bytes / 1024^2), log_file)
+  }
+
+  # 9. Predict sanity check (D-13): 5-row predict, assert [0,1] non-NA
+  # Use task$data() for fixture rows — guaranteed NA-free and correctly typed
+  # from training, avoiding NA failures when transition_data rows have missing predictors.
+  model_check <- qs::qread(output_path)
+  fixture_rows <- task$data(rows = seq_len(min(5L, task$nrow)), cols = task$feature_names)
+  pred_check <- tryCatch(
+    model_check$learner$predict_newdata(newdata = fixture_rows),
+    error = function(e) {
+      log_msg(sprintf("ERROR: sanity predict_newdata() failed: %s", conditionMessage(e)), log_file)
+      stop(sprintf("Sanity check predict_newdata() failed: %s", conditionMessage(e)))
+    }
+  )
+  prob_check <- pred_check$prob[, "1"]  # always by name, not position (Risk 6, Pitfall 2)
+  if (any(is.na(prob_check)) || any(prob_check < 0) || any(prob_check > 1)) {
+    log_msg(sprintf(
+      "ERROR: 5-row sanity check failed for %s — probs: %s",
+      output_path, paste(round(prob_check, 4), collapse = ", ")
+    ), log_file)
+    stop(sprintf("Sanity check failed: probabilities not in [0,1] or contain NA: %s", output_path))
+  }
+  log_msg("  Sanity check passed (5-row predict OK)", log_file)
+
+  # 10. Return result compatible with perform_transition_modelling() aggregation
+  list(
+    transition  = trans_name,
+    region      = ifelse(is.null(region), "National extent", region),
+    status      = "success",
+    model_path  = output_path,
+    cv_metrics  = NULL,
+    test_metrics = NULL,
+    final_model = list(
+      model_path   = output_path,
+      model_type   = "mlr3",
+      size_bytes   = size_bytes,
+      n_predictors = length(predictor_names),
+      algo         = best_algo
+    )
+  )
+}
+
+#' Read an RDS file if it exists, otherwise return NULL
+read_optional_rds <- function(path) {
+  if (!file.exists(path)) {
+    return(NULL)
+  }
+
+  readRDS(path)
+}
+
+#' Format a compact character preview of a data frame for logging
+format_reconciliation_preview <- function(data, cols, max_rows = 5) {
+  if (nrow(data) == 0) {
+    return(character(0))
+  }
+
+  preview <- utils::head(
+    if (data.table::is.data.table(data)) {
+      data[, ..cols]
+    } else {
+      data[, cols, drop = FALSE]
+    },
+    max_rows
+  )
+  apply(preview, 1, function(row) paste(row, collapse = " | "))
+}
+
+#' Reconcile viable transitions against feature-selection outputs for a period
+reconcile_period_transitions <- function(
+  period,
+  region_names,
+  use_regions,
+  config
+) {
+  rate_col <- paste0("rate_", period)
+  viable_path <- config[["viable_transitions_lists"]]
+  fs_success_path <- file.path(
+    config[["feature_selection_dir"]],
+    sprintf("transition_feature_selection_summary_%s.rds", period)
+  )
+  fs_failed_path <- file.path(
+    config[["feature_selection_dir"]],
+    sprintf("feature_selection_failed_%s.rds", period)
+  )
+
+  if (!file.exists(viable_path)) {
+    stop(sprintf("Viable transitions list not found: %s", viable_path))
+  }
+
+  viable_transitions <- utils::read.csv(
+    viable_path,
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+
+  if (!rate_col %in% names(viable_transitions)) {
+    stop(sprintf(
+      "Rate column '%s' not found in viable transitions list: %s",
+      rate_col,
+      viable_path
+    ))
+  }
+
+  expected_transitions <- viable_transitions %>%
+    dplyr::filter(
+      region_name == "whole_map",
+      from_lulc != to_lulc,
+      !is.na(.data[[rate_col]])
+    ) %>%
+    dplyr::transmute(
+      period = period,
+      transition = paste(from_lulc, to_lulc, sep = "-"),
+      from_lulc = from_lulc,
+      to_lulc = to_lulc,
+      id_trans = id_trans,
+      From. = .data[["From."]],
+      To. = .data[["To."]]
+    ) %>%
+    dplyr::distinct()
+
+  expected_pairs <- tidyr::crossing(
+    expected_transitions,
+    region = region_names
+  ) %>%
+    dplyr::select(
+      period,
+      region,
+      transition,
+      from_lulc,
+      to_lulc,
+      id_trans,
+      From.,
+      To.
+    )
+
+  fs_success <- read_optional_rds(fs_success_path)
+  if (is.null(fs_success)) {
+    fs_success <- tibble::tibble(
+      region = character(),
+      transition = character(),
+      n_observations = numeric(),
+      n_transitions = numeric(),
+      n_initial_predictors = numeric(),
+      n_after_collinearity = numeric(),
+      n_after_grrf = numeric(),
+      selected_predictors = character()
+    )
+  }
+
+  fs_failed <- read_optional_rds(fs_failed_path)
+  if (is.null(fs_failed)) {
+    fs_failed <- tibble::tibble(
+      region = character(),
+      transition = character(),
+      error_details = character(),
+      status = character()
+    )
+  }
+
+  fs_success_reduced <- if (nrow(fs_success) > 0) {
+    fs_success %>%
+      dplyr::mutate(region = as.character(region)) %>%
+      dplyr::select(
+        region,
+        transition,
+        n_observations,
+        n_transitions,
+        n_initial_predictors,
+        n_after_collinearity,
+        n_after_grrf,
+        selected_predictors,
+        dplyr::any_of(c(
+          "focal_predictors",
+          "selected_predictors_collinearity",
+          "selected_predictors_grrf"
+        ))
+      ) %>%
+      dplyr::distinct()
+  } else {
+    tibble::tibble(
+      region = character(),
+      transition = character(),
+      n_observations = numeric(),
+      n_transitions = numeric(),
+      n_initial_predictors = numeric(),
+      n_after_collinearity = numeric(),
+      n_after_grrf = numeric(),
+      selected_predictors = character()
+    )
+  }
+
+  fs_failed_reduced <- if (nrow(fs_failed) > 0) {
+    fs_failed %>%
+      dplyr::mutate(region = as.character(region)) %>%
+      dplyr::select(
+        region,
+        transition,
+        fs_error_details = error_details,
+        fs_failure_status = status
+      ) %>%
+      dplyr::distinct()
+  } else {
+    tibble::tibble(
+      region = character(),
+      transition = character(),
+      fs_error_details = character(),
+      fs_failure_status = character()
+    )
+  }
+
+  reconciliation <- expected_pairs %>%
+    dplyr::left_join(
+      fs_success_reduced,
+      by = c("region", "transition")
+    ) %>%
+    dplyr::left_join(
+      fs_failed_reduced,
+      by = c("region", "transition")
+    ) %>%
+    dplyr::mutate(
+      fs_status = dplyr::case_when(
+        !is.na(selected_predictors) ~ "success",
+        !is.na(fs_failure_status) ~ "failed",
+        TRUE ~ "missing"
+      ),
+      fs_error_details = dplyr::if_else(
+        fs_status == "failed",
+        fs_error_details,
+        NA_character_
+      )
+    ) %>%
+    dplyr::select(
+      period,
+      region,
+      transition,
+      from_lulc,
+      to_lulc,
+      id_trans,
+      From.,
+      To.,
+      fs_status,
+      fs_error_details,
+      n_observations,
+      n_transitions,
+      n_initial_predictors,
+      n_after_collinearity,
+      n_after_grrf,
+      dplyr::any_of(c(
+        "focal_predictors",
+        "selected_predictors_collinearity",
+        "selected_predictors_grrf"
+      )),
+      selected_predictors
+    ) %>%
+    dplyr::arrange(region, transition)
+
+  message(sprintf(
+    "Pre-modelling reconciliation for %s: expected=%d, fs_success=%d, fs_failed=%d, fs_missing=%d",
+    period,
+    nrow(reconciliation),
+    sum(reconciliation$fs_status == "success", na.rm = TRUE),
+    sum(reconciliation$fs_status == "failed", na.rm = TRUE),
+    sum(reconciliation$fs_status == "missing", na.rm = TRUE)
+  ))
+
+  failed_preview <- reconciliation %>%
+    dplyr::filter(fs_status == "failed")
+  if (nrow(failed_preview) > 0) {
+    preview_lines <- format_reconciliation_preview(
+      failed_preview,
+      c("transition", "region", "fs_error_details")
+    )
+    message("  Feature-selection failures (first few):")
+    purrr::walk(preview_lines, ~ message(sprintf("    %s", .x)))
+  }
+
+  missing_preview <- reconciliation %>%
+    dplyr::filter(fs_status == "missing")
+  if (nrow(missing_preview) > 0) {
+    preview_lines <- format_reconciliation_preview(
+      missing_preview,
+      c("transition", "region")
+    )
+    message("  Missing from feature-selection outputs (first few):")
+    purrr::walk(preview_lines, ~ message(sprintf("    %s", .x)))
+  }
+
+  reconciliation
+}
+
+#' Write a human-readable period summary log
+write_transition_modelling_summary_log <- function(
+  reconciliation,
+  period,
+  region_names,
+  log_path
+) {
+  if (file.exists(log_path)) {
+    file.remove(log_path)
+  }
+
+  log_msg(
+    sprintf(
+      "Transition modelling summary | period=%s | regions=%d",
+      period,
+      length(region_names)
+    ),
+    log_path
+  )
+
+  counts <- c(
+    expected_pairs = nrow(reconciliation),
+    fs_success = sum(reconciliation$fs_status == "success", na.rm = TRUE),
+    fs_failed = sum(reconciliation$fs_status == "failed", na.rm = TRUE),
+    fs_missing = sum(reconciliation$fs_status == "missing", na.rm = TRUE),
+    model_success = sum(reconciliation$model_status == "success", na.rm = TRUE),
+    model_error = sum(reconciliation$model_status == "error", na.rm = TRUE),
+    skipped_no_predictors = sum(
+      reconciliation$model_status == "skipped_no_predictors",
+      na.rm = TRUE
+    ),
+    missing_no_file = sum(
+      reconciliation$model_status == "missing_no_file",
+      na.rm = TRUE
+    ),
+    not_attempted_fs_failed = sum(
+      reconciliation$model_status == "not_attempted_fs_failed",
+      na.rm = TRUE
+    ),
+    not_attempted_fs_missing = sum(
+      reconciliation$model_status == "not_attempted_fs_missing",
+      na.rm = TRUE
+    )
+  )
+
+  purrr::iwalk(
+    counts,
+    function(value, name) {
+      log_msg(sprintf("%s: %d", name, value), log_path)
+    }
+  )
+
+  status_breakdown <- reconciliation %>%
+    dplyr::filter(model_status != "success") %>%
+    dplyr::select(
+      transition,
+      region,
+      fs_status,
+      model_status,
+      fs_error_details,
+      model_error_message
+    )
+
+  if (nrow(status_breakdown) > 0) {
+    log_msg("Non-success transition-region pairs:", log_path)
+    preview_lines <- apply(
+      status_breakdown,
+      1,
+      function(row) paste(row, collapse = " | ")
+    )
+    purrr::walk(preview_lines, ~ log_msg(.x, log_path))
+  }
+
+  fitted_models <- sum(reconciliation$model_status == "success", na.rm = TRUE)
+  total_pairs <- nrow(reconciliation)
+  pct <- if (total_pairs == 0) 0 else 100 * fitted_models / total_pairs
+  log_msg(
+    sprintf(
+      "%d of %d viable transition-region pairs have fitted models (%.1f%%)",
+      fitted_models,
+      total_pairs,
+      pct
+    ),
+    log_path
+  )
 }
 
 #' Wrapper function to perform transition modelling for a given period
@@ -83,29 +742,32 @@ transition_modelling <- function(
 #' @param use_regions Logical, whether to use regionalization
 #' @param config A list containing configuration parameters
 #' @param refresh_cache Logical, whether to refresh cached datasets
-#' @return A list of model evaluation results
+#' @return A reconciliation data frame summarizing final model status
 perform_transition_modelling <- function(
   period,
   use_regions,
   config,
-  model_dir = model_dir,
-  eval_dir = eval_dir,
+  model_dir = NULL,
+  eval_dir = NULL,
   refresh_cache = FALSE,
-  model_specs_path = config[["model_specs_path"]]
+  model_specs_path = NULL
 ) {
+  # Extract values from config if not provided (keys are flattened by build_full_config)
+  if (is.null(model_dir)) {
+    model_dir <- config[["transition_model_dir"]]
+  }
+  if (is.null(eval_dir)) {
+    eval_dir <- config[["transition_model_eval_dir"]]
+  }
+  if (is.null(model_specs_path)) {
+    model_specs_path <- config[["model_specs_path"]]
+  }
+
   # Directories for saving models, evaluations, and debug info
-  model_dir <- file.path(
-    config[["transition_model_dir"]],
-    period
-  )
-  eval_dir <- file.path(
-    config[["transition_model_eval_dir"]],
-    period
-  )
-  debug_dir <- file.path(
-    model_dir,
-    "debug_logs"
-  )
+  model_dir <- file.path(model_dir, period)
+  eval_dir <- file.path(eval_dir, period)
+  debug_dir <- file.path(model_dir, "debug_logs")
+
   ensure_dir(model_dir)
   ensure_dir(eval_dir)
   ensure_dir(debug_dir)
@@ -131,47 +793,6 @@ perform_transition_modelling <- function(
 
   # Combine predictor lists
   pred_table <- c(static_preds, period_preds)
-
-  # load summary of transition feature selection
-  fs_summary <- readRDS(
-    file.path(
-      config[["feature_selection_dir"]],
-      sprintf(
-        "transition_feature_selection_summary_%s.rds",
-        period
-      )
-    )
-  )
-
-  # Filter out transitions that failed feature selection
-  fs_summary_all <- fs_summary
-  fs_summary <- fs_summary %>%
-    dplyr::filter(
-      !is.na(selected_predictors) &
-        selected_predictors != "" &
-        nchar(trimws(selected_predictors)) > 0
-    ) %>%
-    # Order by increasing number of observations for quick testing
-    dplyr::arrange(n_observations)
-
-  message(sprintf(
-    "Loaded feature selection summary: %d total combinations, %d passed feature selection",
-    nrow(fs_summary_all),
-    nrow(fs_summary)
-  ))
-
-  if (nrow(fs_summary) == 0) {
-    stop(
-      "No transitions passed feature selection. Check feature selection results."
-    )
-  }
-
-  message(sprintf(
-    "Processing %d successful transitions, ordered by n_observations (%d to %d)",
-    nrow(fs_summary),
-    min(fs_summary$n_observations),
-    max(fs_summary$n_observations)
-  ))
 
   # Parquet file paths
   transitions_pq_path <- file.path(
@@ -260,6 +881,105 @@ perform_transition_modelling <- function(
     message("Processing national extent (no regionalization)\n")
   }
 
+  reconciliation <- reconcile_period_transitions(
+    period = period,
+    region_names = region_names,
+    use_regions = use_regions,
+    config = config
+  )
+
+  # Stage 2 -> 3 boundary audit: log structured counts of FS outcomes
+  .audit_23 <- reconciliation %>%
+    dplyr::count(fs_status, name = "n") %>%
+    dplyr::mutate(label = paste0(fs_status, "=", n)) %>%
+    dplyr::pull(label) %>%
+    paste(collapse = " ")
+  n_expected <- nrow(reconciliation)
+  n_fs_success <- sum(reconciliation$fs_status == "success")
+  n_fs_failed  <- sum(reconciliation$fs_status == "failed")
+  n_fs_missing <- sum(reconciliation$fs_status == "missing")
+  message(sprintf(
+    "AUDIT stage=2->3 period=%s expected=%d fs_success=%d fs_failed=%d fs_missing=%d",
+    period, n_expected, n_fs_success, n_fs_failed, n_fs_missing
+  ))
+  if ((n_fs_failed + n_fs_missing) > 0L) {
+    affected <- reconciliation %>%
+      dplyr::filter(fs_status %in% c("failed", "missing")) %>%
+      dplyr::mutate(.label = paste0(transition, "@", region, "[", fs_status, "]")) %>%
+      dplyr::pull(.label)
+    warning(sprintf(
+      "Stage 2->3 [period=%s]: %d transition(s) will not be modelled (fs_failed=%d, fs_missing=%d): %s",
+      period, n_fs_failed + n_fs_missing, n_fs_failed, n_fs_missing,
+      paste(affected, collapse = "; ")
+    ))
+  }
+
+  fs_summary <- reconciliation %>%
+    dplyr::filter(
+      fs_status == "success",
+      !is.na(selected_predictors),
+      selected_predictors != "",
+      nchar(trimws(selected_predictors)) > 0
+    ) %>%
+    dplyr::arrange(n_observations)
+
+  reconciliation_csv_path <- file.path(
+    eval_dir,
+    sprintf("transition_modelling_reconciliation_%s.csv", period)
+  )
+  reconciliation_rds_path <- file.path(
+    eval_dir,
+    sprintf("transition_modelling_reconciliation_%s.rds", period)
+  )
+  summary_log_path <- file.path(
+    eval_dir,
+    sprintf("transition_modelling_summary_%s.log", period)
+  )
+
+  if (nrow(fs_summary) == 0) {
+    message(sprintf(
+      "No successful feature-selection rows available for modelling in %s. Writing summary outputs only.",
+      period
+    ))
+
+    reconciliation <- reconciliation %>%
+      dplyr::mutate(
+        model_path = purrr::map2_chr(
+          transition,
+          region,
+          ~ build_transition_model_path(.x, .y, model_dir)
+        ),
+        model_status = dplyr::case_when(
+          fs_status == "failed" ~ "not_attempted_fs_failed",
+          fs_status == "missing" ~ "not_attempted_fs_missing",
+          TRUE ~ "skipped_no_predictors"
+        ),
+        model_error_message = dplyr::if_else(
+          model_status == "skipped_no_predictors",
+          "Feature selection success row did not include usable predictors.",
+          NA_character_
+        )
+      )
+
+    utils::write.csv(reconciliation, reconciliation_csv_path, row.names = FALSE)
+    saveRDS(reconciliation, reconciliation_rds_path)
+    write_transition_modelling_summary_log(
+      reconciliation = reconciliation,
+      period = period,
+      region_names = region_names,
+      log_path = summary_log_path
+    )
+
+    return(reconciliation)
+  }
+
+  message(sprintf(
+    "Processing %d successful transitions, ordered by n_observations (%d to %d)",
+    nrow(fs_summary),
+    min(fs_summary$n_observations, na.rm = TRUE),
+    max(fs_summary$n_observations, na.rm = TRUE)
+  ))
+
   # --- Parallel processing of transitions ---
 
   # Determine number of cores from SLURM or fallback (default to 1 for safety)
@@ -291,7 +1011,7 @@ perform_transition_modelling <- function(
   ))
 
   # Parallel over region × transition combinations from fs_summary
-  transitions_model_results <- furrr::future_map_dfr(
+  transitions_model_results <- furrr::future_map(
     task_ids,
     function(i) {
       # Extract the row (this row defines ONE task)
@@ -334,37 +1054,56 @@ perform_transition_modelling <- function(
       log_msg("Arrow datasets opened successfully\n", log_file)
 
       # --- Run the actual model ---
+      captured_trace <- NULL
       tryCatch(
-        {
-          model_single_transition(
-            trans_name = trans_name,
-            refresh_cache = refresh_cache,
-            region = region,
-            use_regions = use_regions,
-            ds_transitions = ds_transitions,
-            ds_static = ds_static,
-            ds_dynamic = ds_dynamic,
-            period = period,
-            config = config,
-            model_dir = model_dir,
-            eval_dir = eval_dir,
-            log_file = log_file,
-            fs_summary = fs_summary
-          )
-        },
+        withCallingHandlers(
+          {
+            model_single_transition(
+              trans_name = trans_name,
+              refresh_cache = refresh_cache,
+              region = region,
+              use_regions = use_regions,
+              ds_transitions = ds_transitions,
+              ds_static = ds_static,
+              ds_dynamic = ds_dynamic,
+              period = period,
+              config = config,
+              model_dir = model_dir,
+              eval_dir = eval_dir,
+              log_file = log_file,
+              fs_summary = fs_summary,
+              model_specs_path = model_specs_path
+            )
+          },
+          error = function(e) {
+            # Capture the call stack while it is still intact, before
+            # tryCatch unwinds it. sys.calls() works without rlang.
+            captured_trace <<- sys.calls()
+          }
+        ),
         error = function(e) {
           error_msg <- sprintf(
             "ERROR in transition modelling for %s-%s: %s",
             trans_name,
             region,
-            e$message
+            conditionMessage(e)
           )
           log_msg(error_msg, log_file)
+
+          trace_text <- if (!is.null(captured_trace)) {
+            paste(
+              vapply(
+                captured_trace,
+                function(cl) paste(deparse(cl), collapse = " "),
+                character(1)
+              ),
+              collapse = "\n"
+            )
+          } else {
+            "<no trace captured>"
+          }
           log_msg(
-            sprintf(
-              "Full error traceback: %s",
-              paste(traceback(), collapse = "\n")
-            ),
+            sprintf("Full error traceback:\n%s", trace_text),
             log_file
           )
 
@@ -373,7 +1112,7 @@ perform_transition_modelling <- function(
             transition = trans_name,
             region = region,
             status = "error",
-            error_message = e$message,
+            error_message = conditionMessage(e),
             cv_metrics = NULL,
             test_metrics = NULL
           )
@@ -383,41 +1122,91 @@ perform_transition_modelling <- function(
     .options = furrr::furrr_options(seed = TRUE)
   )
 
-  future::plan(future::sequential) # Reset to sequential
+  future::plan(future::sequential)
 
-  # Log summary of processed vs skipped models
-  total_tasks <- length(task_ids)
-  skipped_models <- sum(
-    sapply(transitions_model_results, function(x) {
-      !is.null(x$skipped) && x$skipped == TRUE
-    }),
-    na.rm = TRUE
+  results_summary <- purrr::map_dfr(
+    transitions_model_results,
+    function(result) {
+      tibble::tibble(
+        transition = result$transition %||% NA_character_,
+        region = result$region %||% NA_character_,
+        result_status = result$status %||% NA_character_,
+        error_message = result$error_message %||% NA_character_,
+        skipped = isTRUE(result$skipped)
+      )
+    }
   )
-  processed_models <- total_tasks - skipped_models
 
-  message(sprintf(
-    "\nModel processing summary for period %s:",
-    periods_to_process
-  ))
-  message(sprintf(
-    "  Total transition-region combinations: %d",
-    total_tasks
-  ))
-  message(sprintf(
-    "  Models processed: %d",
-    processed_models
-  ))
-  message(sprintf(
-    "  Models skipped (existing): %d",
-    skipped_models
-  ))
-  if (skipped_models > 0) {
-    message(sprintf(
-      "  To reprocess existing models, set refresh_cache = TRUE"
-    ))
-  }
+  reconciliation <- reconciliation %>%
+    dplyr::left_join(
+      results_summary,
+      by = c("transition", "region")
+    ) %>%
+    dplyr::mutate(
+      model_path = purrr::map2_chr(
+        transition,
+        region,
+        ~ build_transition_model_path(.x, .y, model_dir)
+      ),
+      model_file_exists = file.exists(model_path),
+      model_status = dplyr::case_when(
+        fs_status == "failed" ~ "not_attempted_fs_failed",
+        fs_status == "missing" ~ "not_attempted_fs_missing",
+        fs_status == "success" &
+          (is.na(selected_predictors) |
+            selected_predictors == "" |
+            nchar(trimws(selected_predictors)) == 0) ~ "skipped_no_predictors",
+        fs_status == "success" & model_file_exists ~ "success",
+        fs_status == "success" &
+          result_status == "skipped_no_predictors" ~ "skipped_no_predictors",
+        fs_status == "success" &
+          result_status == "error" ~ "error",
+        fs_status == "success" ~ "missing_no_file",
+        TRUE ~ "missing_no_file"
+      ),
+      model_error_message = dplyr::case_when(
+        model_status %in% c("error", "skipped_no_predictors") ~ error_message,
+        TRUE ~ NA_character_
+      )
+    ) %>%
+    dplyr::select(-skipped, -model_file_exists, -result_status, -error_message)
 
-  return(transitions_model_results)
+  utils::write.csv(reconciliation, reconciliation_csv_path, row.names = FALSE)
+  saveRDS(reconciliation, reconciliation_rds_path)
+  write_transition_modelling_summary_log(
+    reconciliation = reconciliation,
+    period = period,
+    region_names = region_names,
+    log_path = summary_log_path
+  )
+
+  message(sprintf("\nModel processing summary for period %s:", period))
+  message(sprintf(
+    "  Expected viable transition-region pairs: %d",
+    nrow(reconciliation)
+  ))
+  message(sprintf(
+    "  Feature-selection success / failed / missing: %d / %d / %d",
+    sum(reconciliation$fs_status == "success", na.rm = TRUE),
+    sum(reconciliation$fs_status == "failed", na.rm = TRUE),
+    sum(reconciliation$fs_status == "missing", na.rm = TRUE)
+  ))
+  message(sprintf(
+    "  Model success / error / skipped-no-predictors / missing-no-file: %d / %d / %d / %d",
+    sum(reconciliation$model_status == "success", na.rm = TRUE),
+    sum(reconciliation$model_status == "error", na.rm = TRUE),
+    sum(reconciliation$model_status == "skipped_no_predictors", na.rm = TRUE),
+    sum(reconciliation$model_status == "missing_no_file", na.rm = TRUE)
+  ))
+  message(sprintf(
+    "  Not attempted because feature selection failed / missing: %d / %d",
+    sum(reconciliation$model_status == "not_attempted_fs_failed", na.rm = TRUE),
+    sum(reconciliation$model_status == "not_attempted_fs_missing", na.rm = TRUE)
+  ))
+  message(sprintf("  Reconciliation CSV: %s", reconciliation_csv_path))
+  message(sprintf("  Summary log: %s", summary_log_path))
+
+  reconciliation
 }
 
 #' Model a single transition for a given region
@@ -463,7 +1252,7 @@ model_single_transition <- function(
   save_debug = FALSE,
   log_file = NULL,
   fs_summary,
-  model_specs_path = config[["model_specs_path"]]
+  model_specs_path
 ) {
   log_msg(
     sprintf(
@@ -475,13 +1264,7 @@ model_single_transition <- function(
   )
 
   # Construct model file path for existence check
-  region_suffix <- ifelse(
-    is.null(region),
-    "national",
-    gsub(" ", "_", tolower(region))
-  )
-  model_filename <- sprintf("%s_%s.rds", trans_name, region_suffix)
-  model_path <- file.path(model_dir, model_filename)
+  model_path <- build_transition_model_path(trans_name, region, model_dir)
 
   # Check if model file already exists and skip if refresh_cache = FALSE
   if (!refresh_cache && file.exists(model_path)) {
@@ -641,30 +1424,35 @@ model_single_transition <- function(
   model_specs <- yaml::yaml.load_file(model_specs_path)
   log_msg("Loaded model specifications", log_file)
 
-  # call multi_spec_trans_modelling
-  results <- multi_spec_trans_modelling(
-    transition_data = transition_data,
-    model_specs = model_specs,
-    log_file = log_file
+  # Dispatch to mlr3 training pipeline (D-01: replaces multi_spec_trans_modelling +
+  # fit_and_save_best_model; old functions retained below for reference but not called)
+  results <- tryCatch(
+    withCallingHandlers(
+      train_mlr3_transition(
+        transition_data = transition_data,
+        predictor_names = pred_names,
+        trans_name      = trans_name,
+        region          = region,
+        output_path     = model_path,
+        config          = config,
+        model_specs     = model_specs,
+        log_file        = log_file
+      ),
+      error = function(e) { captured_trace <<- sys.calls() }
+    ),
+    error = function(e) {
+      log_msg(sprintf("  ERROR in train_mlr3_transition: %s", conditionMessage(e)), log_file)
+      list(
+        transition    = trans_name,
+        region        = ifelse(is.null(region), "National extent", region),
+        status        = "error",
+        error_message = conditionMessage(e),
+        cv_metrics    = NULL,
+        test_metrics  = NULL,
+        final_model   = NULL
+      )
+    }
   )
-
-  # # save the result object as rds
-  # saveRDS(
-  #   results,
-  #   file = "test_results.rds"
-  # )
-
-  # Fit best model to full dataset and save (model_path already constructed above)
-  best_model_info <- fit_and_save_best_model(
-    results = results,
-    full_data = transition_data,
-    output_path = model_path,
-    log_file = log_file,
-    max_final_fit_size = model_specs$global$max_final_fit_size
-  )
-
-  # Add best model info to results
-  results$final_model <- best_model_info
   return(results)
 }
 
@@ -2902,9 +3690,6 @@ fit_and_save_best_model <- function(
 
   tryCatch(
     {
-      # Use enhanced model saving with tidypredict support
-      source(file.path("src", "enhanced_model_saving.r"))
-
       saved_model <- save_minimal_model(
         final_workflow = final_workflow,
         best_model_name = best_model_name,
@@ -2971,8 +3756,6 @@ predict_with_saved_model <- function(model_path, new_data, type = "prob") {
       model_obj$model_type %in%
         c("tidypredict_glm", "tidypredict_rf", "tidypredict_xgboost")
   ) {
-    # Source enhanced prediction functions
-    source(file.path("src", "enhanced_model_saving.r"))
     return(predict_minimal_model(model_path, new_data, type))
   }
 

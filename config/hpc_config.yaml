@@ -2,7 +2,10 @@
 environment: "hpc"
 
 # Base paths
-data_basepath: "/cluster/scratch/bblack/nascent-lulcc"
+# `data_basepath` is resolved at load time from the HPC_SCRATCH_ROOT env var
+# (set in .env / hpc_common.sh) so the same checked-in YAML works for any
+# operator on Euler without per-user edits (D-13, D-14, PIPE-04).
+data_basepath: "${HPC_SCRATCH_ROOT}"
 inputs_dir: "inputs"
 tools_dir: "tools"
 outputs_dir: "outputs"
@@ -32,14 +35,16 @@ output_dirs:
   trans_dataset_dir: "outputs/transition_datasets"
   feature_selection_dir: "outputs/feature_selection"
   transition_model_dir: "outputs/transition_models"
+  transition_model_eval_dir: "outputs/transition_model_evaluation"
   validation_dir: "outputs/validation"
+  simulation_output_dir: "outputs/simulations"
 
 # Seperate file path entries for important individual files that are used in multiple places or need to be easily referenced
 input_output_files_paths:
-  viable_transitions_lists: "outputs/transition_identification/viable_transitions_lists.rds"
+  viable_transitions_lists: "outputs/transition_identification/viable_transitions_lists.csv"
   ref_grid_path: "inputs/spatial_reference_grid/ref_grid_aggregated.tif"
   ref_grid_agg_path: "inputs/spatial_reference_grid/ref_grid_aggregated.tif"
-  lulc_initial_areas_path: "inputs/lulc/future_demand/lulc_initial_areas.csv"
+  lulc_initial_areas_path: "inputs/lulc/future_demand"
   lulc_demand_path: "inputs/lulc/future_demand/lulc_demand_results.csv"
   lulc_historic_trans_rates_path : "inputs/lulc/future_demand/historic_lulc_transition_rates.csv"
 
@@ -62,8 +67,25 @@ configuration_settings:
   data_periods: ["2018_2022"] #"2010_2014", "2014_2018", 
   regionalization: true
   scenario_names: ["BAU", "NAT", "CUL", "SOC"]
+  scenario_to_ssp_mapping: 
+    BAU: "ssp245"
+    NAT: "ssp126"
+    CUL: "ssp126"
+    SOC: "ssp126"
   simulation_start_year: 2022
   simulation_end_year: 2060
+  simulation_year_steps: [2022, 2024, 2028, 2032, 2036, 2040, 2044, 2048, 2052, 2056, 2060]  # explicit list — see 03.2-CONTEXT.md D-01
+  selected_scalar: 9.0
+  max_training_rows: 1000000  # Higher threshold on HPC nodes; operator should tune to actual node RAM (Phase 2, D-11)
+  # Stage 7 per-region SLURM routing, probed by submit_allocation_scenario.sh.
+  # Entries are region SUFFIXES (label lowercased, spaces -> underscores),
+  # sized from measured peak RSS of the 160-thread fat runs:
+  #   cuenca_del_amazonas ~341GB, andes ~208GB, selva_andina ~167GB -> fat;
+  #   costa_peruana ~110GB -> highmem (188GB).
+  # A region listed in NEITHER tier routes to fat — the fail-safe default (a
+  # small region on fat merely queues; a big region on highmem OOMs).
+  allocation_fat_regions: ["andes", "cuenca_del_amazonas", "selva_andina"]
+  allocation_highmem_regions: ["costa_peruana"]
 
 # Simulation transition rates preparation configuration
 simulation_trans_rates_params:
@@ -85,6 +107,9 @@ simulation_trans_rates_params:
   forbid_inflow: []
   num_workers: 6
   scale_factor: [1.0, 3.0, 5.0, 9.0]  # Scale factors to apply to the transition rates for each scenario (in same order as scenario_names)
+  forbidden_from_classes: ["mining"]  # LULC classes for which ALL outgoing transitions are globally forbidden
+  saturation_threshold: 0.90
+  saturation_exempt: []  # entries: {from_lulc: <int>, to_lulc: <int>, reason: <text>}
 
 transition_identification_params:
   num_workers: 8

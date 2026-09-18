@@ -19,6 +19,32 @@
 #' @author Ben Black
 #' @export
 
+load_unmodelled_transitions <- function(config) {
+  period <- dplyr::last(config[["data_periods"]])
+  recon_path <- file.path(
+    config[["transition_model_eval_dir"]],
+    period,
+    sprintf("transition_modelling_reconciliation_%s.rds", period)
+  )
+
+  if (!file.exists(recon_path)) {
+    stop(sprintf(
+      "Reconciliation file not found for period '%s': %s. Run transition_modelling() first.",
+      period,
+      recon_path
+    ))
+  }
+
+  readRDS(recon_path) %>%
+    dplyr::filter(model_status != "success") %>%
+    dplyr::transmute(
+      region_name = as.character(region),
+      From = from_lulc,
+      To = to_lulc
+    ) %>%
+    dplyr::distinct()
+}
+
 simulation_trans_rates_prep <- function(
   config = get_config()
 ) {
@@ -28,7 +54,6 @@ simulation_trans_rates_prep <- function(
   # ================================
   # A. LOAD CONFIGURATION
   # ================================
-
   message("\n[1/7] Loading configuration...")
 
   sim_config <- config[["simulation_trans_rates_params"]]
@@ -42,11 +67,6 @@ simulation_trans_rates_prep <- function(
   trans_rate_table_dir <- config[["trans_rate_table_dir"]]
   ensure_dir(trans_rate_table_dir)
   message(sprintf("  ✓ Output directory: %s", trans_rate_table_dir))
-
-  # set up directory for scalar experimentation
-  scalar_dir <- file.path(trans_rate_table_dir, "scalar_experimentation")
-  ensure_dir(scalar_dir)
-  message(sprintf("  ✓ Scalar experimentation directory: %s", scalar_dir))
 
   # ================================
   # B. LOAD INPUT DATA
@@ -122,86 +142,50 @@ simulation_trans_rates_prep <- function(
       )
     )
 
-  # --- CSV version (commented out for xlsx testing) ---
-  # # Load the results of the LULC demand elicitation excercise, which contains the slider values, confidence factors, initial rates, and curve types for each scenario and LULC class.
-  # file_demand <- config[["lulc_demand_path"]]
-  # if (!file.exists(file_demand)) {
-  #   stop(sprintf("File not found: %s", file_demand))
-  # }
-  # lulc_demand <- read.csv(file_demand) %>%
-  #   dplyr::mutate(
-  #     slider_value = clean_numeric(slider_value),
-  #     confidence_factor = clean_numeric(confidence_factor),
-  #     initial_rate = clean_numeric(initial_rate),
-  #     curve_type = dplyr::recode(
-  #       curve_type,
-  #       "Cambio constante" = "Constant change",
-  #       "Crecimiento instantáneo" = "Instant growth",
-  #       "Crecimiento retrasado" = "Delayed growth",
-  #       "Disminución instantánea" = "Instant decline",
-  #       "Disminución retrasada" = "Delayed decline",
-  #       "Immediate growth" = "Instant growth",
-  #       .default = curve_type
-  #     ),
-  #     lulc_name = dplyr::recode(
-  #       lulc_name,
-  #       !!!spanish_to_class,
-  #       .default = lulc_name
-  #     )
-  #   )
-  # message(sprintf("  ✓ Demand results: %d rows", nrow(lulc_demand)))
-
   clean_numeric <- function(x) {
     x <- as.character(x)
     x <- gsub(",", ".", x)
     as.numeric(x)
   }
 
-  # --- xlsx version (testing alternative) ---
-  file_demand <- "E:/nascent-lulcc-agg/inputs/lulc/future_demand/LULC_demand_results.xlsx"
+  # Load the LULC demand elicitation results from the config-driven CSV
+  # path (PIPE-01, D-12, D-13). The previous Windows-only `xlsx` shortcut
+  # has been removed: HPC and any other operator must use the same CSV
+  # path resolved by `get_config()` from `config[["lulc_demand_path"]]`.
+  file_demand <- config[["lulc_demand_path"]]
+  if (is.null(file_demand) || !nzchar(file_demand)) {
+    stop("Config key 'lulc_demand_path' is not set; cannot load LULC demand.")
+  }
   if (!file.exists(file_demand)) {
     stop(sprintf("File not found: %s", file_demand))
   }
-  lulc_demand <- readxl::read_xlsx(file_demand) %>%
+  lulc_demand <- read.csv(file_demand) %>%
     dplyr::mutate(
-      `Slider value` = clean_numeric(`Slider value`),
-      `Confidence factor` = clean_numeric(`Confidence factor`),
-      `Initial rate` = clean_numeric(`Initial rate`),
-      curve = dplyr::recode(
-        curve,
+      slider_value = clean_numeric(slider_value),
+      confidence_factor = clean_numeric(confidence_factor),
+      initial_rate = clean_numeric(initial_rate),
+      curve_type = dplyr::recode(
+        curve_type,
         "Cambio constante" = "Constant change",
         "Crecimiento instantáneo" = "Instant growth",
         "Crecimiento retrasado" = "Delayed growth",
         "Disminución instantánea" = "Instant decline",
         "Disminución retrasada" = "Delayed decline",
-        "Constant change" = "Constant change",
-        "Delayed growth" = "Delayed growth",
         "Immediate growth" = "Instant growth",
-        .default = curve
+        .default = curve_type
       ),
-      LULC = dplyr::recode(
-        LULC,
+      lulc_name = dplyr::recode(
+        lulc_name,
         !!!spanish_to_class,
-        .default = LULC
-      )
-    ) %>%
-    dplyr::rename(
-      slider_value = `Slider value`,
-      confidence_factor = `Confidence factor`,
-      initial_rate = `Initial rate`,
-      scenario = Scenario,
-      region_name = Region,
-      curve_type = curve,
-      lulc_name = LULC
-    ) %>%
-    dplyr::mutate(
+        .default = lulc_name
+      ),
       region_name = dplyr::recode(
         region_name,
         !!!setNames(regions_schema$label, regions_schema$pretty),
         .default = region_name
       )
     )
-  message(sprintf("  ✓ Demand results (xlsx): %d rows", nrow(lulc_demand)))
+  message(sprintf("  ✓ Demand results: %d rows", nrow(lulc_demand)))
 
   # Cross-check: every lulc_name in lulc_demand must exist in initial_lulc_areas and vice versa
   lulc_names_demand <- sort(unique(lulc_demand$lulc_name))
@@ -229,7 +213,14 @@ simulation_trans_rates_prep <- function(
     stop(sprintf("File not found: %s", trans_rates_path))
   }
   hist_trans_rates <- read.csv(trans_rates_path) %>%
-    dplyr::rename(iLULC = from_lulc, jLULC = to_lulc)
+    dplyr::rename(iLULC = from_lulc, jLULC = to_lulc) %>%
+    dplyr::mutate(
+      region_name = dplyr::recode(
+        region_name,
+        !!!setNames(regions_schema$label, regions_schema$pretty),
+        .default = region_name
+      )
+    )
   message(sprintf("  ✓ Transition rates: %d rows", nrow(hist_trans_rates)))
 
   # ================================
@@ -249,12 +240,38 @@ simulation_trans_rates_prep <- function(
   ))
 
   # set up table of forbidden transitions. This will be used in the optimization to set hard constraints on certain transitions.
-  forbid_pairs_df <- tidyr::expand_grid(
-    region_name = NA_character_,
-    From = "mining",
-    To = setdiff(lulcs_global, "mining")
+  # Class-level exclusions are config-driven via sim_config[["forbidden_from_classes"]]
+  # (see 03.2-CONTEXT.md and threat T-3.2-01-1: null-guard defaults to empty list so the
+  # pipeline continues without exclusions when the key is absent).
+  forbidden_from_classes <- sim_config[["forbidden_from_classes"]]
+  if (is.null(forbidden_from_classes)) forbidden_from_classes <- character(0)
+  if (length(forbidden_from_classes) > 0) {
+    message(sprintf(
+      "  - Applying global class exclusions from config (forbidden_from_classes): %s",
+      paste(forbidden_from_classes, collapse = ", ")
+    ))
+  }
+  forbid_pairs_df <- if (length(forbidden_from_classes) > 0) {
+    tidyr::expand_grid(
+      region_name = NA_character_,
+      From = forbidden_from_classes,
+      To = setdiff(lulcs_global, forbidden_from_classes)
+    ) %>%
+      tibble::as_tibble()
+  } else {
+    tibble::tibble(region_name = character(), From = character(), To = character())
+  }
+
+  unmodelled_df <- load_unmodelled_transitions(config)
+  message(sprintf(
+    "  - Forbidding %d non-modelled (region, transition) pairs from reconciliation",
+    nrow(unmodelled_df)
+  ))
+  forbid_pairs_df <- dplyr::bind_rows(
+    forbid_pairs_df,
+    unmodelled_df
   ) %>%
-    tibble::as_tibble()
+    dplyr::distinct()
 
   # Process the historical transition rates to compute min, max, and mean rates for each Region-iLULC-jLULC combination.
   # This will be used to set bounds and preferences in the optimization model.
@@ -273,30 +290,44 @@ simulation_trans_rates_prep <- function(
       meanRate = ifelse(is.finite(meanRate), pmax(0, pmin(1, meanRate)), 0),
       maxRate = pmax(maxRate, minRate)
     ) %>%
-    dplyr::select(region_name, iLULC, jLULC, minRate, maxRate, meanRate)
+    dplyr::select(
+      region_name,
+      iLULC,
+      jLULC,
+      minRate,
+      maxRate,
+      meanRate,
+      id_trans
+    )
 
-  # year_steps <- unique(c(
-  #   seq(
-  #     config[["simulation_start_year"]],
-  #     config[["simulation_end_year"]],
-  #     by = config[["step_length"]]
-  #   ),
-  #   config[["simulation_end_year"]]
-  # ))
-
-  year_steps <- c(
-    2022,
-    2024,
-    2028,
-    2032,
-    2036,
-    2040,
-    2044,
-    2048,
-    2052,
-    2056,
-    2060
-  )
+  # Read year_steps from config as an explicit ordered list (see 03.2-CONTEXT.md D-01..D-03).
+  # No derivation: the explicit list preserves the intentional 2-year first step (2022 -> 2024)
+  # that any cadence-based generator would silently relocate. The anchor keys for the start and
+  # end years are kept as canonical references against which the list is validated below.
+  year_steps <- config[["simulation_year_steps"]]
+  if (is.null(year_steps) || length(year_steps) == 0) {
+    stop("config[[\"simulation_year_steps\"]] is missing or empty. Add an explicit ordered list to your config YAML — see 03.2-CONTEXT.md D-01.")
+  }
+  sim_start <- config[["simulation_start_year"]]
+  sim_end   <- config[["simulation_end_year"]]
+  if (year_steps[1] != sim_start) {
+    stop(sprintf(
+      "simulation_year_steps[1] is %d but simulation_start_year is %d — update one to match the other before continuing.",
+      year_steps[1], sim_start
+    ))
+  }
+  if (tail(year_steps, 1) != sim_end) {
+    stop(sprintf(
+      "simulation_year_steps ends at %d but simulation_end_year is %d — update one to match the other before continuing.",
+      tail(year_steps, 1), sim_end
+    ))
+  }
+  if (!all(diff(year_steps) > 0)) {
+    stop(sprintf(
+      "simulation_year_steps must be strictly increasing — observed diffs: %s",
+      paste(diff(year_steps), collapse = ", ")
+    ))
+  }
 
   step_length <- diff(year_steps)
   T_steps_val <- length(step_length)
@@ -313,7 +344,7 @@ simulation_trans_rates_prep <- function(
     step_length = step_length,
     T_steps_val = T_steps_val,
     forbid_pairs_df = forbid_pairs_df,
-    trans_rate_table_dir = scalar_dir
+    trans_rate_table_dir = trans_rate_table_dir
   )
 
   message("\nSimulation Transition Rates Preparation Complete")
@@ -817,14 +848,44 @@ optimize_region_scenario <- function(
       )
       lulc_ids <- class_to_value[lulcs]
 
+      # Build id_trans lookup from df_trans_source (From./To. in class_name → id_trans)
+      # We need to map lulc_ids (numeric values) back to class names, then to id_trans
+      value_to_class <- setNames(
+        sapply(lulc_schema, function(x) x$class_name),
+        sapply(lulc_schema, function(x) x$value)
+      )
+
+      # Create lookup: (from_val, to_val) → id_trans
+      # Derive numeric values via class_to_value[iLULC] so they have the same
+      # type as lulc_ids (both come from class_to_value, guaranteeing type match).
+      id_trans_lookup <- df_trans_source %>%
+        dplyr::filter(region_name == r) %>%
+        dplyr::mutate(
+          from_val = class_to_value[iLULC],
+          to_val = class_to_value[jLULC]
+        ) %>%
+        dplyr::select(from_val, to_val, id_trans) %>%
+        dplyr::distinct()
+
       rate_dir <- file.path(output_dir, s, r)
       dir.create(rate_dir, recursive = TRUE, showWarnings = FALSE)
 
+      # Stage 4 boundary audit precompute: per-region viable input and
+      # forbidden-excluded counts (independent of timestep)
+      n_viable_input <- nrow(df_trans_source[df_trans_source$region_name == r, ])
+      n_forbidden_excluded <- nrow(forbid_pairs_df[
+        is.na(forbid_pairs_df$region_name) | forbid_pairs_df$region_name == r,
+      ])
+
       for (t in seq_len(T_steps_val)) {
-        x_val <- res$getValue(x_vars[[t]])
+        # Clamp solver output to >= 0: OSQP/SCS can return tiny negative values
+        # (~1e-18) due to numerical tolerances even when x_t >= 0 is constrained.
+        x_val <- pmax(res$getValue(x_vars[[t]]), 0)
         area_t <- area_mat[, t]
-        # rate[i,j] = flow[i,j] / area[i]
-        rate_mat <- x_val / pmax(area_t, 1e-12)
+        # rate[i,j] = flow[i,j] / area[i] — both must be in the same units.
+        # x_val is in optimizer fraction space; area_mat is scaled by scale_fac,
+        # so divide area_t back to fractions before the ratio.
+        rate_mat <- x_val / pmax(area_t / scale_fac, 1e-12)
 
         from_ids <- rep(lulc_ids, each = L)
         to_ids <- rep(lulc_ids, times = L)
@@ -837,11 +898,37 @@ optimize_region_scenario <- function(
           check.names = FALSE
         )
 
+        # Drop hard-forbidden transitions (forbidden_from_classes + unmodelled
+        # region pairs). The optimiser drives their flow to ~0 via the x_t == 0
+        # constraint, but the row must be physically ABSENT from Stage 4 output
+        # (see scripts/audit_transition_pipeline.r: forbidden transitions appear
+        # in Stage 1 but not Stage 4). Without this, the row survives the
+        # !is.na(id_trans) filter carrying a solver residual (~1e-11) into the
+        # rate table. hard_forbid is L x L; as.vector(t(.)) is row-major, matching
+        # the from_ids = rep(lulc_ids, each = L) row order of rate_df at this point.
+        rate_df <- rate_df[!as.vector(t(mats$hard_forbid)), , drop = FALSE]
+
+        # Left-join id_trans
+        rate_df <- rate_df %>%
+          dplyr::left_join(
+            id_trans_lookup,
+            by = c("From*" = "from_val", "To*" = "to_val")
+          )
+
+        # Filter out persistence rows (From* == To*, id_trans = NA)
+        # Keep only modelable transitions for Dinamica
+        rate_df <- rate_df %>%
+          dplyr::filter(!is.na(id_trans))
+
         rate_file <- file.path(
           rate_dir,
           paste0(s, "-", r, "-trans_rates-", year_steps[t], ".csv")
         )
         readr::write_csv(rate_df, file = rate_file)
+        message(sprintf(
+          "AUDIT stage=4 scenario=%s region=%s timestep=%s viable_input=%d forbidden_excluded=%d rate_csv_rows=%d",
+          s, r, year_steps[t], n_viable_input, n_forbidden_excluded, nrow(rate_df)
+        ))
       }
 
       log_msg(
@@ -1240,9 +1327,13 @@ run_scalar_optimization_loop <- function(
 
   message("\n[5/7] Setting up scalar iterations...")
 
-  # scalars <- config$simulation_trans_rates_params$scale_factor
-  # scalars <- 5
-  scalars <- c(1.0, seq(3.0, 9.0, by = 2))
+  # scalars come from config (see threat T-3.2-01-2: stop() with actionable message if absent).
+  # sim_config is NOT in scope here — run_scalar_optimization_loop() does not receive it;
+  # read directly from config which IS a parameter of this function.
+  scalars <- config[["simulation_trans_rates_params"]][["scale_factor"]]
+  if (is.null(scalars) || length(scalars) == 0) {
+    stop("config[[\"simulation_trans_rates_params\"]][[\"scale_factor\"]] is missing or empty. Add it to your config YAML.")
+  }
   message(sprintf("  ✓ Scalars: %s", paste(scalars, collapse = ", ")))
 
   # Extract colors from lulc_schema, keyed by class_name to match lulc_name in data

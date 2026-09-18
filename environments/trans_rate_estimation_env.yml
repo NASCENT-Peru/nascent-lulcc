@@ -35,6 +35,8 @@ dependencies:
   # Visualization packages
   - r-ggplot2
   - r-scales
+  - r-ggrepel
+  - r-patchwork
   
   # Utility packages
   - r-data.table
