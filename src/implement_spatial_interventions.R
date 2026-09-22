@@ -1,3 +1,145 @@
+#' @title Resolve intervention mask paths for a scenario and set of years
+#' @description
+#' Shared resolver used by the allocation engine, the Stage 7 pre-flight and
+#' the standalone validator. Reads `<scenario>_interventions.yml` from
+#' `interventions_dir`, keeps Allocation-stage entries, and returns one row per
+#' (intervention, year) where the year is in both `years` and the entry's
+#' `Time_steps_implemented`. Mask names must be bare filenames and always
+#' resolve to `file.path(mask_dir, name)` (D-05). An implemented year with no
+#' Dynamic mask entry is an error (D-14). Missing mask files are NOT an error
+#' here: they are reported via `exists = FALSE` and callers decide.
+#'
+#' Uses base R and `yaml::` only (no data.table syntax) so it can be sourced
+#' into baseenv-parented environments.
+#' @param interventions_dir Directory containing `<scenario>_interventions.yml`.
+#' @param mask_dir Directory containing the intervention mask rasters.
+#' @param scenario Scenario identifier.
+#' @param years Integer vector of simulation years to resolve.
+#' @return data.frame with columns scenario, intervention_id, rank, year,
+#'   mask_type, mask_name, mask_path, exists (zero rows when nothing active).
+resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, years) {
+  yaml_path <- file.path(interventions_dir, paste0(scenario, "_interventions.yml"))
+  empty <- data.frame(
+    scenario = character(0),
+    intervention_id = character(0),
+    rank = numeric(0),
+    year = integer(0),
+    mask_type = character(0),
+    mask_name = character(0),
+    mask_path = character(0),
+    exists = logical(0),
+    stringsAsFactors = FALSE
+  )
+  if (!file.exists(yaml_path)) {
+    stop(sprintf("interventions YAML missing: %s", yaml_path))
+  }
+  entries <- yaml::yaml.load_file(yaml_path)
+  if (is.null(entries) || length(entries) == 0L) {
+    return(empty)
+  }
+  is_alloc <- vapply(entries, function(x) {
+    st <- x[["Intervention_stage"]]
+    !is.null(st) && identical(as.character(st), "Allocation")
+  }, logical(1))
+  entries <- entries[is_alloc]
+  if (length(entries) == 0L) {
+    return(empty)
+  }
+  ids <- vapply(entries, function(x) {
+    v <- x[["Intervention_ID"]]
+    if (is.null(v)) NA_character_ else as.character(v)
+  }, character(1))
+  dup <- unique(ids[duplicated(ids)])
+  if (length(dup) > 0L) {
+    stop(sprintf(
+      "duplicate Intervention_ID in %s: %s",
+      yaml_path, paste(dup, collapse = ", ")
+    ))
+  }
+
+  years <- as.integer(years)
+  rows <- list()
+  for (i in seq_along(entries)) {
+    x <- entries[[i]]
+    id <- ids[[i]]
+    rank <- if (is.null(x[["Intervention_ranking"]])) {
+      NA_real_
+    } else {
+      as.numeric(x[["Intervention_ranking"]])
+    }
+    implemented <- as.integer(unlist(x[["Time_steps_implemented"]]))
+    active_years <- intersect(years, implemented)
+    mask_type <- if (is.null(x[["Mask_type"]])) NA_character_ else as.character(x[["Mask_type"]])
+    for (y in active_years) {
+      if (identical(mask_type, "Static")) {
+        name <- x[["Intervention_mask"]]
+      } else if (identical(mask_type, "Dynamic")) {
+        name <- x[["Intervention_mask"]][[as.character(y)]]
+        if (is.null(name)) {
+          stop(sprintf(
+            "no Dynamic Intervention_mask entry for year %d (scenario=%s id=%s)",
+            y, scenario, id
+          ))
+        }
+      } else {
+        stop(sprintf("Unknown Mask_type: %s (scenario=%s id=%s)", mask_type, scenario, id))
+      }
+      name <- as.character(unlist(name))
+      if (length(name) != 1L || is.na(name) || !nzchar(name)) {
+        stop(sprintf(
+          "Intervention_mask must be a single bare filename (scenario=%s id=%s year=%d)",
+          scenario, id, y
+        ))
+      }
+      if (grepl("[/\\\\]", name) || grepl("..", name, fixed = TRUE)) {
+        stop(sprintf("Intervention_mask must be a bare filename: %s", name))
+      }
+      mask_path <- file.path(mask_dir, name)
+      rows[[length(rows) + 1L]] <- data.frame(
+        scenario = as.character(scenario),
+        intervention_id = id,
+        rank = rank,
+        year = as.integer(y),
+        mask_type = mask_type,
+        mask_name = name,
+        mask_path = mask_path,
+        exists = file.exists(mask_path),
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+  if (length(rows) == 0L) {
+    return(empty)
+  }
+  out <- do.call(rbind, rows)
+  rownames(out) <- NULL
+  out
+}
+
+#' @title Cached inside-mask lookup table indexed by region cell_id
+#' @description
+#' Reads `mask_path` once per call-scoped `cache`, samples it at the national
+#' cell numbers `cell_index$ref_cell_id` (never an xy matrix), and returns a
+#' logical vector of length `max(cell_index$cell_id)` that is TRUE where the
+#' mask value equals 1.
+#' @param mask_path Path to the mask raster.
+#' @param cell_index data.table/data.frame with columns cell_id (region) and
+#'   ref_cell_id (national cell number on the mask grid).
+#' @param cache Environment created with `new.env(parent = emptyenv())`.
+#' @return Logical vector indexed by region cell_id.
+.mask_inside_lut <- function(mask_path, cell_index, cache) {
+  key <- normalizePath(mask_path, mustWork = TRUE)
+  if (exists(key, envir = cache, inherits = FALSE)) {
+    return(get(key, envir = cache, inherits = FALSE))
+  }
+  m <- terra::rast(mask_path)
+  v <- terra::extract(m, cell_index$ref_cell_id)[[1L]]
+  lut <- logical(max(cell_index$cell_id))
+  lut[cell_index$cell_id[!is.na(v) & v == 1]] <- TRUE
+  assign(key, lut, envir = cache)
+  lut
+}
+
 #' @title Implement Spatial Interventions on per-transition Probabilities
 #' @description
 #' Implement all specified spatial interventions on the long-format
