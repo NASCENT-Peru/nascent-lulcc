@@ -399,6 +399,7 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
   packages_expected <- character(0)
   files_expected <- character(0)
   dinamica_expected <- NULL
+  intervention_errors <- character(0)
 
   if (!is.null(fixture)) {
     env_expected <- as.character(fixture[["env"]] %||% character(0))
@@ -437,6 +438,61 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
         maybe("lulc_aggregation_path"),
         regions_json
       )
+
+      # D-14: every intervention mask the active scenarios x active posterior
+      # years will read must exist. Check files, not the directory
+      # (build_full_config auto-creates spat_prob_perturb_dir). run_allocation.r
+      # has already narrowed scenario_names by ALLOCATION_PROFILE_SCENARIO.
+      interventions_dir <- maybe("interventions_dir")
+      mask_dir <- maybe("spat_prob_perturb_dir")
+      if (!is.null(interventions_dir) && !is.null(mask_dir) &&
+          exists("resolve_intervention_masks", mode = "function")) {
+        years <- utils::tail(
+          as.integer(unlist(config[["simulation_year_steps"]])), -1L
+        )
+        # Mirror filter_allocation_timesteps(): a non-integer value is
+        # reported here; a non-posterior year leaves nothing to check (that
+        # function stops on it later).
+        year_post_filter <- Sys.getenv("ALLOCATION_YEAR_POST_FILTER", unset = "")
+        if (nzchar(year_post_filter)) {
+          year_post <- suppressWarnings(as.integer(year_post_filter))
+          if (is.na(year_post)) {
+            intervention_errors <- c(
+              intervention_errors,
+              "intervention config: ALLOCATION_YEAR_POST_FILTER must be an integer posterior year"
+            )
+            years <- integer(0)
+          } else {
+            years <- years[years == year_post]
+          }
+        }
+        if (length(years) > 0L) {
+          for (scenario in as.character(unlist(config[["scenario_names"]]))) {
+            resolved <- tryCatch(
+              resolve_intervention_masks(interventions_dir, mask_dir, scenario, years),
+              error = function(e) {
+                intervention_errors <<- c(
+                  intervention_errors,
+                  sprintf("intervention config: %s", conditionMessage(e))
+                )
+                NULL
+              }
+            )
+            if (is.null(resolved) || nrow(resolved) == 0L) next
+            missing_rows <- resolved[!resolved$exists, , drop = FALSE]
+            if (nrow(missing_rows) > 0L) {
+              intervention_errors <- c(
+                intervention_errors,
+                sprintf(
+                  "intervention mask: missing %s (scenario=%s id=%s year=%d)",
+                  missing_rows$mask_path, scenario,
+                  missing_rows$intervention_id, missing_rows$year
+                )
+              )
+            }
+          }
+        }
+      }
     }
     dinamica_backend <- Sys.getenv("DINAMICA_BACKEND", unset = "auto")
     dinamica_artifact <- Sys.getenv("DINAMICA_EGO_8_HOME", unset = "")
@@ -473,6 +529,9 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
       errors <- c(errors, sprintf("file: missing %s", f))
     }
   }
+
+  # 3b. intervention masks / config (D-14; non-fixture mode only)
+  errors <- c(errors, intervention_errors)
 
   # 4. Dinamica backend availability
   if (!is.null(dinamica_expected)) {
