@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 5 context gathered
-last_updated: "2026-09-22T10:47:27.248Z"
+last_updated: "2026-09-22T10:53:29.733Z"
 last_activity: 2026-09-22 -- Phase 05 execution started
 progress:
   total_phases: 12
   completed_phases: 9
   total_plans: 42
-  completed_plans: 38
+  completed_plans: 39
   percent: 75
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 ## Current Position
 
 Phase: 05 (integrate-spatial-interventions-branch-and-stage-interventio) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Executing Phase 05
 Last activity: 2026-09-22 -- Phase 05 execution started
 
@@ -37,7 +37,7 @@ Last activity: 2026-09-22 -- Phase 05 execution started
 - Phase 3.3 inserted after Phase 3.2 (2026-05-26, URGENT): Dinamica allocation throughput observed at ~1% in Phase 3.1 (4,477 of hundreds of thousands of requested cells placed); root cause likely probability maps with too few non-zero values to support the demanded volume; phase diagnoses and remediates
 - Phase 3.5 inserted after Phase 3 (2026-06-22): Reduce the allocation memory floor — (a) lazy per-transition Parquet predictor reads to cut the ~80GB preload floor to ~10–20GB (memory-bound → core-bound), and (b) threaded ranger prediction using spare cores. Multi-scenario node packing (S2) folded into Phase 4's goal + success criteria. (Replaces the briefly-added Phase 5, which was split: Goals 2+3 → Phase 3.5, Goal 1 → Phase 4.)
 
-Progress: [█████████░] 90%
+Progress: [█████████░] 93%
 
 - Phase 03.6 inserted after Phase 3: Complete single-scenario end-to-end run (all regions x all timesteps) (URGENT)
 - Phase 5 added (2026-09-22): Integrate colleague's `spatial_interventions` branch into the much-advanced `main`; check spatial-intervention masks (`D:\C.3_Modelling\nascent-lulcc-agg\inputs\spat_prob_perturb`) against the intervention config files and plan their HPC file-system placement
@@ -75,6 +75,7 @@ Progress: [█████████░] 90%
 | Phase 05 P01 | 10 min | 2 tasks | 18 files |
 | Phase 05 P02 | 25min | 2 tasks | 2 files |
 | Phase 05 P03 | 12 min | 3 tasks | 27 files |
+| Phase 05 P04 | 20min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,8 @@ Recent decisions affecting current work:
 - [Phase ?]: 05-02: allocation.r caller keeps old implement_spatial_interventions signature until 05-04 rewires it
 - [Phase 05]: 05-03: Stage 6 spatial-interventions prep retired; interventions run inside allocation (Stage 7), legacy code parked in src/old/
 - [Phase 05]: 05-03: Scenario YAML Intervention_mask values are bare filenames resolved under spat_prob_perturb_dir (D-05); intervention prose lives in docs/spatial_interventions/
+- [Phase 05]: 05-04: Intervention pre-flight lines (D-14) collected separately and appended after file checks; fixture mode never emits them
+- [Phase 05]: 05-04: generate_probability_maps() hook uses year_post (D-07); normalized re-keyed on row_idx after the engine call
 
 ### Pending Todos
 
@@ -128,6 +131,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-22T10:47:15.924Z
+Last session: 2026-09-22T10:53:15.629Z
 Stopped at: Phase 5 context gathered
 Resume file: .planning/phases/05-integrate-spatial-interventions-branch-and-stage-interventio/05-CONTEXT.md
