@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# sha256 manifests are verified with `sha256sum -c` on Linux, which rejects CRLF
+docs/spatial_interventions/masks.sha256 text eol=lf

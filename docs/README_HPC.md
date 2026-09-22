@@ -275,6 +275,91 @@ alone leaves no headroom.
 > Prerequisite: confirm the Dinamica wiring with the dry-run / `--live`
 > `scripts/smoke_test_dinamica.sh` (above) before the first real Stage 7 job.
 
+### Spatial intervention masks
+
+Allocation applies the Allocation-stage interventions from
+`config/<SCENARIO>_interventions.yml` to the per-transition probabilities, so
+the mask rasters must be on scratch before any Stage 7 job. The Stage 7
+pre-flight stops with `intervention mask: missing ...` if a referenced mask is
+absent.
+
+**Placement.** Masks live in `${HPC_SCRATCH_ROOT}/inputs/spat_prob_perturb/`
+(currently `/beegfs/black/nascent-lulcc/inputs/spat_prob_perturb/`). The path is
+`data_basepath` + `spat_prob_perturb_dir` from `config/hpc_config.yaml`; a
+local run uses the same key under the local `data_basepath`. Each
+`Intervention_mask` entry in the YAMLs is a bare filename that is joined to
+this directory. `interventions_dir` is the repo `config/` directory on both HPC
+and local (resolved from the project root), so the YAMLs arrive with
+`git pull` on login02. Masks never go into git. Config loading auto-creates
+the mask directory, so an empty directory means "not staged": the pre-flight
+and the validator check the files, not the directory.
+
+**What to stage.** Only the flat `*_mask*.tif` set: 14 files, about 34 MB,
+listed in `docs/spatial_interventions/masks.sha256`. The local
+`nascent-pa-prioritization/` folder (PA source inputs), `README.txt` and
+`urban_settlement_mask_methodology.txt` stay on the workstation.
+
+**Transfer.** From the workstation:
+
+```bash
+# Preferred (where rsync is available):
+rsync -av --include='*_mask*.tif' --exclude='*' \
+  /d/C.3_Modelling/nascent-lulcc-agg/inputs/spat_prob_perturb/ \
+  login02.cluster.zalf.de:/beegfs/black/nascent-lulcc/inputs/spat_prob_perturb/
+
+# Fallback from the Windows workstation (Git Bash has no rsync):
+ssh login02.cluster.zalf.de 'mkdir -p /beegfs/black/nascent-lulcc/inputs/spat_prob_perturb'
+scp /d/C.3_Modelling/nascent-lulcc-agg/inputs/spat_prob_perturb/*_mask*.tif \
+  login02.cluster.zalf.de:/beegfs/black/nascent-lulcc/inputs/spat_prob_perturb/
+```
+
+**Verify on HPC** (login02, after `git pull`). The checksum step proves the
+transfer; the validator proves existence for every scenario and posterior
+year, the exact reference grid (`compareGeom`, no resampling) and the value
+domain {0, 1, NA}:
+
+```bash
+cd "$HPC_SCRATCH_ROOT/inputs/spat_prob_perturb" && \
+  sha256sum -c <repo>/docs/spatial_interventions/masks.sha256
+
+# From the repo root, inside allocation_env:
+Rscript scripts/validate_intervention_masks.r --out logs/intervention_mask_validation_hpc.md
+# Require "VERDICT: PASS" (exit 0). Any FAIL is fixed by an offline re-export
+# of the mask, never by resampling on HPC.
+```
+
+**Intervention smoke.** One scenario, region and posterior year, then the
+assertion script:
+
+```bash
+sbatch --partition=highmem \
+  --export=ALL,ALLOCATION_PROFILE_SCENARIO=NAT,ALLOCATION_REGION_FILTER=costa_peruana,ALLOCATION_YEAR_POST_FILTER=2032 \
+  scripts/submit_allocation_smoke.sh
+
+# After the job completes:
+Rscript scripts/verify_intervention_smoke.r --scenario NAT --region costa_peruana --year 2032 \
+  --extra-log logs/lulc-allocation-smoke-<job_id>.out
+```
+
+`verify_intervention_smoke.r` prints one `PASS ...` line or `ERROR:` lines and
+exits 1. It checks that `posterior.tif` exists, that the worker log has one
+`AUDIT stage=intervention region=` line per active intervention (5 for NAT
+2032) plus one summary line, that every Absolute-0 target probability map is 0
+inside (or outside) its mask, and that no forbidden error marker appears.
+
+Notes:
+
+- Always pass `ALLOCATION_YEAR_POST_FILTER` explicitly. The script default
+  (2026) is not a posterior year, so no intervention would fire.
+- Bare `sbatch` lands on `compute` (93 GB) and OOMs. Use `highmem`, and `fat`
+  for the big regions (`andes`, `cuenca_del_amazonas`).
+- The smoke overwrites `outputs/simulations/NAT/2032/region_costa_peruana/`.
+  Move the old directory aside first if you want to keep it.
+- With a year filter the anterior map is the initial 2022 map, so the output
+  is a mechanism check, not a scientific 2032 result.
+- Every scenario output produced before interventions were wired in is
+  obsolete. The Phase 4 sweep reruns them.
+
 ### Allocation smoke test
 
 `scripts/submit_allocation_smoke.sh` runs the allocation for a **single region**,
