@@ -1,0 +1,194 @@
+# =============================================================================
+# NAT_interventions.yml — Nature for Nature scenario (SSP1-aligned)
+# =============================================================================
+#
+# Spatial intervention configuration for the NAT scenario, applied inside
+# generate_probability_maps() in src/allocation.r between probability
+# prediction and per-transition TIF writes.
+#
+# Authored 2026-06-05 from the design recorded in
+# spatial_interventions_integration_protocol.md §4a.
+#
+# Narrative anchor (from scenario_narratives.txt):
+#   - Strict nature protection: 30% PA expansion by 2030 with strong
+#     suppression of high-impact land-use change inside PAs.
+#   - Mining: no new concessions granted beyond 2030; existing operations
+#     allowed to continue.
+#   - Urban densification: 92% urban by 2060; growth concentrated inside
+#     existing settlement zones with active suppression of sprawl.
+#   - Indigenous reserves recognised as part of the conservation estate;
+#     high-impact conversions suppressed inside titled community lands.
+#
+# Years: 4-year simulation steps from 2024 to 2060 (LULC baseline = 2022).
+# Class names follow config/lulc_schema.json.
+# Mask paths are relative to the project root.
+#
+# Intervention_ranking semantics: lower number runs earlier; later
+# interventions further adjust probabilities the earlier ones produced.
+#   1. Conservation     — Absolute=0 inside PAs (most restrictive; runs first)
+#   2. Mining freeze    — Absolute=0 outside concessions (from 2032+)
+#   3. Indigenous OECM forest — Relative-Decrease on forest-loss transitions
+#   4. Indigenous OECM ag     — Relative-Decrease on intensification
+#   5. Urban densification    — Relative push (boost-inside / decrease-outside)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Conservation_expansion_and_preservation
+#    Hard-block high-impact transitions inside the time-staggered PA mask.
+#    Mask = Deléglise-derived NAT PAs, phase-staggered:
+#      phase0 (current, 17.9%) for 2024-2028
+#      phase1 (target, ~30% reached by 2030) for 2032
+#      phase2 (full + connectivity) for 2036-2060
+# -----------------------------------------------------------------------------
+- Intervention_stage: Allocation
+  Intervention_ID: Conservation_expansion_and_preservation
+  Intervention_ranking: 1
+  Time_steps_implemented:
+    - 2024
+    - 2028
+    - 2032
+    - 2036
+    - 2040
+    - 2044
+    - 2048
+    - 2052
+    - 2056
+    - 2060
+  Transition_target_classes:
+    - built_up_and_barren_lands
+    - high_intensity_agricultural_areas
+    - mining
+  Prob_adjust_type: Absolute
+  Prob_adjust_value: 0
+  Prob_adjust_zone: Inside
+  Mask_type: Dynamic
+  Intervention_mask:
+    '2024': spatial_masks/protected_areas_mask_NAT_phase0_current.tif
+    '2028': spatial_masks/protected_areas_mask_NAT_phase0_current.tif
+    '2032': spatial_masks/protected_areas_mask_NAT_phase1_target.tif
+    '2036': spatial_masks/protected_areas_mask_NAT_phase2_full.tif
+    '2040': spatial_masks/protected_areas_mask_NAT_phase2_full.tif
+    '2044': spatial_masks/protected_areas_mask_NAT_phase2_full.tif
+    '2048': spatial_masks/protected_areas_mask_NAT_phase2_full.tif
+    '2052': spatial_masks/protected_areas_mask_NAT_phase2_full.tif
+    '2056': spatial_masks/protected_areas_mask_NAT_phase2_full.tif
+    '2060': spatial_masks/protected_areas_mask_NAT_phase2_full.tif
+
+# -----------------------------------------------------------------------------
+# 2. Mining_freeze_post_2030
+#    From the 2032 timestep onward (first post-2030 step): no new mining
+#    outside the existing concession mask. Inside the concession mask the
+#    baseline model probabilities are unchanged.
+# -----------------------------------------------------------------------------
+- Intervention_stage: Allocation
+  Intervention_ID: Mining_freeze_post_2030
+  Intervention_ranking: 2
+  Time_steps_implemented:
+    - 2032
+    - 2036
+    - 2040
+    - 2044
+    - 2048
+    - 2052
+    - 2056
+    - 2060
+  Transition_target_classes: mining
+  Prob_adjust_type: Absolute
+  Prob_adjust_value: 0
+  Prob_adjust_zone: Outside
+  Mask_type: Static
+  Intervention_mask: spatial_masks/mining_concessions_mask.tif
+
+# -----------------------------------------------------------------------------
+# 3. Indigenous_land_OECM_forest
+#    Inside titled Indigenous lands (SICNA Amazonian + COFOPRI Andean),
+#    suppress forest-loss transitions to high-impact destinations.
+# -----------------------------------------------------------------------------
+- Intervention_stage: Allocation
+  Intervention_ID: Indigenous_land_OECM_forest
+  Intervention_ranking: 3
+  Time_steps_implemented:
+    - 2024
+    - 2028
+    - 2032
+    - 2036
+    - 2040
+    - 2044
+    - 2048
+    - 2052
+    - 2056
+    - 2060
+  Transition_target_classes:
+    - built_up_and_barren_lands
+    - high_intensity_agricultural_areas
+    - mining
+  From_lulc_filter: forested_areas
+  Prob_adjust_type: Relative
+  Prob_adjust_valency: Decrease
+  Prob_adjust_intervention_percentile: 90
+  Prob_adjust_non_intervention_percentile: 90
+  Prob_adjust_threshold: 5
+  Prob_adjust_zone: Inside
+  Mask_type: Static
+  Intervention_mask: spatial_masks/indigenous_lands_mask.tif
+
+# -----------------------------------------------------------------------------
+# 4. Indigenous_land_OECM_ag
+#    Inside titled Indigenous lands, suppress agricultural intensification
+#    (low-intensity ag -> high-intensity ag).
+# -----------------------------------------------------------------------------
+- Intervention_stage: Allocation
+  Intervention_ID: Indigenous_land_OECM_ag
+  Intervention_ranking: 4
+  Time_steps_implemented:
+    - 2024
+    - 2028
+    - 2032
+    - 2036
+    - 2040
+    - 2044
+    - 2048
+    - 2052
+    - 2056
+    - 2060
+  Transition_target_classes: high_intensity_agricultural_areas
+  From_lulc_filter: low_intensity_agricultural_areas
+  Prob_adjust_type: Relative
+  Prob_adjust_valency: Decrease
+  Prob_adjust_intervention_percentile: 90
+  Prob_adjust_non_intervention_percentile: 90
+  Prob_adjust_threshold: 5
+  Prob_adjust_zone: Inside
+  Mask_type: Static
+  Intervention_mask: spatial_masks/indigenous_lands_mask.tif
+
+# -----------------------------------------------------------------------------
+# 5. Urban_densification
+#    Inside the settlement-zone mask (GHSL >=1500 m² + DBSCAN-equivalent
+#    clustering + 500 m buffer): simultaneously boost top-percentile cells
+#    inside and suppress top-percentile cells outside. Strongest possible
+#    "concentrate built-up into existing settlements" effect.
+# -----------------------------------------------------------------------------
+- Intervention_stage: Allocation
+  Intervention_ID: Urban_densification
+  Intervention_ranking: 5
+  Time_steps_implemented:
+    - 2024
+    - 2028
+    - 2032
+    - 2036
+    - 2040
+    - 2044
+    - 2048
+    - 2052
+    - 2056
+    - 2060
+  Transition_target_classes: built_up_and_barren_lands
+  Prob_adjust_type: Relative
+  Prob_adjust_valency: Increase_inside_decrease_outside
+  Prob_adjust_intervention_percentile: 90
+  Prob_adjust_non_intervention_percentile: 90
+  Prob_adjust_threshold: 5
+  Prob_adjust_zone: Inside
+  Mask_type: Static
+  Intervention_mask: spatial_masks/urban_settlement_mask.tif

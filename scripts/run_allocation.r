@@ -90,7 +90,8 @@ src_files <- c(
   "src/utils.r",
   "src/dinamica_utils.r",
   "src/saturation_diagnostics.r",
-  "src/allocation.r"
+  "src/allocation.r",
+  "src/implement_spatial_interventions.R"
 )
 
 for (src_file in src_files) {
