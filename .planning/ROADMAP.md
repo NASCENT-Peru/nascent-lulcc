@@ -295,7 +295,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 **Requirements**: TBD
 **Depends on:** Phase 3.6 (allocation runs end-to-end on `main`)
-**Plans:** 4/6 plans executed
+**Plans:** 5/6 plans executed
 
 Plans:
 
@@ -308,7 +308,7 @@ Plans:
 
 **Wave 3** *(parallel — no files_modified overlap)*
 - [x] 05-04-PLAN.md — Allocation wiring: year_post into generate_probability_maps() hook, fatal sourcing, Stage 7 pre-flight mask checks (D-07, D-14).
-- [ ] 05-05-PLAN.md — Mask validator + local report, smoke assertion script, sha256 manifest, README_HPC placement/staging (D-08..D-13, D-15).
+- [x] 05-05-PLAN.md — Mask validator + local report, smoke assertion script, sha256 manifest, README_HPC placement/staging (D-08..D-13, D-15).
 
 **Wave 4** *(operator-gated)*
 - [ ] 05-06-PLAN.md — Hand-off gate, HPC mask staging + validation, NAT x costa_peruana x 2032 intervention smoke, merge to main (D-11, D-15, SC4).
