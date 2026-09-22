@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Phase 03.6 complete (5/5) — ready to discuss Phase 4
-last_updated: 2026-06-28T17:13:26.874Z
-last_activity: 2026-06-25 -- Phase 03.6 execution started
+status: planning
+stopped_at: Phase 5 context gathered
+last_updated: "2026-09-22T08:54:43.342Z"
+last_activity: 2026-06-28
 progress:
-  total_phases: 11
-  completed_phases: 8
+  total_phases: 12
+  completed_phases: 9
   total_plans: 36
   completed_plans: 35
-  percent: 73
+  percent: 75
 ---
 
 # Project State
@@ -40,6 +40,7 @@ Last activity: 2026-06-28
 Progress: [█████████░] 94%
 
 - Phase 03.6 inserted after Phase 3: Complete single-scenario end-to-end run (all regions x all timesteps) (URGENT)
+- Phase 5 added (2026-09-22): Integrate colleague's `spatial_interventions` branch into the much-advanced `main`; check spatial-intervention masks (`D:\C.3_Modelling\nascent-lulcc-agg\inputs\spat_prob_perturb`) against the intervention config files and plan their HPC file-system placement
 
 ## Performance Metrics
 
@@ -119,6 +120,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-25T13:23:29.289Z
-Stopped at: Completed 03.6-04-PLAN.md
-Resume file: None
+Last session: 2026-09-22T08:54:43.312Z
+Stopped at: Phase 5 context gathered
+Resume file: .planning/phases/05-integrate-spatial-interventions-branch-and-stage-interventio/05-CONTEXT.md
