@@ -382,7 +382,7 @@ Inputs: `outputs/simulations/NAT/2032/region_costa_peruana/{probability_map_dir,
 | A3 | The HPC mask dir `/beegfs/black/nascent-lulcc/inputs/spat_prob_perturb` is currently empty or absent | HPC Placement | If older SSP-era layers exist there, the orphan check will list them. Harmless |
 | A4 | The pre-intervention NAT outputs on HPC mirror the local copy | Runtime State | Only affects the backup advice |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Re-cap the per-cell sum after interventions?**
    - Known: the branch hook sits after normalisation, and the helpers clamp per value to [0,1] only.
