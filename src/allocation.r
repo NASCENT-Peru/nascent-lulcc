@@ -2314,6 +2314,7 @@ setup_allocation_inputs <- function(
     region_val = region_val,
     scenario = scenario,
     year_ant = year_ant,
+    year_post = year_post,
     calibration_period = calibration_period,
     anterior_path = anterior_path,
     trans_rates_df = trans_rates_df,
@@ -2461,6 +2462,7 @@ load_from_class_predictor_data <- function(
 #'   `config$scenario_to_ssp_mapping` before being passed to the dynamic
 #'   predictor parquet.
 #' @param year_ant Anterior year
+#' @param year_post Posterior year of the current (year_ant, year_post) pair from simulation_year_steps; used as the intervention time step.
 #' @param calibration_period Calibration period string
 #' @param anterior_path Path to the anterior LULC raster
 #' @param trans_rates_df Data frame of transition rates (From*, To*, Rate)
@@ -2473,6 +2475,7 @@ generate_probability_maps <- function(
   region_val,
   scenario,
   year_ant,
+  year_post,
   calibration_period,
   anterior_path,
   trans_rates_df,
@@ -2880,17 +2883,23 @@ generate_probability_maps <- function(
   data.table::setkey(normalized, row_idx)
 
   # Apply scenario-specific spatial-policy interventions to the
-  # per-transition probability surface before writing per-transition TIFs.
+  # per-transition probability surface before writing per-transition TIFs
+  # (D-07: posterior year). Masks are bare filenames under
+  # config$spat_prob_perturb_dir (D-05/D-06); cell_index maps region cell_id
+  # to the national ref_cell_id used for the mask lookup.
+  class_name_to_value <- load_allocation_class_map(config)
   normalized <- implement_spatial_interventions(
     normalized           = normalized,
-    anterior             = anterior,
-    trans_rates_dt       = trans_rates_dt,
+    cell_index           = anterior_dt[, .(cell_id, ref_cell_id)],
     class_name_to_value  = class_name_to_value,
     interventions_dir    = config[["interventions_dir"]],
+    mask_dir             = config[["spat_prob_perturb_dir"]],
     scenario             = scenario,
-    simulation_time_step = year_ant + config[["step_length"]],
-    log_file             = log_file
+    simulation_time_step = year_post,
+    log_file             = log_file,
+    region_label         = region_label
   )
+  data.table::setkey(normalized, row_idx)
 
   # Write one TIF per trans_rates row, preserving the numeric prefix required
   # by Dinamica's CreateCubeOfProbabilityMaps submodel.
