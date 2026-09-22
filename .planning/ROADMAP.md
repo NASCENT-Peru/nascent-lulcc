@@ -295,7 +295,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 **Requirements**: TBD
 **Depends on:** Phase 3.6 (allocation runs end-to-end on `main`)
-**Plans:** 2/6 plans executed
+**Plans:** 3/6 plans executed
 
 Plans:
 
@@ -304,7 +304,7 @@ Plans:
 
 **Wave 2** *(parallel — no files_modified overlap)*
 - [x] 05-02-PLAN.md — Intervention engine fix-ups: shared mask resolver, cached cell-number LUT, fail-fast, NaN guard, AUDIT logging + fixture tests (D-05, D-07, D-14, D-15).
-- [ ] 05-03-PLAN.md — Housekeeping: bare-filename YAMLs + headers, legacy code to src/old/, docs to docs/spatial_interventions/ as Markdown (D-02..D-06).
+- [x] 05-03-PLAN.md — Housekeeping: bare-filename YAMLs + headers, legacy code to src/old/, docs to docs/spatial_interventions/ as Markdown (D-02..D-06).
 
 **Wave 3** *(parallel — no files_modified overlap)*
 - [ ] 05-04-PLAN.md — Allocation wiring: year_post into generate_probability_maps() hook, fatal sourcing, Stage 7 pre-flight mask checks (D-07, D-14).
