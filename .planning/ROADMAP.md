@@ -295,7 +295,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 **Requirements**: TBD
 **Depends on:** Phase 3.6 (allocation runs end-to-end on `main`)
-**Plans:** 1/6 plans executed
+**Plans:** 2/6 plans executed
 
 Plans:
 
@@ -303,7 +303,7 @@ Plans:
 - [x] 05-01-PLAN.md — Real git merge of origin/spatial_interventions into feature branch `spatial-interventions-integration`; resolve .gitignore / hpc_config / run_allocation.r conflicts; baseline test gate (D-01, D-02).
 
 **Wave 2** *(parallel — no files_modified overlap)*
-- [ ] 05-02-PLAN.md — Intervention engine fix-ups: shared mask resolver, cached cell-number LUT, fail-fast, NaN guard, AUDIT logging + fixture tests (D-05, D-07, D-14, D-15).
+- [x] 05-02-PLAN.md — Intervention engine fix-ups: shared mask resolver, cached cell-number LUT, fail-fast, NaN guard, AUDIT logging + fixture tests (D-05, D-07, D-14, D-15).
 - [ ] 05-03-PLAN.md — Housekeeping: bare-filename YAMLs + headers, legacy code to src/old/, docs to docs/spatial_interventions/ as Markdown (D-02..D-06).
 
 **Wave 3** *(parallel — no files_modified overlap)*
