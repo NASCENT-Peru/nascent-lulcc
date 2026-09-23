@@ -25,6 +25,14 @@
 #' --mask-dir config$spat_prob_perturb_dir, --ref-grid config$ref_grid_path,
 #' --interventions-dir config$interventions_dir, --scenarios
 #' config$scenario_names. Both `--flag value` and `--flag=value` work.
+#'
+#' --scenarios caveat (IN-05):
+#'   Orphan list is scoped to the scenarios checked in this run (--scenarios);
+#'   masks referenced only by other scenarios will appear here as orphans.
+#' A narrowed run is therefore not a whole-directory audit; the same sentence is
+#' emitted in the report header so a narrowed report cannot be misread as one.
+#' Mask-candidate detection is case-insensitive over .tif/.tiff, so .TIF and
+#' .TIFF are classified rather than silently reported as local-only.
 
 # ---------------------------------------------------------------------------
 # Set working directory to project root (before sourcing src/*.r).
@@ -291,12 +299,19 @@ if (!dir.exists(mask_dir)) {
 } else {
   top <- list.files(mask_dir, all.files = TRUE, no.. = TRUE, include.dirs = TRUE)
   is_dir <- dir.exists(file.path(mask_dir, top))
-  tifs <- top[!is_dir & grepl("[.]tif$", top)]
-  orphans <- sort(setdiff(tifs, referenced_names))
+  # IN-05: .TIF / .tiff / .TIFF are mask candidates too. A case-sensitive
+  # "[.]tif$" silently dropped them into the local-only bucket, hiding a staged
+  # file from every integrity check below.
+  tifs <- top[!is_dir & grepl("[.]tiff?$", top, ignore.case = TRUE)]
+  # referenced_names stays exact (the resolver already rejects anything that is
+  # not a bare filename), but the orphan comparison is done on lower-cased
+  # names so a YAML referencing `x.TIF` against a staged `x.tif` is not reported
+  # as an orphan plus a missing file.
+  orphans <- sort(tifs[!(tolower(tifs) %in% tolower(referenced_names))])
   for (o in orphans) {
     add_result("WARN", "orphan", o, "top-level .tif not referenced by any scenario YAML")
   }
-  others <- top[is_dir | !grepl("[.]tif$", top)]
+  others <- top[is_dir | !grepl("[.]tiff?$", top, ignore.case = TRUE)]
   local_only <- sort(ifelse(is_dir[match(others, top)], paste0(others, "/"), others))
 }
 
@@ -322,6 +337,7 @@ md <- c(
   sprintf("- interventions_dir: `%s`", interventions_dir),
   sprintf("- Reference grid: %s", ref_summary),
   sprintf("- Scenarios: %s", paste(scenarios, collapse = ", ")),
+  "> Orphan list is scoped to the scenarios checked in this run (--scenarios); masks referenced only by other scenarios will appear here as orphans.",
   sprintf("- Posterior years: %s", paste(years, collapse = ", ")),
   "- Checks: existence (D-12), compareGeom + nlyr == 1 hard fail, no resampling (D-13), values within {0,1,NA}, orphan top-level .tif",
   "",
