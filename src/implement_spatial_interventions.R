@@ -16,7 +16,16 @@
 #' @param scenario Scenario identifier.
 #' @param years Integer vector of simulation years to resolve.
 #' @return data.frame with columns scenario, intervention_id, rank, year,
-#'   mask_type, mask_name, mask_path, exists (zero rows when nothing active).
+#'   mask_type, mask_name, mask_path, exists, entry_index (zero rows when
+#'   nothing is active). `entry_index` is the 1-based index of the row's source
+#'   entry in the Allocation-filtered entry list, and that list is attached to
+#'   every return value (including the zero-row ones) as
+#'   `attr(<return>, "entries")` — `list()` when the YAML holds no Allocation
+#'   entries. Callers MUST consume `attr(., "entries")` rather than re-parsing
+#'   the YAML: this function is the only place the Allocation/year filter, the
+#'   `Mask_type` domain and the `Prob_adjust_*` schema are enforced, and every
+#'   entry is validated whether or not it is active in `years`
+#'   (05-REVIEW.md CR-01, CR-03, WR-06, IN-01).
 resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, years) {
   yaml_path <- file.path(interventions_dir, paste0(scenario, "_interventions.yml"))
   empty <- data.frame(
@@ -28,14 +37,20 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
     mask_name = character(0),
     mask_path = character(0),
     exists = logical(0),
+    entry_index = integer(0),
     stringsAsFactors = FALSE
   )
+  # Every return path carries the Allocation-filtered entries (WR-06).
+  with_entries <- function(out, entries) {
+    attr(out, "entries") <- entries
+    out
+  }
   if (!file.exists(yaml_path)) {
     stop(sprintf("interventions YAML missing: %s", yaml_path))
   }
   entries <- yaml::yaml.load_file(yaml_path)
   if (is.null(entries) || length(entries) == 0L) {
-    return(empty)
+    return(with_entries(empty, list()))
   }
   is_alloc <- vapply(entries, function(x) {
     st <- x[["Intervention_stage"]]
@@ -43,18 +58,116 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
   }, logical(1))
   entries <- entries[is_alloc]
   if (length(entries) == 0L) {
-    return(empty)
+    return(with_entries(empty, list()))
   }
+  # Identity is a validated requirement, not a best-effort derivation: a NULL,
+  # non-scalar, NA or empty Intervention_ID used to survive as a single
+  # NA_character_ (not `duplicated()`), resolve a mask, and then silently drop
+  # the whole policy entry in the applier (CR-01).
   ids <- vapply(entries, function(x) {
     v <- x[["Intervention_ID"]]
-    if (is.null(v)) NA_character_ else as.character(v)
+    if (is.null(v) || length(v) != 1L) NA_character_ else as.character(v)
   }, character(1))
+  bad <- which(is.na(ids) | !nzchar(ids))
+  if (length(bad) > 0L) {
+    stop(sprintf(
+      "Allocation entry %s in %s has no usable Intervention_ID",
+      paste(bad, collapse = ", "), yaml_path
+    ))
+  }
   dup <- unique(ids[duplicated(ids)])
   if (length(dup) > 0L) {
     stop(sprintf(
       "duplicate Intervention_ID in %s: %s",
       yaml_path, paste(dup, collapse = ", ")
     ))
+  }
+
+  # Per-entry validation pass. Runs for every Allocation entry regardless of
+  # `years` so a malformed entry is reported by the pre-flight and the
+  # standalone validator, not by a hard crash mid-run after higher-ranked
+  # interventions have already rewritten the probability surface (CR-03), and
+  # so an unknown Mask_type is caught even when the entry is not active in
+  # `years` (IN-01).
+  mask_types <- character(length(entries))
+  for (i in seq_along(entries)) {
+    x <- entries[[i]]
+    id <- ids[[i]]
+
+    mt_raw <- x[["Mask_type"]]
+    mt <- if (is.null(mt_raw)) NA_character_ else as.character(mt_raw)
+    if (length(mt) != 1L || is.na(mt) || !(mt %in% c("Static", "Dynamic"))) {
+      stop(sprintf(
+        "Unknown Mask_type: %s (scenario=%s id=%s)",
+        paste(mt, collapse = ", "), scenario, id
+      ))
+    }
+    mask_types[[i]] <- mt
+
+    adj_raw <- x[["Prob_adjust_type"]]
+    adj <- if (is.null(adj_raw) || length(adj_raw) != 1L) {
+      NA_character_
+    } else {
+      as.character(adj_raw)
+    }
+    req <- if (identical(adj, "Absolute")) {
+      c("Prob_adjust_value", "Prob_adjust_zone")
+    } else if (identical(adj, "Relative")) {
+      c(
+        "Prob_adjust_valency", "Prob_adjust_zone", "Prob_adjust_threshold",
+        "Prob_adjust_intervention_percentile",
+        "Prob_adjust_non_intervention_percentile"
+      )
+    } else {
+      stop(sprintf(
+        "Unknown Prob_adjust_type: %s (scenario=%s id=%s)",
+        if (is.na(adj)) "<missing>" else adj, scenario, id
+      ))
+    }
+    missing_keys <- req[vapply(req, function(k) length(x[[k]]) != 1L, logical(1))]
+    if (length(missing_keys) > 0L) {
+      stop(sprintf(
+        "scenario=%s id=%s missing/!scalar: %s",
+        scenario, id, paste(missing_keys, collapse = ", ")
+      ))
+    }
+    num_keys <- intersect(req, c(
+      "Prob_adjust_value", "Prob_adjust_threshold",
+      "Prob_adjust_intervention_percentile",
+      "Prob_adjust_non_intervention_percentile"
+    ))
+    bad_num <- num_keys[vapply(
+      num_keys,
+      function(k) is.na(suppressWarnings(as.numeric(x[[k]]))),
+      logical(1)
+    )]
+    if (length(bad_num) > 0L) {
+      stop(sprintf(
+        "scenario=%s id=%s non-numeric: %s",
+        scenario, id, paste(bad_num, collapse = ", ")
+      ))
+    }
+    pct_keys <- intersect(req, c(
+      "Prob_adjust_intervention_percentile",
+      "Prob_adjust_non_intervention_percentile"
+    ))
+    if (length(pct_keys) > 0L) {
+      pct <- suppressWarnings(as.numeric(unlist(x[pct_keys])))
+      if (any(pct < 0 | pct > 100)) {
+        stop(sprintf(
+          "scenario=%s id=%s percentile outside 0-100", scenario, id
+        ))
+      }
+    }
+    # The applier hard-errors on an unknown or absent target class list, so
+    # require it here too.
+    tgt <- as.character(unlist(x[["Transition_target_classes"]]))
+    if (length(tgt) == 0L || any(is.na(tgt)) || !all(nzchar(tgt))) {
+      stop(sprintf(
+        "scenario=%s id=%s Transition_target_classes missing or empty",
+        scenario, id
+      ))
+    }
   }
 
   years <- as.integer(years)
@@ -69,11 +182,12 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
     }
     implemented <- as.integer(unlist(x[["Time_steps_implemented"]]))
     active_years <- intersect(years, implemented)
-    mask_type <- if (is.null(x[["Mask_type"]])) NA_character_ else as.character(x[["Mask_type"]])
+    mask_type <- mask_types[[i]]
     for (y in active_years) {
       if (identical(mask_type, "Static")) {
         name <- x[["Intervention_mask"]]
-      } else if (identical(mask_type, "Dynamic")) {
+      } else {
+        # Dynamic: the domain is already validated above (IN-01).
         name <- x[["Intervention_mask"]][[as.character(y)]]
         if (is.null(name)) {
           stop(sprintf(
@@ -81,8 +195,6 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
             y, scenario, id
           ))
         }
-      } else {
-        stop(sprintf("Unknown Mask_type: %s (scenario=%s id=%s)", mask_type, scenario, id))
       }
       name <- as.character(unlist(name))
       if (length(name) != 1L || is.na(name) || !nzchar(name)) {
@@ -104,16 +216,17 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
         mask_name = name,
         mask_path = mask_path,
         exists = file.exists(mask_path),
+        entry_index = i,
         stringsAsFactors = FALSE
       )
     }
   }
   if (length(rows) == 0L) {
-    return(empty)
+    return(with_entries(empty, entries))
   }
   out <- do.call(rbind, rows)
   rownames(out) <- NULL
-  out
+  with_entries(out, entries)
 }
 
 #' @title Cached inside-mask lookup table indexed by region cell_id
@@ -166,7 +279,9 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
 #' are NOT renormalised; the number of cells whose summed probability exceeds 1
 #' is only logged (`cells_sum_gt1`).
 #' @param normalized data.table with columns row_idx, from_val, to_val,
-#'   cell_id (region), x, y, prob. Modified in place by reference.
+#'   cell_id (region), prob. Modified in place by reference. The engine never
+#'   reads `x`/`y`: mask membership is looked up by national cell number
+#'   (IN-02).
 #' @param cell_index data.table with columns cell_id (region cell id) and
 #'   ref_cell_id (national cell number on the mask grid).
 #' @param class_name_to_value named integer vector mapping
@@ -229,27 +344,15 @@ implement_spatial_interventions <- function(
     )
   }
 
-  # Load interventions for scenario from YAML file (existence already checked
-  # by the resolver).
-  Interventions <- yaml::yaml.load_file(file.path(
-    interventions_dir,
-    paste0(scenario, "_interventions.yml")
-  ))
-
-  # filter to Intervention_stage == Allocation
-  Current_interventions <- Interventions[vapply(Interventions, function(x) {
-    identical(as.character(x[["Intervention_stage"]]), "Allocation")
-  }, logical(1))]
-
-  # Subset to only interventions for which simulation_time_step is in Time_steps_implemented
-  Current_interventions <- Current_interventions[vapply(
-    Current_interventions,
-    function(x) year %in% as.integer(unlist(x$Time_steps_implemented)),
-    logical(1)
-  )]
+  # Drive everything below off the resolver's rows. It has already parsed the
+  # YAML once, filtered to Intervention_stage == "Allocation", intersected
+  # Time_steps_implemented with `year` and validated identity, mask type and
+  # the Prob_adjust_* schema. Re-parsing and re-filtering here is exactly what
+  # let a typo'd Intervention_ID silently drop a policy entry (WR-06, CR-01).
+  entries <- attr(resolved, "entries")
 
   # If no interventions are found, return the normalized DT unchanged
-  if (length(Current_interventions) == 0) {
+  if (nrow(resolved) == 0L) {
     log_msg(
       paste(
         "No interventions found for scenario", scenario,
@@ -263,7 +366,7 @@ implement_spatial_interventions <- function(
 
   log_msg(
     paste(
-      "Found", length(Current_interventions),
+      "Found", nrow(resolved),
       "allocation stage interventions for scenario", scenario,
       "at time step", year
     ),
@@ -271,20 +374,30 @@ implement_spatial_interventions <- function(
   )
 
   # order interventions by Intervention_ranking putting NAs last
-  ranks <- vapply(Current_interventions, function(x) {
-    if (is.null(x$Intervention_ranking)) NA_real_ else as.numeric(x$Intervention_ranking)
-  }, numeric(1))
-  ord <- order(ranks, na.last = TRUE)
-  Current_interventions <- Current_interventions[ord]
-  ranks <- ranks[ord]
+  ord <- order(resolved$rank, na.last = TRUE)
 
   cache <- new.env(parent = emptyenv())
   n_applied <- 0L
 
   # loop over interventions
-  for (k in seq_along(Current_interventions)) {
-    intervention <- Current_interventions[[k]]
-    iv_id <- as.character(intervention[["Intervention_ID"]])
+  for (k in ord) {
+    entry_index <- resolved$entry_index[k]
+    if (
+      is.null(entries) || length(entry_index) != 1L || is.na(entry_index) ||
+        entry_index < 1L || entry_index > length(entries)
+    ) {
+      stop(sprintf(
+        "resolver contract violation: entry_index=%s has no parsed entry (id=%s year=%d scenario=%s)",
+        paste(entry_index, collapse = ","),
+        paste(resolved$intervention_id[k], collapse = ","),
+        year, scenario
+      ), call. = FALSE)
+    }
+    intervention <- entries[[entry_index]]
+    iv_id <- resolved$intervention_id[k]
+    mask_path <- resolved$mask_path[k]
+    mask_name <- resolved$mask_name[k]
+    rank_k <- resolved$rank[k]
     log_msg(paste("Applying intervention:", iv_id), log_file)
 
     # Translate Transition_target_classes (class_name strings) to integer
@@ -299,21 +412,10 @@ implement_spatial_interventions <- function(
       ))
     }
 
-    if (!intervention$Mask_type %in% c("Static", "Dynamic")) {
-      stop(paste("Unknown Mask_type:", intervention[["Mask_type"]]))
-    }
-    # Mask path comes from the resolver row for this intervention and year.
-    mask_row <- resolved[resolved$intervention_id == iv_id, , drop = FALSE]
-    if (nrow(mask_row) == 0L) {
-      # Unreachable defence: the resolver stops on Dynamic masks without an
-      # entry for an implemented year.
-      log_msg(
-        paste("No resolved mask for intervention", iv_id, "year", year, "- skipping intervention."),
-        log_file
-      )
-      next
-    }
-    inside_lut <- .mask_inside_lut(mask_row$mask_path[1L], cell_index, cache)
+    # Mask_type is validated by the resolver for every Allocation entry
+    # (IN-01); the mask path is the resolver row's own, so there is no join and
+    # no way for an intervention to be skipped here.
+    inside_lut <- .mask_inside_lut(mask_path, cell_index, cache)
 
     # If the Intervention requires filtering by LULC classes then translate
     # the From_lulc_filter class names to integer from_val values, to be
@@ -397,11 +499,11 @@ implement_spatial_interventions <- function(
         scenario,
         year,
         iv_id,
-        if (is.na(ranks[[k]])) "NA" else as.character(ranks[[k]]),
+        if (is.na(rank_k)) "NA" else as.character(rank_k),
         intervention[["Prob_adjust_type"]],
         intervention[["Prob_adjust_zone"]],
         paste(Target_classes, collapse = ","),
-        mask_row$mask_name[1L],
+        mask_name,
         as.integer(res$rows_target),
         as.integer(res$rows_changed)
       ),
