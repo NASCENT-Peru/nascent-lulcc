@@ -75,6 +75,23 @@ test_that("the hook passes in-scope cell_index, class map, mask_dir and interven
   expect_match(after_hook, "data.table::setkey(normalized, row_idx)", fixed = TRUE)
 })
 
+test_that("CR-02: the hook threads ref_grid_path into the interventions engine", {
+  # The engine validates every mask against this grid at runtime (D-13). If the
+  # argument is ever dropped the call errors on a missing formal, but this
+  # static check fails first and names the cause.
+  call_pos <- regexpr(
+    "normalized <- implement_spatial_interventions(", allocation_text, fixed = TRUE
+  )[[1L]]
+  expect_gt(call_pos, 0L)
+  call_text <- substr(allocation_text, call_pos, call_pos + 600L)
+  expect_match(call_text, 'ref_grid_path\\s*=\\s*config\\[\\["ref_grid_path"\\]\\]')
+  # It sits immediately after mask_dir, mirroring the formals order.
+  expect_match(
+    call_text,
+    'mask_dir\\s*=\\s*config\\[\\["spat_prob_perturb_dir"\\]\\],\\s*\n\\s*ref_grid_path\\s*='
+  )
+})
+
 # --- Fatal sourcing guard in run_allocation.r --------------------------------
 
 test_that("run_allocation.r sources implement_spatial_interventions.R after allocation.r and not the legacy file", {
