@@ -112,7 +112,11 @@ test_that("resolver: Dynamic mask picks the per-year entry", {
     Intervention_ID = "iv_dyn",
     Mask_type = "Dynamic",
     Intervention_mask = list("2028" = "m2028.tif", "2032" = "m2032.tif"),
-    Time_steps_implemented = list(2028L, 2032L)
+    Time_steps_implemented = list(2028L, 2032L),
+    Prob_adjust_type = "Absolute",
+    Prob_adjust_value = 0,
+    Prob_adjust_zone = "Inside",
+    Transition_target_classes = list("built_up_and_barren_lands")
   )
   .write_yaml(scratch, "BAU", list(entry))
   res <- resolve_intervention_masks(scratch, scratch, "BAU", years = c(2028L, 2032L))
@@ -135,7 +139,11 @@ test_that("resolver: implemented year without a Dynamic entry is an error (D-14)
     Intervention_ID = "iv_dyn",
     Mask_type = "Dynamic",
     Intervention_mask = list("2028" = "m2028.tif"),
-    Time_steps_implemented = list(2028L, 2032L)
+    Time_steps_implemented = list(2028L, 2032L),
+    Prob_adjust_type = "Absolute",
+    Prob_adjust_value = 0,
+    Prob_adjust_zone = "Inside",
+    Transition_target_classes = list("built_up_and_barren_lands")
   )
   .write_yaml(scratch, "BAU", list(entry))
   expect_error(
