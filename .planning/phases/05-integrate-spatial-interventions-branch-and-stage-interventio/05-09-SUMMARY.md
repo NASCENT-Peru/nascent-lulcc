@@ -262,3 +262,8 @@ implemented and each has a named regression test.
   blocks reuse the existing helper rather than adding a third copy; hoisting it into a
   `helper-*.R` remains open.
 - The 4 pre-existing `test-prep-paths.R` errors were left alone per the execution brief.
+
+## Self-Check: PASSED
+
+All claimed files exist on disk and all claimed commits exist in `git log`:
+`c83db8f`, `0980fa5`, `11c380a`, `8bf8250`.
