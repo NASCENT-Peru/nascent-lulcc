@@ -35,11 +35,50 @@ source(file.path(.repo_root, "src", "implement_spatial_interventions.R"))
 # Mask = 1 on national cells 2, 7, 13 -> region cell_ids 1, 3, 5 are inside.
 .mask_cells <- c(2L, 7L, 13L)
 
-.write_mask <- function(dir, name = "mask_a.tif", cells = .mask_cells) {
-  r <- terra::rast(nrows = 4, ncols = 5, xmin = 0, xmax = 5, ymin = 0, ymax = 4)
+# The reference grid the national cell numbers in `ref_cell_id` are defined on.
+# A cell number is only meaningful on this exact grid, which is why the engine
+# must refuse any mask that is not on it (CR-02).
+.ref_grid <- function() {
+  terra::rast(nrows = 4, ncols = 5, xmin = 0, xmax = 5, ymin = 0, ymax = 4)
+}
+
+# Write a single-layer mask onto a caller-supplied template raster. Passing a
+# template that is NOT .ref_grid() is how the CR-02 mis-gridded fixtures are
+# built (shifted extent, smaller extent).
+.write_mask_on <- function(dir, template, name = "mask_a.tif", cells = .mask_cells) {
+  r <- terra::rast(template)
   v <- rep(NA_real_, terra::ncell(r))
-  v[cells] <- 1
+  keep <- cells[cells >= 1L & cells <= terra::ncell(r)]
+  v[keep] <- 1
   terra::values(r) <- v
+  path <- file.path(dir, name)
+  terra::writeRaster(r, path, overwrite = TRUE)
+  path
+}
+
+.write_mask <- function(dir, name = "mask_a.tif", cells = .mask_cells) {
+  .write_mask_on(dir, .ref_grid(), name = name, cells = cells)
+}
+
+# A multi-band raster ON the reference grid: compareGeom() passes (it ignores
+# layer count by default), so only an explicit terra::nlyr() check catches it
+# before `[[1L]]` silently takes band 1 (CR-02c).
+.write_multilayer_mask <- function(dir, name = "mask_multi.tif", n_layers = 2L) {
+  r <- .ref_grid()
+  v <- rep(NA_real_, terra::ncell(r))
+  v[.mask_cells] <- 1
+  terra::values(r) <- v
+  stack <- do.call(c, rep(list(r), n_layers))
+  path <- file.path(dir, name)
+  terra::writeRaster(stack, path, overwrite = TRUE)
+  path
+}
+
+# The reference grid on disk. The engine takes a path (not a SpatRaster) so it
+# owns the read and the terra pointer lifetime stays in one scope.
+.write_ref_grid <- function(dir, name = "ref_grid.tif") {
+  r <- .ref_grid()
+  terra::values(r) <- seq_len(terra::ncell(r))
   path <- file.path(dir, name)
   terra::writeRaster(r, path, overwrite = TRUE)
   path
@@ -204,20 +243,154 @@ test_that("resolver: missing YAML is an error", {
 test_that(".mask_inside_lut maps region cell_id to mask membership and caches", {
   scratch <- withr::local_tempdir()
   path <- .write_mask(scratch)
+  ref <- .ref_grid()
   cache <- new.env(parent = emptyenv())
-  lut <- .mask_inside_lut(path, .cell_index(), cache)
+  lut <- .mask_inside_lut(path, .cell_index(), cache, ref_grid = ref)
   expect_type(lut, "logical")
   expect_length(lut, 6L)
   expect_identical(which(lut), c(1L, 3L, 5L))
 
-  key <- normalizePath(path, mustWork = TRUE)
-  expect_true(exists(key, envir = cache, inherits = FALSE))
-  # Overwrite the file with a different mask: a cached second call must return
-  # the cached object without re-reading it.
-  .write_mask(scratch, cells = c(3L, 8L))
-  lut2 <- .mask_inside_lut(path, .cell_index(), cache)
+  # The cache key is no longer the bare path: it is path|mtime|size|n (IN-03).
+  keys <- ls(cache, all.names = TRUE)
+  expect_length(keys, 1L)
+  expect_true(startsWith(keys[[1L]], normalizePath(path, mustWork = TRUE)))
+
+  # An untouched file is still served from the cache: one key, same value.
+  lut2 <- .mask_inside_lut(path, .cell_index(), cache, ref_grid = ref)
   expect_identical(lut2, lut)
-  expect_identical(which(.mask_inside_lut(path, .cell_index(), new.env(parent = emptyenv()))), c(2L, 4L))
+  expect_length(ls(cache, all.names = TRUE), 1L)
+})
+
+test_that("IN-03: the LUT cache key tracks file mtime", {
+  # Before this plan the cache key was the normalised path ALONE, and this
+  # block asserted the opposite of what it asserts now: that overwriting the
+  # mask on disk returned the STALE LUT. That documented staleness was the
+  # IN-03 hazard - benign only while the cache stayed call-scoped, and a
+  # silent-corruption bug the moment the cache was hoisted to a session-level
+  # one (as `.transition_model_cache` already is). The key now carries
+  # path | mtime | size | length(cell_id), so an overwritten mask cannot be
+  # served from cache.
+  scratch <- withr::local_tempdir()
+  path <- .write_mask(scratch)
+  ref <- .ref_grid()
+  cache <- new.env(parent = emptyenv())
+  lut <- .mask_inside_lut(path, .cell_index(), cache, ref_grid = ref)
+  expect_identical(which(lut), c(1L, 3L, 5L))
+
+  .write_mask(scratch, cells = c(3L, 8L))
+  Sys.setFileTime(path, Sys.time() + 5)
+  lut2 <- .mask_inside_lut(path, .cell_index(), cache, ref_grid = ref)
+  expect_identical(which(lut2), c(2L, 4L))
+  expect_length(ls(cache, all.names = TRUE), 2L)
+})
+
+test_that("CR-02a: a mask on a shifted grid is rejected, not silently applied", {
+  scratch <- withr::local_tempdir()
+  shifted <- terra::rast(nrows = 4, ncols = 5, xmin = 100, xmax = 105, ymin = 0, ymax = 4)
+  path <- .write_mask_on(scratch, shifted, name = "mask_shift.tif")
+  # Same dimensions, different geography: pre-fix this produced NO warning at
+  # all and applied an entirely fictional cell set.
+  expect_error(
+    .mask_inside_lut(
+      path, .cell_index(), new.env(parent = emptyenv()), ref_grid = .ref_grid()
+    ),
+    "not on the reference grid"
+  )
+})
+
+test_that("CR-02b: a mask with a smaller extent is rejected before out-of-range extraction", {
+  scratch <- withr::local_tempdir()
+  small <- terra::rast(nrows = 2, ncols = 2, xmin = 0, xmax = 2, ymin = 0, ymax = 2)
+  path <- .write_mask_on(scratch, small, name = "mask_small.tif", cells = c(1L, 2L))
+  # Pre-fix, terra::extract() emitted "[extract] out of range cell numbers
+  # detected" to stderr - never to the worker log - and the run continued on a
+  # truncated cell set. The geometry check must fire first, as an error.
+  expect_no_warning(
+    expect_error(
+      .mask_inside_lut(
+        path, .cell_index(), new.env(parent = emptyenv()), ref_grid = .ref_grid()
+      ),
+      "not on the reference grid"
+    )
+  )
+})
+
+test_that("CR-02c: a multi-layer mask is rejected", {
+  scratch <- withr::local_tempdir()
+  path <- .write_multilayer_mask(scratch)
+  expect_error(
+    .mask_inside_lut(
+      path, .cell_index(), new.env(parent = emptyenv()), ref_grid = .ref_grid()
+    ),
+    "has 2 layers (expected 1)",
+    fixed = TRUE
+  )
+})
+
+test_that("WR-10: degenerate cell_index is rejected", {
+  scratch <- withr::local_tempdir()
+  path <- .write_mask(scratch)
+  ref <- .ref_grid()
+  msg <- "cell_index\\$cell_id must be non-empty, non-NA and >= 1"
+
+  # max(integer(0)) is -Inf -> logical(-Inf) errored opaquely.
+  expect_error(
+    .mask_inside_lut(
+      path, data.table(cell_id = integer(0), ref_cell_id = integer(0)),
+      new.env(parent = emptyenv()), ref_grid = ref
+    ),
+    msg
+  )
+  # max() with an NA is NA -> "vector size cannot be NA".
+  expect_error(
+    .mask_inside_lut(
+      path, data.table(cell_id = c(1L, NA_integer_), ref_cell_id = c(2L, 7L)),
+      new.env(parent = emptyenv()), ref_grid = ref
+    ),
+    msg
+  )
+  # cell_id == 0 silently shortened the subscript vector and mis-selected rows.
+  expect_error(
+    .mask_inside_lut(
+      path, data.table(cell_id = c(0L, 1L), ref_cell_id = c(2L, 7L)),
+      new.env(parent = emptyenv()), ref_grid = ref
+    ),
+    msg
+  )
+})
+
+test_that("WR-10b: out-of-range ref_cell_id is rejected", {
+  scratch <- withr::local_tempdir()
+  path <- .write_mask(scratch)
+  expect_error(
+    .mask_inside_lut(
+      path, data.table(cell_id = c(1L, 2L), ref_cell_id = c(2L, 25L)),
+      new.env(parent = emptyenv()), ref_grid = .ref_grid()
+    ),
+    "ref_cell_id .* outside the reference grid"
+  )
+})
+
+test_that("IN-07: a mask removed after resolution reports the forbidden marker", {
+  scratch <- withr::local_tempdir()
+  mask_dir <- file.path(scratch, "masks")
+  dir.create(mask_dir)
+  path <- .write_mask(mask_dir)
+  .write_yaml(scratch, "TOCTOU", list(.static_entry()))
+  res <- resolve_intervention_masks(scratch, mask_dir, "TOCTOU", years = 2028L)
+  expect_true(all(res$exists))
+
+  # beegfs drops the mount between the resolver's file.exists() and the read.
+  expect_true(file.remove(path))
+  err <- tryCatch(
+    .mask_inside_lut(
+      res$mask_path[1], .cell_index(), new.env(parent = emptyenv()),
+      ref_grid = .ref_grid()
+    ),
+    error = function(e) conditionMessage(e)
+  )
+  # verify_intervention_smoke.r treats this literal as fatal.
+  expect_true(grepl("intervention mask missing", err, fixed = TRUE))
 })
 
 # --------------------------------------------------------------------------
@@ -258,6 +431,7 @@ test_that(".mask_inside_lut maps region cell_id to mask membership and caches", 
   list(
     interventions_dir = scratch,
     mask_dir = mask_dir,
+    ref_grid_path = .write_ref_grid(scratch),
     scenario = scenario,
     log_file = file.path(scratch, "t.log")
   )
@@ -270,6 +444,7 @@ test_that(".mask_inside_lut maps region cell_id to mask membership and caches", 
     class_name_to_value = .class_map,
     interventions_dir = fx$interventions_dir,
     mask_dir = fx$mask_dir,
+    ref_grid_path = fx$ref_grid_path,
     scenario = fx$scenario,
     simulation_time_step = year,
     log_file = fx$log_file,
@@ -609,5 +784,33 @@ test_that("WR-06: the engine drives its loop off the resolver rows, one AUDIT li
   expect_true(all(nzchar(a$iv)))
   expect_match(a$iv[1], "id=iv_first rank=1 ", fixed = TRUE)
   expect_match(a$iv[2], "id=iv_second rank=2 ", fixed = TRUE)
+})
+
+# --------------------------------------------------------------------------
+# Phase 5 Plan 09 gap closure, engine half: runtime mask geometry validation
+# (05-REVIEW.md CR-02).
+
+test_that("CR-02a: the engine aborts on a shifted mask without editing probabilities", {
+  fx <- .engine_fixture(list(.abs_entry()), scenario = "SHIFT", write_mask = FALSE)
+  shifted <- terra::rast(nrows = 4, ncols = 5, xmin = 100, xmax = 105, ymin = 0, ymax = 4)
+  .write_mask_on(fx$mask_dir, shifted, name = "mask_a.tif")
+  dt <- .norm()
+  before <- copy(dt)
+  # Pre-fix this reported rows_target=3 rows_changed=3 on a fictional geography.
+  expect_error(.run_engine(fx, dt), "not on the reference grid")
+  expect_equal(as.data.frame(dt), as.data.frame(before))
+  expect_length(
+    grep("AUDIT stage=intervention region=", .log_lines(fx$log_file), fixed = TRUE),
+    0L
+  )
+})
+
+test_that("CR-02: an unreadable reference grid stops the engine", {
+  fx <- .engine_fixture(list(.abs_entry()), scenario = "NOREF")
+  fx$ref_grid_path <- file.path(fx$interventions_dir, "no_such_ref_grid.tif")
+  dt <- .norm()
+  before <- copy(dt)
+  expect_error(.run_engine(fx, dt), "intervention ref grid unreadable")
+  expect_equal(as.data.frame(dt), as.data.frame(before))
 })
 
