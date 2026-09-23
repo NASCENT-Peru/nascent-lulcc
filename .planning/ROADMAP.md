@@ -24,7 +24,7 @@ Decimal phases appear between their surrounding integers in numeric order.
  (completed 2026-06-24)
 - [x] **Phase 3.6: Complete Single-Scenario End-to-End Run** *(INSERTED 2026-06-24)* (completed 2026-06-28) - A single scenario (NAT) runs to completion across all regions and all timesteps, producing posterior rasters for every region/timestep — capstone proof of the Phase 3 machinery at scale.
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port; parallelise the full scenario sweep across Rundeck nodes (S2 multi-scenario packing)
-- [ ] **Phase 5: Integrate spatial_interventions branch and stage intervention masks** - Port the colleague's `spatial_interventions` branch onto the much-advanced `main`; check the `spat_prob_perturb` masks against the intervention configs and plan where they go on HPC
+- [x] **Phase 5: Integrate spatial_interventions branch and stage intervention masks** - Port the colleague's `spatial_interventions` branch onto the much-advanced `main`; check the `spat_prob_perturb` masks against the intervention configs and plan where they go on HPC (completed 2026-09-23)
 
 ## Phase Details
 
@@ -295,7 +295,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 **Requirements**: TBD
 **Depends on:** Phase 3.6 (allocation runs end-to-end on `main`)
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans complete
 
 Plans:
 
@@ -311,4 +311,4 @@ Plans:
 - [x] 05-05-PLAN.md — Mask validator + local report, smoke assertion script, sha256 manifest, README_HPC placement/staging (D-08..D-13, D-15).
 
 **Wave 4** *(operator-gated)*
-- [ ] 05-06-PLAN.md — Hand-off gate, HPC mask staging + validation, NAT x costa_peruana x 2032 intervention smoke, merge to main (D-11, D-15, SC4).
+- [x] 05-06-PLAN.md — Hand-off gate, HPC mask staging + validation, NAT x costa_peruana x 2032 intervention smoke, merge to main (D-11, D-15, SC4). *(job 838021 COMPLETED 0:0, verifier PASS; merge to main PENDING — PR #2 open)*

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 5 context gathered
-last_updated: "2026-09-22T11:22:47.359Z"
+stopped_at: "Completed 05-06-PLAN.md (main merge pending: PR #2)"
+last_updated: "2026-09-23T08:42:13.580Z"
 last_activity: 2026-09-22 -- Phase 05 execution started
 progress:
   total_phases: 12
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 42
-  completed_plans: 40
-  percent: 75
+  completed_plans: 41
+  percent: 83
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 05 (integrate-spatial-interventions-branch-and-stage-interventio) — EXECUTING
+Phase: 05 (integrate-spatial-interventions-branch-and-stage-interventio) — ALL 6 PLANS EXECUTED
 Plan: 6 of 6
-Status: Executing Phase 05
-Last activity: 2026-09-22 -- Phase 05 execution started
+Status: Ready for verification. One operator action outstanding: merge PR #2 into main (SC1/D-01).
+Last activity: 2026-09-23 -- Phase 05 Plan 06 complete (HPC smoke job 838021 verified PASS)
 
 ### Roadmap Evolution
 
@@ -37,7 +37,7 @@ Last activity: 2026-09-22 -- Phase 05 execution started
 - Phase 3.3 inserted after Phase 3.2 (2026-05-26, URGENT): Dinamica allocation throughput observed at ~1% in Phase 3.1 (4,477 of hundreds of thousands of requested cells placed); root cause likely probability maps with too few non-zero values to support the demanded volume; phase diagnoses and remediates
 - Phase 3.5 inserted after Phase 3 (2026-06-22): Reduce the allocation memory floor — (a) lazy per-transition Parquet predictor reads to cut the ~80GB preload floor to ~10–20GB (memory-bound → core-bound), and (b) threaded ranger prediction using spare cores. Multi-scenario node packing (S2) folded into Phase 4's goal + success criteria. (Replaces the briefly-added Phase 5, which was split: Goals 2+3 → Phase 3.5, Goal 1 → Phase 4.)
 
-Progress: [██████████] 95%
+Progress: [██████████] 98%
 
 - Phase 03.6 inserted after Phase 3: Complete single-scenario end-to-end run (all regions x all timesteps) (URGENT)
 - Phase 5 added (2026-09-22): Integrate colleague's `spatial_interventions` branch into the much-advanced `main`; check spatial-intervention masks (`D:\C.3_Modelling\nascent-lulcc-agg\inputs\spat_prob_perturb`) against the intervention config files and plan their HPC file-system placement
@@ -77,6 +77,7 @@ Progress: [██████████] 95%
 | Phase 05 P03 | 12 min | 3 tasks | 27 files |
 | Phase 05 P04 | 20min | 2 tasks | 3 files |
 | Phase 05 P05 | 35min | 3 tasks | 6 files |
+| Phase 05 P06 | ~2h | 3 tasks | 0 files |
 
 ## Accumulated Context
 
@@ -114,6 +115,10 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-04: Intervention pre-flight lines (D-14) collected separately and appended after file checks; fixture mode never emits them
 - [Phase 05]: 05-04: generate_probability_maps() hook uses year_post (D-07); normalized re-keyed on row_idx after the engine call
 - [Phase 05]: 05-05: smoke verifier judges newest worker log with AUDIT summary; mlr3 .__Task__col_info fallback line whitelisted from forbidden markers; masks.sha256 forced eol=lf
+- [Phase 05]: 05-06: branch landed via PR #2 (open, not merged) rather than a local --no-ff merge; SC1/D-01 'changes on main' remains PENDING until the operator merges
+- [Phase 05]: 05-06: intervention allocation is a highmem-only workload (MaxRSS 95.7 GB on job 838021 vs the 93 GB compute limit)
+- [Phase 05]: 05-06: .env must be sourced in the submitting shell before sbatch; --export=ALL alone exports an unconfigured environment (job 838019 died in 2s on the Stage 7 path contract)
+- [Phase 05]: 05-06: HPC mask integrity accepted via the validator's compareGeom/value checks on all 14 masks; a separate sha256sum -c result was not reported back
 
 ### Pending Todos
 
@@ -123,6 +128,7 @@ None yet.
 
 - `MultisessionFuture interrupted` (OOM SIGKILL) at ~3 minutes locally — the project's defining failure mode; addressed structurally across Phases 2–3.
 - Phase 1 HPC-only verification gates (live Euler smoke test, live env solve, live SIGKILL test) pending operator confirmation — tracked in 01-HUMAN-UAT.md. **Phase 1.1 now closed** — the INFRA-01 live smoke gate is satisfied (exit 0).
+- Phase 05 SC1/D-01 PENDING: PR #2 (spatial-interventions-integration -> main) is open but NOT merged; main still has no intervention support
 
 ## Deferred Items
 
@@ -133,6 +139,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-22T11:22:25.573Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-integrate-spatial-interventions-branch-and-stage-interventio/05-CONTEXT.md
+Last session: 2026-09-23T08:42:13.549Z
+Stopped at: Completed 05-06-PLAN.md (main merge pending: PR #2)
+Resume file: None
