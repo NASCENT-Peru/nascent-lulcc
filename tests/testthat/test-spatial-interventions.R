@@ -58,19 +58,32 @@ source(file.path(.repo_root, "src", "implement_spatial_interventions.R"))
 .static_entry <- function(id = "iv_static", mask = "mask_a.tif",
                           years = list(2028L, 2032L), stage = "Allocation",
                           ...) {
-  c(list(
+  base <- list(
     Intervention_stage = stage,
     Intervention_ID = id,
     Mask_type = "Static",
     Intervention_mask = mask,
-    Time_steps_implemented = years
-  ), list(...))
+    Time_steps_implemented = years,
+    # Minimal valid Prob_adjust_* field set so mask-resolution fixtures satisfy
+    # the resolver's per-entry schema gate (CR-03). Override via `...`.
+    Prob_adjust_type = "Absolute",
+    Prob_adjust_value = 0,
+    Prob_adjust_zone = "Inside",
+    Transition_target_classes = list("built_up_and_barren_lands")
+  )
+  utils::modifyList(base, list(...))
 }
 
 .resolver_cols <- c(
   "scenario", "intervention_id", "rank", "year", "mask_type",
-  "mask_name", "mask_path", "exists"
+  "mask_name", "mask_path", "exists", "entry_index"
 )
+
+# Log files only exist once the engine has written its first line; a resolver
+# stop happens before that.
+.log_lines <- function(log_file) {
+  if (file.exists(log_file)) readLines(log_file) else character(0)
+}
 
 # --------------------------------------------------------------------------
 # resolve_intervention_masks()
@@ -107,7 +120,7 @@ test_that("resolver: Dynamic mask picks the per-year entry", {
   expect_true(all(is.na(res$rank)))
 })
 
-test_that("resolver: non-implemented years give no rows and keep the 8 columns", {
+test_that("resolver: non-implemented years give no rows and keep the 9 columns", {
   scratch <- withr::local_tempdir()
   .write_yaml(scratch, "BAU", list(.static_entry()))
   res <- resolve_intervention_masks(scratch, scratch, "BAU", years = 2030L)
@@ -399,3 +412,194 @@ test_that("engine: unknown class name in Transition_target_classes stops", {
   fx <- .engine_fixture(list(.abs_entry(targets = list("not_a_class"))))
   expect_error(.run_engine(fx, .norm()), "Unknown class_name")
 })
+# --------------------------------------------------------------------------
+# Phase 5 Plan 07 gap closure: resolver-owned identity, mask type and
+# Prob_adjust_* schema (05-REVIEW.md CR-01, CR-03, WR-06, IN-01).
+
+# A complete Allocation entry that is missing only the Intervention_ID key —
+# exactly what a typo'd key (`Intervention_Id`, `intervention_id`) produces.
+.noid_entry <- function(rank = 1L) {
+  list(
+    Intervention_stage = "Allocation",
+    Intervention_ranking = rank,
+    Mask_type = "Static",
+    Intervention_mask = "mask_a.tif",
+    Time_steps_implemented = list(2028L),
+    Prob_adjust_type = "Absolute",
+    Prob_adjust_zone = "Inside",
+    Prob_adjust_value = 0,
+    Transition_target_classes = list("built_up_and_barren_lands"),
+    From_lulc_filter = list("None")
+  )
+}
+
+test_that("CR-01: an Allocation entry without Intervention_ID is an error, not a silent skip", {
+  scratch <- withr::local_tempdir()
+  .write_yaml(scratch, "NOID", list(.noid_entry()))
+  expect_error(
+    resolve_intervention_masks(scratch, scratch, "NOID", years = 2028L),
+    "no usable Intervention_ID"
+  )
+
+  # An empty-string or non-scalar id is equally unusable.
+  e_empty <- .noid_entry()
+  e_empty$Intervention_ID <- ""
+  .write_yaml(scratch, "EMPTYID", list(e_empty))
+  expect_error(
+    resolve_intervention_masks(scratch, scratch, "EMPTYID", years = 2028L),
+    "no usable Intervention_ID"
+  )
+})
+
+test_that("CR-03: a Relative entry missing Prob_adjust_threshold stops the resolver", {
+  scratch <- withr::local_tempdir()
+  bad <- .rel_entry(id = "iv_no_threshold")
+  bad$Prob_adjust_threshold <- NULL
+  .write_yaml(scratch, "NOTHR", list(bad))
+  expect_error(
+    resolve_intervention_masks(scratch, scratch, "NOTHR", years = 2028L),
+    "missing/!scalar"
+  )
+  expect_error(
+    resolve_intervention_masks(scratch, scratch, "NOTHR", years = 2028L),
+    "Prob_adjust_threshold"
+  )
+})
+
+test_that("CR-03: non-numeric, out-of-range and unknown Prob_adjust_* values stop the resolver", {
+  scratch <- withr::local_tempdir()
+
+  e_abc <- .rel_entry(id = "iv_abc")
+  e_abc$Prob_adjust_intervention_percentile <- "abc"
+  .write_yaml(scratch, "ABC", list(e_abc))
+  expect_error(resolve_intervention_masks(scratch, scratch, "ABC", 2028L), "non-numeric")
+
+  e_150 <- .rel_entry(id = "iv_150")
+  e_150$Prob_adjust_non_intervention_percentile <- 150
+  .write_yaml(scratch, "P150", list(e_150))
+  expect_error(
+    resolve_intervention_masks(scratch, scratch, "P150", 2028L),
+    "percentile outside 0-100"
+  )
+
+  e_side <- .abs_entry(id = "iv_side")
+  e_side$Prob_adjust_type <- "Sideways"
+  .write_yaml(scratch, "SIDE", list(e_side))
+  expect_error(
+    resolve_intervention_masks(scratch, scratch, "SIDE", 2028L),
+    "Unknown Prob_adjust_type"
+  )
+
+  e_notgt <- .abs_entry(id = "iv_notgt")
+  e_notgt$Transition_target_classes <- NULL
+  .write_yaml(scratch, "NOTGT", list(e_notgt))
+  expect_error(
+    resolve_intervention_masks(scratch, scratch, "NOTGT", 2028L),
+    "Transition_target_classes"
+  )
+})
+
+test_that("CR-03: the Prob_adjust_* schema is checked even when no requested year is implemented", {
+  scratch <- withr::local_tempdir()
+  bad <- .rel_entry(id = "iv_inactive")
+  bad$Prob_adjust_threshold <- NULL
+  .write_yaml(scratch, "INACT", list(bad))
+  expect_error(
+    resolve_intervention_masks(scratch, scratch, "INACT", years = 2030L),
+    "missing/!scalar"
+  )
+})
+
+test_that("WR-06: the resolver returns entry_index and the parsed Allocation entries", {
+  scratch <- withr::local_tempdir()
+  .write_yaml(scratch, "IDX", list(
+    .static_entry(id = "iv_demand", stage = "Demand"),
+    .static_entry(id = "iv_a", Intervention_ranking = 1L),
+    .static_entry(id = "iv_b", Intervention_ranking = 2L)
+  ))
+  res <- resolve_intervention_masks(scratch, scratch, "IDX", years = 2028L)
+  expect_true("entry_index" %in% names(res))
+  expect_type(res$entry_index, "integer")
+
+  entries <- attr(res, "entries")
+  expect_false(is.null(entries))
+  # Allocation-filtered: the Demand entry is not in the list.
+  expect_length(entries, 2L)
+  expect_identical(
+    entries[[res$entry_index[1]]][["Intervention_ID"]],
+    res$intervention_id[1]
+  )
+  expect_identical(
+    entries[[res$entry_index[2]]][["Intervention_ID"]],
+    res$intervention_id[2]
+  )
+
+  # The zero-row return carries the same contract.
+  res0 <- resolve_intervention_masks(scratch, scratch, "IDX", years = 2030L)
+  expect_identical(res0$entry_index, integer(0))
+  expect_false(is.null(attr(res0, "entries")))
+})
+
+test_that("IN-01: an unknown Mask_type stops even when no requested year is implemented", {
+  scratch <- withr::local_tempdir()
+  bad <- .static_entry(id = "iv_weird")
+  bad$Mask_type <- "Weird"
+  .write_yaml(scratch, "IN01", list(bad))
+  # .static_entry() implements 2028/2032 only: pre-fix the check lived inside
+  # the per-year loop and never fired for 2030.
+  expect_error(
+    resolve_intervention_masks(scratch, scratch, "IN01", years = 2030L),
+    "Unknown Mask_type"
+  )
+})
+
+# --------------------------------------------------------------------------
+# Gap closure, engine half: no silent skip, no partial mutation.
+
+test_that("CR-01: the engine aborts on a missing Intervention_ID without mutating probabilities", {
+  fx <- .engine_fixture(list(.noid_entry()), scenario = "NOID")
+  dt <- .norm()
+  before <- copy(dt)
+  expect_error(.run_engine(fx, dt), "no usable Intervention_ID")
+  expect_equal(as.data.frame(dt), as.data.frame(before))
+  # The pre-fix engine logged "... - skipping intervention." and reported PASS.
+  lines <- .log_lines(fx$log_file)
+  expect_false(any(grepl("- skipping intervention.", lines, fixed = TRUE)))
+  expect_length(grep("AUDIT stage=intervention_summary", lines, fixed = TRUE), 0L)
+})
+
+test_that("CR-03: a rank-2 entry with a missing Prob_adjust_threshold aborts before rank 1 mutates", {
+  bad <- .rel_entry(id = "iv_rank2", rank = 2L)
+  bad$Prob_adjust_threshold <- NULL
+  fx <- .engine_fixture(
+    list(.abs_entry(id = "iv_rank1", rank = 1L, value = 0), bad),
+    scenario = "PARTIAL"
+  )
+  dt <- .norm()
+  before <- copy(dt)
+  expect_error(.run_engine(fx, dt), "missing/!scalar")
+  # The blast radius the review reproduced: pre-fix, rank 1 had already
+  # rewritten the probability surface by the time rank 2 crashed.
+  expect_equal(as.data.frame(dt), as.data.frame(before))
+  expect_length(
+    grep("AUDIT stage=intervention region=", .log_lines(fx$log_file), fixed = TRUE),
+    0L
+  )
+})
+
+test_that("WR-06: the engine drives its loop off the resolver rows, one AUDIT line per row", {
+  fx <- .engine_fixture(
+    list(
+      .abs_entry(id = "iv_second", rank = 2L, value = 0.05),
+      .abs_entry(id = "iv_first", rank = 1L, value = 0.01)
+    ),
+    scenario = "WR06"
+  )
+  .run_engine(fx, .norm())
+  a <- .audit_lines(fx$log_file)
+  expect_length(a$iv, 2L)
+  expect_true(all(nzchar(a$iv)))
+  expect_match(a$iv[1], "id=iv_first rank=1 ", fixed = TRUE)
+  expect_match(a$iv[2], "id=iv_second rank=2 ", fixed = TRUE)
+})
+
