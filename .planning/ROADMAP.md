@@ -295,7 +295,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 **Requirements**: TBD
 **Depends on:** Phase 3.6 (allocation runs end-to-end on `main`)
-**Plans:** 8/16 plans executed
+**Plans:** 9/16 plans executed
 
 Plans:
 
@@ -320,7 +320,7 @@ Plans:
 - [x] 05-08-PLAN.md - In-repo parameter provenance record for the four scenario YAMLs + case-insensitive validator orphan detection (WR-11, IN-05).
 
 **Wave 6**
-- [ ] 05-09-PLAN.md - Runtime mask geometry validation (compareGeom/nlyr/cell-range), degenerate cell_index guards, TOCTOU wrap, mtime-aware LUT cache (CR-02, WR-10, IN-03, IN-07).
+- [x] 05-09-PLAN.md - Runtime mask geometry validation (compareGeom/nlyr/cell-range), degenerate cell_index guards, TOCTOU wrap, mtime-aware LUT cache (CR-02, WR-10, IN-03, IN-07).
 
 **Wave 7** *(parallel - no files_modified overlap)*
 - [ ] 05-10-PLAN.md - Stage 7 pre-flight fails closed, checks mask geometry, honours profile_timestep_index (CR-02, WR-04, WR-05).
