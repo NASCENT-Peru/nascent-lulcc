@@ -104,3 +104,40 @@ Out of scope: new intervention types or changes to the scenario narratives/inter
 
 *Phase: 05-integrate-spatial-interventions-branch-and-stage-interventio*
 *Context gathered: 2026-09-22*
+
+---
+
+# Gap-Closure Addendum
+
+**Gathered:** 2026-09-23
+**Trigger:** `/gsd:plan-phase 5 --gaps` after `05-VERIFICATION.md` (status: `gaps_found`) and `05-REVIEW.md` (3 critical / 11 warning / 7 info).
+**Applies to:** gap-closure plans `05-07-PLAN.md` onward. Plans `05-01` through `05-06` are executed and are not to be rewritten.
+
+<decisions>
+## Gap-Closure Decisions
+
+### Scope
+- **D-16:** Close **every finding in `05-REVIEW.md`** — all 21 (CR-01..CR-03, WR-01..WR-11, IN-01..IN-07). Nothing is deferred on severity grounds. Where a finding is genuinely not actionable in-repo (WR-11: the authoritative design source for the four scenario YAMLs lives outside the repository), the closure is to record the provenance explicitly in-repo rather than to import the source.
+- **D-17:** The two `05-VERIFICATION.md` gaps are **operator actions, not executable work**:
+  - SC1 truth #16 — PR #2 (`spatial-interventions-integration` → `main`) is open and unmerged. Closure is a human merging the PR, then confirming `git merge-base --is-ancestor a917ba1 origin/main` exits 0.
+  - Truth #14 — the HPC-side `sha256sum -c docs/spatial_interventions/masks.sha256` was never separately run; the HPC validator's `compareGeom`/value checks were accepted in its place. Closure is running the checksum on HPC and reporting `14 OK`.
+  These belong in a single **operator-gated** plan (the D-11 pattern from `05-06-PLAN.md`): the plan supplies exact commands, the user runs them and reports back. No executor may claim either as done from local evidence.
+
+### Probability-change telemetry (new requirement)
+- **D-18:** Every intervention must report **summary statistics of the change it makes to cell probabilities**, not just `rows_target` / `rows_changed`. Recorded in **two places**:
+  1. **Extended `AUDIT stage=intervention` line** (existing format string in `src/implement_spatial_interventions.R`, currently at line ~395) — append `delta_mean`, `delta_med`, `delta_sd`, `delta_min`, `delta_max`, `n_inc`, `n_dec`, `sum_abs_delta`. Existing fields and their order stay unchanged so `scripts/verify_intervention_smoke.r` and any existing log parsing keep working; new fields are appended at the end.
+  2. **Per-intervention × per-target-class CSV** written alongside the run outputs: `intervention_prob_deltas_<scenario>_<region>_<year>.csv`, columns `scenario, region, year, intervention_id, rank, type, zone, mask, target_class, n_target, n_changed, mean_before, mean_after, sd_before, sd_after, p05_delta, p25_delta, p50_delta, p75_delta, p95_delta, min_delta, max_delta, sum_abs_delta, prob_mass_before, prob_mass_after`.
+- **D-19:** Statistics are computed over the **rows the intervention targeted** (the `rows_target` set), on the delta between the probability values immediately before and immediately after that single intervention's adjustment — i.e. per-intervention deltas, sequential, so a later intervention sees the earlier one's output as its "before". The `AUDIT stage=intervention_summary` line stays the whole-call roll-up.
+- **D-20:** Delta statistics must **not** materialise a second full copy of the probability table per intervention where that can be avoided; capture only the pre-adjustment values of the targeted rows/columns. Memory on `highmem` is already at 95.7 GB MaxRSS for the NAT × costa_peruana × 2032 smoke (job 838021) — a naive full-table copy per intervention is not acceptable.
+- **D-21:** The CSV is **additive telemetry**: failure to write it must not abort an allocation run that would otherwise succeed (warn and continue), but a malformed/unwritable path discovered at Stage 7 pre-flight time should be reported there alongside the existing mask checks.
+- **D-22:** `scripts/verify_intervention_smoke.r` gains assertions over the new telemetry: the CSV exists, has one row per (intervention × target class) matching the AUDIT lines, and the `Absolute`-to-0 interventions show `mean_after = 0` for their targeted class rows.
+
+### Validation
+- **D-23:** Every CR-/WR-level fix needs a **regression test that fails against the current code** — the review reproduced CR-01/CR-02/CR-03 empirically with synthetic fixtures, so the same fixtures belong in `tests/testthat/`. A fix without a test that would have caught the bug does not close the finding.
+</decisions>
+
+<deferred>
+## Gap-Closure Deferred
+
+- Re-running the full HPC smoke (job 838021 equivalent) after these fixes is desirable but is an operator action; it is covered by the operator-gated plan, not by an executor task.
+</deferred>
