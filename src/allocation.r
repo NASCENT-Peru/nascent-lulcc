@@ -2946,6 +2946,13 @@ generate_probability_maps <- function(
   # (D-07: posterior year). Masks are bare filenames under
   # config$spat_prob_perturb_dir (D-05/D-06); cell_index maps region cell_id
   # to the national ref_cell_id used for the mask lookup.
+  #
+  # ref_grid_path is the grid those ref_cell_id values were computed against
+  # (terra::cellFromXY above). The engine re-reads it and validates EVERY mask
+  # against it at runtime — single-layer, matching crs/res/extent — so a
+  # mis-gridded mask aborts the region instead of applying an intervention to a
+  # fictional cell set (D-13, CR-02). This is in addition to, not instead of,
+  # the Stage 7 pre-flight: nothing here is ever resampled or reprojected.
   class_name_to_value <- load_allocation_class_map(config)
   normalized <- implement_spatial_interventions(
     normalized           = normalized,
@@ -2953,6 +2960,7 @@ generate_probability_maps <- function(
     class_name_to_value  = class_name_to_value,
     interventions_dir    = config[["interventions_dir"]],
     mask_dir             = config[["spat_prob_perturb_dir"]],
+    ref_grid_path        = config[["ref_grid_path"]],
     scenario             = scenario,
     simulation_time_step = year_post,
     log_file             = log_file,
