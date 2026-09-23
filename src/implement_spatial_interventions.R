@@ -235,20 +235,95 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
 #' cell numbers `cell_index$ref_cell_id` (never an xy matrix), and returns a
 #' logical vector of length `max(cell_index$cell_id)` that is TRUE where the
 #' mask value equals 1.
+#'
+#' A national cell number is only meaningful on the exact grid that produced it
+#' (`config$ref_grid_path`, via `terra::cellFromXY()` in the allocation hook), so
+#' this function refuses to trust a mask it has not proven is on that grid: a
+#' multi-layer file, or any crs/resolution/extent mismatch, is a hard stop
+#' (CR-02, D-13). Nothing is ever resampled or reprojected at runtime. The
+#' caller's `cell_index` is validated too, because `max(cell_id)` drives a vector
+#' allocation and a `cell_id` of 0 silently mis-selects rows downstream (WR-10).
+#'
+#' The cache is keyed on the normalised path, the mask's modification time
+#' (sub-second), its size in bytes and `length(cell_index$cell_id)` — not on the
+#' path alone (IN-03). An overwritten mask therefore cannot be served stale, so a
+#' longer-lived (e.g. session-level) cache is safe here, not just the call-scoped
+#' `new.env()` the engine currently passes.
 #' @param mask_path Path to the mask raster.
 #' @param cell_index data.table/data.frame with columns cell_id (region) and
 #'   ref_cell_id (national cell number on the mask grid).
 #' @param cache Environment created with `new.env(parent = emptyenv())`.
+#' @param ref_grid SpatRaster for the reference grid the `ref_cell_id` values
+#'   are defined on. REQUIRED: there is no fallback that skips the geometry
+#'   check.
 #' @return Logical vector indexed by region cell_id.
-.mask_inside_lut <- function(mask_path, cell_index, cache) {
-  key <- normalizePath(mask_path, mustWork = TRUE)
+.mask_inside_lut <- function(mask_path, cell_index, cache, ref_grid) {
+  # WR-10: validate before anything depends on max(cell_id). Done first so a
+  # degenerate call fails identically whether or not the mask file exists.
+  cid <- cell_index$cell_id
+  if (length(cid) == 0L || anyNA(cid) || any(cid < 1L)) {
+    stop("cell_index$cell_id must be non-empty, non-NA and >= 1", call. = FALSE)
+  }
+
+  # IN-07: a mask can vanish (or its mount drop) between the resolver's
+  # file.exists() and this read. Re-raise on the marker the smoke verifier
+  # already treats as fatal instead of a bare normalizePath() error.
+  key_path <- tryCatch(
+    normalizePath(mask_path, mustWork = TRUE),
+    error = function(e) {
+      stop(sprintf(
+        "intervention mask missing: %s (disappeared after pre-flight)", mask_path
+      ), call. = FALSE)
+    }
+  )
+
+  # IN-03: path alone is not a safe cache key.
+  key <- paste(
+    key_path,
+    format(file.mtime(key_path), "%Y-%m-%d %H:%M:%OS6"),
+    file.size(key_path),
+    length(cid),
+    sep = "|"
+  )
   if (exists(key, envir = cache, inherits = FALSE)) {
     return(get(key, envir = cache, inherits = FALSE))
   }
+
   m <- terra::rast(mask_path)
-  v <- terra::extract(m, cell_index$ref_cell_id)[[1L]]
-  lut <- logical(max(cell_index$cell_id))
-  lut[cell_index$cell_id[!is.na(v) & v == 1]] <- TRUE
+  # Checked before compareGeom(), which ignores layer count by default and would
+  # let a multi-band file through to a silent `[[1L]]`.
+  if (terra::nlyr(m) != 1L) {
+    stop(sprintf(
+      "intervention mask %s has %d layers (expected 1)",
+      mask_path, terra::nlyr(m)
+    ), call. = FALSE)
+  }
+  # Same assertion scripts/validate_intervention_masks.r makes offline, so the
+  # runtime and the validator report the same condition (CR-02).
+  if (!isTRUE(terra::compareGeom(m, ref_grid, stopOnError = FALSE))) {
+    stop(sprintf(
+      "intervention mask %s is not on the reference grid (crs/res/extent mismatch); cell-number lookup would be silently wrong",
+      mask_path
+    ), call. = FALSE)
+  }
+
+  # CR-02(b): terra::extract() only warns on out-of-range cell numbers, to
+  # stderr, and the NA it returns reads as "outside". Reject deterministically.
+  rcid <- cell_index$ref_cell_id
+  n_ref <- terra::ncell(m)
+  if (
+    length(rcid) != length(cid) || anyNA(rcid) ||
+      any(rcid < 1) || any(rcid > n_ref)
+  ) {
+    stop(sprintf(
+      "cell_index$ref_cell_id values outside the reference grid 1..%.0f (or not aligned with cell_id) for mask %s",
+      n_ref, mask_path
+    ), call. = FALSE)
+  }
+
+  v <- terra::extract(m, rcid)[[1L]]
+  lut <- logical(max(cid))
+  lut[cid[!is.na(v) & v == 1]] <- TRUE
   assign(key, lut, envir = cache)
   lut
 }
@@ -273,7 +348,9 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
 #' `mask_dir`, D-05). Any referenced mask file that does not exist stops the
 #' call before any probability is edited (D-14). Mask membership is looked up
 #' by national cell number through a per-call cached LUT
-#' ([.mask_inside_lut()]). Each applied intervention writes one
+#' ([.mask_inside_lut()]), which aborts the call if the mask is not on
+#' `ref_grid_path`'s grid or is not single-layer (CR-02, D-13). Each applied
+#' intervention writes one
 #' intervention AUDIT line and each call writes one intervention summary
 #' AUDIT line to `log_file` (D-15). Probabilities
 #' are NOT renormalised; the number of cells whose summed probability exceeds 1
@@ -288,6 +365,10 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
 #'   lulc_schema class_name to raster integer value.
 #' @param interventions_dir Directory containing `<scenario>_interventions.yml`.
 #' @param mask_dir Directory containing the intervention mask rasters.
+#' @param ref_grid_path Path to the reference grid raster whose cell numbers
+#'   `cell_index$ref_cell_id` was computed against. Every mask is checked
+#'   against it at runtime and a mismatch aborts the call (CR-02, D-13): the
+#'   engine never resamples or reprojects.
 #' @param scenario Identifier for the scenario to apply interventions.
 #' @param simulation_time_step The (posterior) year at which to apply the
 #'   interventions.
@@ -300,6 +381,7 @@ implement_spatial_interventions <- function(
   class_name_to_value,
   interventions_dir,
   mask_dir,
+  ref_grid_path,
   scenario,
   simulation_time_step,
   log_file,
@@ -331,6 +413,32 @@ implement_spatial_interventions <- function(
     log_msg(msg, log_file)
     stop(msg, call. = FALSE)
   }
+
+  # Read the reference grid once. Every mask must sit on it exactly: the mask
+  # lookup indexes by national cell number, which is meaningless on any other
+  # grid (CR-02). Read here, not per mask, so the terra pointer lifetime stays
+  # inside this one scope.
+  ref_grid_fail <- function(why) {
+    m <- sprintf(
+      "intervention ref grid unreadable: %s (%s)",
+      paste(ref_grid_path, collapse = ", "), why
+    )
+    log_msg(m, log_file)
+    stop(m, call. = FALSE)
+  }
+  if (
+    length(ref_grid_path) != 1L || is.na(ref_grid_path) ||
+      !nzchar(ref_grid_path)
+  ) {
+    ref_grid_fail("not a single non-empty path")
+  }
+  # Checked before terra::rast() so a missing file reports here rather than as a
+  # bare GDAL warning on stderr.
+  if (!file.exists(ref_grid_path)) ref_grid_fail("file does not exist")
+  ref_grid <- tryCatch(
+    terra::rast(ref_grid_path),
+    error = function(e) ref_grid_fail(conditionMessage(e))
+  )
 
   write_summary <- function(n_applied) {
     sums <- normalized[, list(s = sum(prob, na.rm = TRUE)), by = cell_id]
@@ -415,7 +523,9 @@ implement_spatial_interventions <- function(
     # Mask_type is validated by the resolver for every Allocation entry
     # (IN-01); the mask path is the resolver row's own, so there is no join and
     # no way for an intervention to be skipped here.
-    inside_lut <- .mask_inside_lut(mask_path, cell_index, cache)
+    inside_lut <- .mask_inside_lut(
+      mask_path, cell_index, cache, ref_grid = ref_grid
+    )
 
     # If the Intervention requires filtering by LULC classes then translate
     # the From_lulc_filter class names to integer from_val values, to be
