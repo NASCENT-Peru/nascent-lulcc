@@ -8,7 +8,11 @@
 #
 # Authored 2026-06-05 from the design recorded in the colleague's local design
 # protocol (spatial_interventions_integration_protocol.md, not versioned in
-# this repo) §4a.
+# this repo) §4a. That protocol remains the original design authority, but it
+# is not reviewable from this repository; the rationale for every parameter
+# below is recorded in-repo in
+# docs/spatial_interventions/parameter_provenance.md (WR-11 / D-16), which also
+# names the choices that still depend on the unversioned protocol.
 #
 # Narrative anchor (from docs/spatial_interventions/scenario_narratives.md):
 #   - Strict nature protection: 30% PA expansion by 2030 with strong
