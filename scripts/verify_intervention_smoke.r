@@ -14,7 +14,11 @@
 #'       per-transition probability map whose To class is a target (and whose
 #'       From class passes From_lulc_filter when present) is 0 inside the mask
 #'       (zone Inside) or outside the mask (zone Outside). The national mask is
-#'       cropped to the region map (same grid, no resampling).
+#'       cropped to the region map (same grid, no resampling). The selected zone
+#'       must contain at least one non-NA probability cell: a zone with none is
+#'       a FAIL and is NOT counted in maps_checked, because `r * sel` is 0
+#'       wherever `sel` is FALSE and would otherwise report a vacuous [ok] for a
+#'       mask that lands entirely outside the region (WR-07).
 #'   (d) No forbidden marker appears in any log under the region dir (or in
 #'       --extra-log, e.g. the SLURM stdout file).
 #'
@@ -26,10 +30,14 @@
 #' Usage:
 #'   Rscript scripts/verify_intervention_smoke.r --year <posterior year>
 #'     [--scenario NAT] [--region costa_peruana] [--output-root <path>]
-#'     [--mask-dir <path>] [--extra-log <path>]
+#'     [--mask-dir <path>] [--interventions-dir <path>] [--extra-log <path>]
 #'
 #' --year is required: the smoke script default (2026) is not a posterior
 #' year (Pitfall 5). --region is the region suffix (lower case, spaces as _).
+#' --interventions-dir overrides the directory holding
+#' <scenario>_interventions.yml (default: config[["interventions_dir"]]); it
+#' mirrors the existing --mask-dir / --output-root overrides and lets the
+#' verifier be pointed at a fixture config.
 #' Exit status: 0 PASS, 1 FAIL, 2 usage or sourcing error.
 
 # ---------------------------------------------------------------------------
@@ -51,10 +59,13 @@ setwd(project_root)
 usage <- paste(
   "Usage: Rscript scripts/verify_intervention_smoke.r --year <posterior year>",
   "[--scenario NAT] [--region costa_peruana] [--output-root <path>]",
-  "[--mask-dir <path>] [--extra-log <path>]"
+  "[--mask-dir <path>] [--interventions-dir <path>] [--extra-log <path>]"
 )
 
-known_flags <- c("scenario", "region", "year", "output-root", "mask-dir", "extra-log")
+known_flags <- c(
+  "scenario", "region", "year", "output-root", "mask-dir",
+  "interventions-dir", "extra-log"
+)
 opts <- list()
 args <- commandArgs(trailingOnly = TRUE)
 i <- 1L
@@ -131,13 +142,16 @@ region <- opt_or("region", "costa_peruana")
 output_root <- opt_or("output-root", config[["simulation_output_dir"]])
 mask_dir <- opt_or("mask-dir", config[["spat_prob_perturb_dir"]])
 extra_log <- opts[["extra-log"]]
-interventions_dir <- config[["interventions_dir"]]
+interventions_dir <- opt_or("interventions-dir", config[["interventions_dir"]])
 
 region_dir <- file.path(output_root, scenario, as.character(year), paste0("region_", region))
 prob_map_dir <- file.path(region_dir, "probability_map_dir")
 
 cat(sprintf("region_dir: %s\n", region_dir))
-cat(sprintf("mask_dir:   %s\n\n", mask_dir))
+cat(sprintf("mask_dir:   %s\n", mask_dir))
+# Echoed because --interventions-dir selects WHICH policy set is asserted on
+# (T-05-54): the resolved value must be visible in the verifier's own output.
+cat(sprintf("interventions_dir: %s\n\n", interventions_dir))
 
 errors <- character(0)
 fail <- function(msg) {
@@ -308,12 +322,33 @@ if (length(abs0) > 0L) {
           }
           m0 <- terra::ifel(is.na(m), 0, m)
           sel <- if (identical(zone, "Inside")) (m0 == 1) else (m0 != 1)
+          # WR-07: `r * sel` is 0 everywhere `sel` is FALSE, so the max over an
+          # EMPTY zone is 0 and would be reported [ok] — a mask that lands
+          # entirely outside the region would pass with nothing asserted on.
+          # Prove the zone is non-empty first, and do not let a vacuous check
+          # contribute to maps_checked.
+          n_zone <- terra::global(sel & !is.na(r), "sum", na.rm = TRUE)[[1]][1]
+          if (!is.finite(n_zone) || n_zone == 0) {
+            fail(sprintf(
+              "%s: %s has 0 non-NA cells in zone=%s for mask %s (assertion would be vacuous)",
+              id, basename(tif), zone, basename(mask_path)
+            ))
+            next
+          }
           mx <- terra::global(r * sel, "max", na.rm = TRUE)[[1]][1]
-          if (!is.finite(mx)) mx <- 0
+          if (!is.finite(mx)) {
+            # The zone is provably non-empty, so a non-finite max means the
+            # product yielded no usable value. Never convert that to a pass.
+            fail(sprintf(
+              "%s: %s has a non-finite max over %d non-NA cell(s) in zone=%s for mask %s",
+              id, basename(tif), as.integer(n_zone), zone, basename(mask_path)
+            ))
+            next
+          }
           maps_checked <- maps_checked + 1L
           status <- if (mx == 0) "ok" else "FAIL"
-          cat(sprintf("  %s zone=%s %s: max prob in zone = %g [%s]\n",
-                      id, zone, basename(tif), mx, status))
+          cat(sprintf("  %s zone=%s %s: n_zone=%d max prob in zone = %g [%s]\n",
+                      id, zone, basename(tif), as.integer(n_zone), mx, status))
           if (mx != 0) {
             fail(sprintf("%s: %s has max probability %g %s %s (expected 0)",
                          id, basename(tif), mx, tolower(zone), basename(mask_path)))
@@ -330,9 +365,32 @@ cat("\n")
 
 # (d) Forbidden markers -------------------------------------------------------
 forbidden <- c(
+  # Generic R crash signatures. The length-zero message below is the EXACT
+  # text the missing-Prob_adjust_* defect produced end to end (CR-03); the
+  # out-of-bounds one is its sibling for a mis-shaped index.
   "missing value where TRUE/FALSE needed",
+  "argument is of length zero",
+  "subscript out of bounds",
   "could not find function",
-  "intervention mask missing"
+  # Runtime intervention stops introduced by plan 05-09 (CR-02, IN-07, WR-10).
+  # The two geometry strings are deliberately prefix-free so they also catch
+  # the Stage 7 pre-flight wording, which differs only in its "intervention
+  # mask: " prefix and the absent trailing clause.
+  "intervention mask missing",
+  "intervention ref grid unreadable",
+  "is not on the reference grid",
+  "layers (expected 1)",
+  "cell_index$cell_id must be",
+  "cell_index$ref_cell_id values outside",
+  # Stage 7 pre-flight rejections (plan 05-10). Every string carrying either of
+  # these two prefixes is an error; no success line uses them.
+  "intervention mask: ",
+  "intervention config: ",
+  # Telemetry degradation (plan 05-13). The success line is
+  # "intervention telemetry: wrote N rows to ...", so only the WARN form and
+  # the pre-flight form are forbidden.
+  "WARN intervention telemetry:",
+  "intervention telemetry: output directory not writable"
 )
 scan_sets <- log_lines
 if (!is.null(extra_log)) {
@@ -343,7 +401,7 @@ if (!is.null(extra_log)) {
   }
 }
 # Known benign line: allocation always logs the mlr3 predict_newdata()
-# failure (".__Task__col_info" missing) before its deterministic direct
+# failure (its task column-info attribute is missing) before its deterministic direct
 # ranger fallback. It contains "could not find function" but is expected.
 benign <- c(".__Task__col_info", "falling back to direct model prediction")
 for (p in names(scan_sets)) {
