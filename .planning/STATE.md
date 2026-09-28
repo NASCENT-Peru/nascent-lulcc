@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 05-12-PLAN.md (wave 4 of 7 merged; next: 05-13)"
+stopped_at: "Completed 05-13-PLAN.md (wave 5 of 7 merged; next: 05-14 + 05-15)"
 last_updated: "2026-09-28T09:40:00.000Z"
-last_activity: 2026-09-28 -- Phase 05 wave 4 complete (05-12)
+last_activity: 2026-09-28 -- Phase 05 wave 5 complete (05-13)
 progress:
   total_phases: 12
   completed_phases: 9
   total_plans: 52
-  completed_plans: 44
+  completed_plans: 45
   percent: 75
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 ## Current Position
 
 Phase: 05 (integrate-spatial-interventions-branch-and-stage-interventio) — EXECUTING
-Plan: 12 of 16
+Plan: 13 of 16
 Status: Executing Phase 05
-Last activity: 2026-09-28 -- Phase 05 wave 4 complete (05-12)
+Last activity: 2026-09-28 -- Phase 05 wave 5 complete (05-13)
 
 ### Roadmap Evolution
 
@@ -81,6 +81,7 @@ Progress: [██████████] 98%
 | Phase 05 P10 | ~6 min | 2 tasks | 3 files |
 | Phase 05 P11 | ~40 min | 3 tasks | 3 files |
 | Phase 05 P12 | ~35 min | 3 tasks | 3 files |
+| Phase 05 P13 | ~50 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -132,6 +133,10 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-12: AUDIT line extended APPEND-ONLY from 13 to 21 tokens (delta_mean/med/sd/min/max, n_inc, n_dec, sum_abs_delta). Verified: the shipped verify_intervention_smoke.r parser extracts id and rows_changed identically from old and extended lines, so the verifier needs no parser change. Non-finite stats render as literal NA.
 - [Phase 05]: 05-12: plan's literal formatC(format="g") left-pads to `digits`, which exploded the AUDIT body to 41 tokens - threat T-05-46 materialising out of its own mitigation; fixed with trimws(formatC(..., width=1L))
 - [Phase 05]: 05-13 handoff: res$stats' 19 columns are a superset of the D-18 CSV per-class columns; the writer only needs to prepend scenario, region, year, intervention_id, rank, type, zone, mask
+
+- [Phase 05]: 05-13: telemetry CSV is `intervention_prob_deltas_<scenario>_<region>_<year>.csv` in work_dir, 25 columns; `<region>` is the slug gsub(" ","_",tolower(label)). AUDIT `region=` keeps the label verbatim, the CSV `region` column is the slug - they differ BY DESIGN.
+- [Phase 05]: 05-13: rows_target vs sum(n_target) is NOT an equality for Relative interventions - relative_prob_adjust() adds length(sub_idx) to rows_target before its three `next` paths, so a skipped class counts toward AUDIT rows_target while its CSV row correctly reports n_target=0. Any cross-check must scope to Absolute or to n_target>0 rows. sum_abs_delta and rows_changed reconcile unconditionally.
+- [Phase 05]: 05-13: plan's sanitiser gsub("[^A-Za-z0-9_.-]","_") keeps `.` so `../` survived as `.._`; a second pass gsub("\.{2,}","_") was added. Verified empirically: 0 traversal survivals across ../, backslash and ....// vectors, SSP2.6 preserved.
 
 ### Pending Todos
 

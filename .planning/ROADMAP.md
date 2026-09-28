@@ -330,7 +330,7 @@ Plans:
 - [x] 05-12-PLAN.md - Per-target-class delta statistics from both adjusters and eight appended AUDIT fields (D-18, D-19, D-20).
 
 **Wave 9**
-- [ ] 05-13-PLAN.md - intervention_prob_deltas CSV, hook wiring, non-fatal write and pre-flight writability check (D-18, D-21).
+- [x] 05-13-PLAN.md - intervention_prob_deltas CSV, hook wiring, non-fatal write and pre-flight writability check (D-18, D-21).
 
 **Wave 10** *(parallel - no files_modified overlap)*
 - [ ] 05-14-PLAN.md - Smoke verifier: non-vacuous zone assertions, extended forbidden markers, telemetry assertions (WR-07, CR-03, D-22).
