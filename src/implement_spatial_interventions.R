@@ -768,9 +768,15 @@ relative_prob_adjust <- function(
       log_file
     )
   }
-  because_msg <- function(tail) {
+  # IN-04: the explanation used to be logged as a bare sentence fragment with no
+  # target class, so a line read as an orphan next to the `to_val=`-prefixed
+  # skip lines and could not be attributed to a class from the log alone.
+  because_msg <- function(lulc_class, tail) {
     log_msg(
-      paste("because the Prob_adjust_valency is", Prob_adjust_valency, tail),
+      paste0(
+        "to_val=", lulc_class, ": ",
+        paste("because the Prob_adjust_valency is", Prob_adjust_valency, tail)
+      ),
       log_file
     )
   }
@@ -848,7 +854,7 @@ relative_prob_adjust <- function(
     Perc_diff <- (Mean_diff / Average_mean) * 100
 
     # NaN guard: with no positive probabilities in one zone the percentile /
-    # mean chain yields NA/NaN and `if (Perc_diff > 0)` would crash with
+    # mean chain yields NA/NaN and `if (Perc_diff >= 0)` would crash with
     # "missing value where TRUE/FALSE needed". Skip and log instead.
     if (
       !any(Intervention_vals > 0, na.rm = TRUE) ||
@@ -878,51 +884,63 @@ relative_prob_adjust <- function(
 
     if (Prob_adjust_valency == "Increase") {
       # Goal: increase the probability of change for the target class in the
-      # intervention area. Perc_diff > 0 -> increase intervention pixels above
+      # intervention area. Perc_diff >= 0 -> increase intervention pixels above
       # the percentile; Perc_diff < 0 -> decrease non-intervention pixels.
-      if (Perc_diff > 0) {
+      # WR-01(b): `>= 0`, not `> 0`. At exactly zero neither branch used to run,
+      # so Prob_adjust_threshold - whose purpose is to guarantee a nudge when
+      # the two zones are indistinguishable - was silently skipped, while
+      # Increase_inside_decrease_outside applied it. All three valencies now
+      # agree at the boundary.
+      if (Perc_diff >= 0) {
         if (abs(Perc_diff) < Prob_adjust_threshold) {
           threshold_msg(lulc_class, Prob_adjust_threshold)
           Perc_diff <- Prob_adjust_threshold
         }
-        because_msg("and the percentage difference is >0 then increasing the probability of the intervention pixels")
-        # Increase the probability of instances above the specified percentile
-        ix <- Intervention_idx[Intervention_vals > Intervention_ptile_val]
+        because_msg(lulc_class, "and the percentage difference is >0 then increasing the probability of the intervention pixels")
+        # Increase the probability of instances above the specified percentile.
+        # WR-01(a): the selection must mirror the `>=` used for
+        # Intervention_ptile_mean / Non_intervention_ptile_mean above; with a
+        # strict `>` the mean was taken over rows that were then never adjusted.
+        ix <- Intervention_idx[Intervention_vals >= Intervention_ptile_val]
         normalized[ix, prob := prob + (prob / 100) * Perc_diff]
       } else if (Perc_diff < 0) {
         if (abs(Perc_diff) < Prob_adjust_threshold) {
-          threshold_msg(lulc_class, Perc_diff)
+          # WR-03: log the signed value actually assigned on the next line.
+          threshold_msg(lulc_class, -(Prob_adjust_threshold))
           Perc_diff <- -(Prob_adjust_threshold)
         }
-        because_msg("and the percentage difference is <0 then decreasing the probability of the non-intervention pixels")
+        because_msg(lulc_class, "and the percentage difference is <0 then decreasing the probability of the non-intervention pixels")
         # Decrease the probability of instances above the specified percentile
         ix <- Non_intervention_idx[
-          Non_Intervention_vals > Non_intervention_ptile_val
+          Non_Intervention_vals >= Non_intervention_ptile_val
         ]
         normalized[ix, prob := prob + (prob / 100) * Perc_diff]
       }
     } else if (Prob_adjust_valency == "Decrease") {
       # Goal: decrease the probability of change for the target class in the
-      # intervention area. Perc_diff > 0 -> decrease intervention pixels above
+      # intervention area. Perc_diff >= 0 -> decrease intervention pixels above
       # the percentile; Perc_diff < 0 -> increase non-intervention pixels.
-      if (Perc_diff > 0) {
+      # WR-01(b): `>= 0` for the same reason as the Increase branch above.
+      if (Perc_diff >= 0) {
         if (abs(Perc_diff) < Prob_adjust_threshold) {
           threshold_msg(lulc_class, Prob_adjust_threshold)
           Perc_diff <- Prob_adjust_threshold
         }
-        because_msg("and the percentage difference is >0 then decreasing the probability of the intervention pixels")
+        because_msg(lulc_class, "and the percentage difference is >0 then decreasing the probability of the intervention pixels")
         # Decrease the probability of instances above the specified percentile
-        ix <- Intervention_idx[Intervention_vals > Intervention_ptile_val]
+        # (WR-01(a): `>=`, mirroring Intervention_ptile_mean).
+        ix <- Intervention_idx[Intervention_vals >= Intervention_ptile_val]
         normalized[ix, prob := prob + (prob / 100) * -(Perc_diff)]
       } else if (Perc_diff < 0) {
         if (abs(Perc_diff) < Prob_adjust_threshold) {
-          threshold_msg(lulc_class, Prob_adjust_threshold)
+          # WR-03: the assignment below is -(Prob_adjust_threshold); log that.
+          threshold_msg(lulc_class, -(Prob_adjust_threshold))
           Perc_diff <- -(Prob_adjust_threshold)
         }
-        because_msg("and the percentage difference is <0 then increasing the probability of the non-intervention pixels")
+        because_msg(lulc_class, "and the percentage difference is <0 then increasing the probability of the non-intervention pixels")
         # Increase the probability of instances above the specified percentile
         ix <- Non_intervention_idx[
-          Non_Intervention_vals > Non_intervention_ptile_val
+          Non_Intervention_vals >= Non_intervention_ptile_val
         ]
         normalized[ix, prob := prob + (prob / 100) * abs(Perc_diff)]
       }
@@ -933,15 +951,16 @@ relative_prob_adjust <- function(
         threshold_msg(lulc_class, Prob_adjust_threshold)
         Perc_diff <- Prob_adjust_threshold
       }
-      because_msg("increasing the probability of the intervention pixels and decreasing the probability of the non-intervention pixels")
+      because_msg(lulc_class, "increasing the probability of the intervention pixels and decreasing the probability of the non-intervention pixels")
 
-      # Increase the probability of instances above the specified percentile in the intervention area
-      ix <- Intervention_idx[Intervention_vals > Intervention_ptile_val]
+      # Increase the probability of instances above the specified percentile in
+      # the intervention area (WR-01(a): `>=`, mirroring the percentile mean).
+      ix <- Intervention_idx[Intervention_vals >= Intervention_ptile_val]
       normalized[ix, prob := prob + (prob / 100) * abs(Perc_diff)]
 
       # Decrease the probability of instances above the specified percentile in the non-intervention area
       ix <- Non_intervention_idx[
-        Non_Intervention_vals > Non_intervention_ptile_val
+        Non_Intervention_vals >= Non_intervention_ptile_val
       ]
       normalized[ix, prob := prob + (prob / 100) * -(abs(Perc_diff))]
     }
