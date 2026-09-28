@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 05-13-PLAN.md (wave 5 of 7 merged; next: 05-14 + 05-15)"
+stopped_at: "Completed 05-15-PLAN.md (waves 1-6 done; 05-16 is the OPERATOR GATE, autonomous: false)"
 last_updated: "2026-09-28T09:40:00.000Z"
-last_activity: 2026-09-28 -- Phase 05 wave 5 complete (05-13)
+last_activity: 2026-09-28 -- Phase 05 wave 6 complete (05-14, 05-15); 15/16 plans done
 progress:
   total_phases: 12
   completed_phases: 9
   total_plans: 52
-  completed_plans: 45
+  completed_plans: 47
   percent: 75
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 ## Current Position
 
 Phase: 05 (integrate-spatial-interventions-branch-and-stage-interventio) — EXECUTING
-Plan: 13 of 16
+Plan: 15 of 16 (05-16 pending - operator gate)
 Status: Executing Phase 05
-Last activity: 2026-09-28 -- Phase 05 wave 5 complete (05-13)
+Last activity: 2026-09-28 -- Phase 05 wave 6 complete (05-14, 05-15); 15/16 plans done
 
 ### Roadmap Evolution
 
@@ -82,6 +82,8 @@ Progress: [██████████] 98%
 | Phase 05 P11 | ~40 min | 3 tasks | 3 files |
 | Phase 05 P12 | ~35 min | 3 tasks | 3 files |
 | Phase 05 P13 | ~50 min | 3 tasks | 5 files |
+| Phase 05 P14 | ~40 min | 3 tasks | 3 files |
+| Phase 05 P15 | ~35 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -137,6 +139,12 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-13: telemetry CSV is `intervention_prob_deltas_<scenario>_<region>_<year>.csv` in work_dir, 25 columns; `<region>` is the slug gsub(" ","_",tolower(label)). AUDIT `region=` keeps the label verbatim, the CSV `region` column is the slug - they differ BY DESIGN.
 - [Phase 05]: 05-13: rows_target vs sum(n_target) is NOT an equality for Relative interventions - relative_prob_adjust() adds length(sub_idx) to rows_target before its three `next` paths, so a skipped class counts toward AUDIT rows_target while its CSV row correctly reports n_target=0. Any cross-check must scope to Absolute or to n_target>0 rows. sum_abs_delta and rows_changed reconcile unconditionally.
 - [Phase 05]: 05-13: plan's sanitiser gsub("[^A-Za-z0-9_.-]","_") keeps `.` so `../` survived as `.._`; a second pass gsub("\.{2,}","_") was added. Verified empirically: 0 traversal survivals across ../, backslash and ....// vectors, SSP2.6 preserved.
+
+- [Phase 05]: 05-14: PASS banner extended APPEND-ONLY - prefix through `maps_checked=%d` byte-identical, `telemetry_rows=%d` appended. New banner: `PASS verify_intervention_smoke scenario=.. region=.. year=.. interventions=.. maps_checked=.. telemetry_rows=..`. Exit codes 0/1/2 unchanged.
+- [Phase 05]: 05-14: WR-07 reproduced against the UNMODIFIED shipped script (all-NA mask gave maps_checked=2, exit 0, zero cells asserted); now n_zone is counted before the max and a zero/non-finite zone fails without incrementing maps_checked.
+- [Phase 05]: 05-14: AUDIT-vs-CSV cross-check scoped to Absolute only for rows_target vs sum(n_target); rows_changed and sum_abs_delta carry the unconditional checks (rel tol 1e-5). CSV region slug and AUDIT region label deliberately NOT compared.
+- [Phase 05]: 05-15: verified independently from config/*.yml - 14 Allocation entries, 6 distinct valency/zone combos. Confirms 05-REVIEW.md WR-11 is WRONG: the Outside+value:0 pairing is NAT Mining_freeze_post_2030 and SOC Mining_in_low_ES_areas, NOT CUL Mining_outside_restraint (which is Relative/Decrease/Outside with no Prob_adjust_value).
+- [Phase 05]: DEFERRED (out of phase scope): tests/testthat/test-prep-paths.R carries the same sys.frame(1)$ofile defect 05-15 removed and is the sole source of all 4 standing suite errors. It is now a one-line fix - delete its bootstrap and consume helper-spatial-interventions.R's .repo_root.
 
 ### Pending Todos
 
