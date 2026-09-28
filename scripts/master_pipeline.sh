@@ -346,7 +346,7 @@ summary_file="$PROJECT_ROOT/logs/complete_pipeline_summary_$(date +%Y%m%d_%H%M%S
     echo "  3. Transition Modelling: Statistical modelling of LULC transitions"
     echo "  4. Allocation Parameter Estimation: Evaluation, specification selection, final training"
     echo "  5. Scenario Preparation: Transition tables and predictor data for scenarios"
-    echo "  6. Simulation Setup: Calibration parameters and spatial interventions"
+    echo "  6. Simulation Setup: Calibration parameters (spatial interventions now applied inside allocation)"
     echo "  7. Dinamica Simulations: Final land use change simulations"
     echo
     echo "Output directories: Check individual step logs and configuration files"

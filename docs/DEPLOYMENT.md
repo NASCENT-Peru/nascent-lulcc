@@ -259,11 +259,11 @@ sbatch --dependency=afterok:<model_job_id> scripts/submit_calibrate_allocation_p
 # Stage 5: Scenario transition rate preparation
 sbatch --dependency=afterok:<alloc_param_job_id> scripts/submit_simulation_trans_rates_estimation.sh
 
-# Stage 6: Spatial interventions preparation
-sbatch --dependency=afterok:<trans_rates_job_id> scripts/submit_spatial_interventions_prep.sh
+# Stage 6: retired (legacy code in src/old/); spatial interventions now run
+# inside allocation (Stage 7) from config/{BAU,NAT,CUL,SOC}_interventions.yml.
 
 # Stage 7: Allocation / Dinamica simulations — run the launcher with bash once
-# Stage 6 has finished (it is not an SBATCH job itself; it probes the region list
+# Stage 5 has finished (it is not an SBATCH job itself; it probes the region list
 # and calls sbatch per region, then queues the national-mosaic job afterok):
 ALLOC_SCENARIO=NAT bash scripts/submit_allocation_scenario.sh   # one scenario
 bash scripts/submit_allocation_all_scenarios.sh                 # all four scenarios
@@ -308,7 +308,6 @@ Resource directives are defined per stage in each `submit_*.sh` script. Adjust
 | Transition modelling | `submit_transition_modelling.sh` | 3 | 42 G | 72 h |
 | Alloc. param. calibration | `submit_calibrate_allocation_parameters.sh` | 4 | 28 G | 6 h |
 | Sim. transition rates prep | `submit_simulation_trans_rates_estimation.sh` | 6 | 16 G | 4 h |
-| Spatial interventions prep | `submit_spatial_interventions_prep.sh` | 4 | 16 G | 4 h |
 | Allocation region job (per region) | `submit_allocation_region.sh` (via `submit_allocation_scenario.sh`) | 160 (fat) / 80 (highmem) | whole node (`--exclusive --mem=0`) | 24 h |
 | National mosaic assembly | `submit_assemble_mosaic.sh` (queued `afterok` by the launcher) | 4 | node default | 4 h |
 | Allocation smoke | `submit_allocation_smoke.sh` | 4 | 16 G | 12 h |

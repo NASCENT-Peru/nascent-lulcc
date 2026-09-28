@@ -1,5 +1,9 @@
 # Integrate `implement_spatial_interventions` into `allocation.r`
 
+_Authored by Manuel Kurmann on the spatial_interventions branch (commit d0a11df); moved and converted to Markdown in Phase 5 (already Markdown; relative links updated)._
+
+_Historical pre-integration briefing: it describes the plan before the merge (SSP-named configs, open questions). The current behaviour is documented in `docs/ARCHITECTURE.md` and `src/implement_spatial_interventions.R`._
+
 ## Context
 
 The project's allocation pipeline (`src/allocation.r`) predicts per-cell transition
@@ -10,11 +14,11 @@ scenario-specific spatial policy (e.g. "push urban growth *inside* building
 zones under BAU", "suppress agricultural expansion inside protected areas under
 NAT").
 
-A standalone script, [`src/implement_spatial_interventions.R`](src/implement_spatial_interventions.R),
+A standalone script, [`src/implement_spatial_interventions.R`](../../src/implement_spatial_interventions.R),
 was developed in a spinoff project to apply such policies by reweighting
 probabilities over spatial masks. It is **not currently called** from anywhere
 in this repo. The task is to integrate it between probability prediction and
-the per-transition TIF writes inside [`generate_probability_maps()`](src/allocation.r#L457).
+the per-transition TIF writes inside [`generate_probability_maps()`](../../src/allocation.r#L457).
 
 The goal of this plan is to (1) brief a colleague on what the function
 mechanically does, and (2) specify the concrete integration work.
@@ -87,7 +91,7 @@ land without changing *how much* total change occurs.
 ### 1. Rename intervention configs to match scenario names
 
 Current: `config/SSP{0,1,3,4,5}_interventions.yml` (5 files, SSP-named).
-Project scenarios: `BAU`, `NAT`, `CUL`, `SOC` (4 scenarios, set in [`local_config.yaml:64`](config/local_config.yaml#L64)).
+Project scenarios: `BAU`, `NAT`, `CUL`, `SOC` (4 scenarios, set in [`local_config.yaml:64`](../../config/local_config.yaml#L64)).
 
 Target: `config/{BAU,NAT,CUL,SOC}_interventions.yml`.
 
@@ -97,15 +101,15 @@ merged. Document the mapping in the file header comment once decided.
 
 ### 2. Add `interventions_dir` to both config files
 
-- [`config/local_config.yaml`](config/local_config.yaml) and [`config/hpc_config.yaml`](config/hpc_config.yaml)
+- [`config/local_config.yaml`](../../config/local_config.yaml) and [`config/hpc_config.yaml`](../../config/hpc_config.yaml)
 - Add under `config_files_paths:` (or a new `interventions_dir` key in the root) a path to the directory containing the YAML files. The project already has `config_dir: "config"` at the top; the cleanest option is to add:
   ```yaml
   interventions_dir: "config"
   ```
   and reference it via `config[["interventions_dir"]]` in R.
-- Note: [`config/hpc_config.yaml:66`](config/hpc_config.yaml#L66) has a pre-existing indentation bug on the `scenario_to_ssp_mapping:` line (double indent) — fix while you're there.
+- Note: [`config/hpc_config.yaml:66`](../../config/hpc_config.yaml#L66) has a pre-existing indentation bug on the `scenario_to_ssp_mapping:` line (double indent) — fix while you're there.
 
-### 3. Refactor [`src/implement_spatial_interventions.R`](src/implement_spatial_interventions.R)
+### 3. Refactor [`src/implement_spatial_interventions.R`](../../src/implement_spatial_interventions.R)
 
 **New signature** (to match what's available in `allocation.r`):
 
@@ -130,14 +134,14 @@ Returns: the same `normalized` data.table with `prob` values modified in place
 | Legacy                                                         | New                                                                              |
 | -------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `raster_prob_values` wide df (x, y, LULC, Prob_<Class> cols)   | long-format `normalized` DT (see columns above)                                  |
-| `LULC_rat` from Excel (`Class_abbreviation`, `Aggregated_ID`)  | `class_name_to_value` vector derived from [`config/lulc_schema.json`](config/lulc_schema.json) (fields `class_name` → `value`). Build once in `generate_probability_maps`, pass in. |
+| `LULC_rat` from Excel (`Class_abbreviation`, `Aggregated_ID`)  | `class_name_to_value` vector derived from [`config/lulc_schema.json`](../../config/lulc_schema.json) (fields `class_name` → `value`). Build once in `generate_probability_maps`, pass in. |
 | `scenario_ID` (SSP name)                                       | `scenario` (BAU/NAT/CUL/SOC)                                                     |
 | `Proj = ProjCH`                                                | Dropped — take CRS from `anterior` raster                                        |
 | Wide-to-raster conversion via `rast(df[, c("x","y",col)])`     | Build per-target-class SpatRasters from `normalized` (rasterize from long rows) only when needed by the helpers, then write results back to `prob`. Alternatively, keep the helpers raster-native and do one round-trip per intervention; picking between these is a helper-implementation detail (your spinoff code will dictate). |
 | `Current_lulc_raster` built from the wide df                   | Use the `anterior` SpatRaster directly                                           |
 | `Transition_target_classes` matched via `paste0("Prob_", ...)` | Match target class string → integer via `class_name_to_value`, then filter `normalized` to rows where `to_val == <that integer>` |
 | `From_lulc_filter` matched via `Class_abbreviation`            | Same — match string → integer via `class_name_to_value`                          |
-| `cat(...)` for progress                                        | `log_msg(..., log_file)` — project convention ([`allocation.r:187`](src/allocation.r#L187)) |
+| `cat(...)` for progress                                        | `log_msg(..., log_file)` — project convention ([`allocation.r:187`](../../src/allocation.r#L187)) |
 
 Drop the Excel-based `LULC_rat` plumbing entirely. The JSON schema's
 `class_name` values (e.g. `forested_areas`, `built_up_and_barren_lands`) become
@@ -148,15 +152,15 @@ the rename step (Step 1).
 ### 4. Wire the helpers
 
 Ben will drop `absolute_prob_adjust()` and `relative_prob_adjust()` into
-[`src/implement_spatial_interventions.R`](src/implement_spatial_interventions.R)
+[`src/implement_spatial_interventions.R`](../../src/implement_spatial_interventions.R)
 before the colleague starts. The colleague adapts them to operate on whichever
 data shape the refactored wrapper settles on (long DT vs. per-target SpatRaster).
 
 ### 5. Integration point in `allocation.r`
 
-Insert the call inside [`generate_probability_maps()`](src/allocation.r#L457)
-**after the normalization block** (currently [`src/allocation.r:787-795`](src/allocation.r#L787-L795))
-and **before the per-transition TIF-write loop** ([`src/allocation.r:805`](src/allocation.r#L805)):
+Insert the call inside [`generate_probability_maps()`](../../src/allocation.r#L457)
+**after the normalization block** (currently [`src/allocation.r:787-795`](../../src/allocation.r#L787-L795))
+and **before the per-transition TIF-write loop** ([`src/allocation.r:805`](../../src/allocation.r#L805)):
 
 ```r
 # after: normalized[, tot_prob := NULL]
@@ -181,7 +185,7 @@ normalized <- implement_spatial_interventions(
 
 Also add `source("src/implement_spatial_interventions.R")` to the project's
 loader (wherever `allocation.r`'s other sources are pulled in — check
-[`src/main.r`](src/main.r) or the equivalent entrypoint).
+[`src/main.r`](../../src/main.r) or the equivalent entrypoint).
 
 ### 6. Preserve the Agri_maintenance/abandonment special case
 
@@ -193,10 +197,10 @@ Carry over the upper-quartile-of-marginality mask restriction (legacy lines
 
 ## Files to modify
 
-- [`src/allocation.r`](src/allocation.r) — insert call inside `generate_probability_maps()`.
-- [`src/implement_spatial_interventions.R`](src/implement_spatial_interventions.R) — refactor signature + body per Section 3.
-- [`config/local_config.yaml`](config/local_config.yaml) — add `interventions_dir: "config"`.
-- [`config/hpc_config.yaml`](config/hpc_config.yaml) — same, plus fix existing indentation bug on line 66.
+- [`src/allocation.r`](../../src/allocation.r) — insert call inside `generate_probability_maps()`.
+- [`src/implement_spatial_interventions.R`](../../src/implement_spatial_interventions.R) — refactor signature + body per Section 3.
+- [`config/local_config.yaml`](../../config/local_config.yaml) — add `interventions_dir: "config"`.
+- [`config/hpc_config.yaml`](../../config/hpc_config.yaml) — same, plus fix existing indentation bug on line 66.
 - `config/SSP{0,1,3,4,5}_interventions.yml` — rename to `{BAU,NAT,CUL,SOC}_interventions.yml` (mapping decision required), and replace short class names (`Urban`, `Int_AG`, etc.) with lulc_schema `class_name` values.
 - Project loader / main entrypoint — `source()` the spatial interventions script.
 

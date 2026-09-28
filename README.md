@@ -106,7 +106,7 @@ The pipeline consists of 7 sequential stages with SLURM `afterok` dependency cha
 | 3. Transition Modelling | `submit_transition_modelling.sh` | 12–24 h | tidymodels GLM/RF/XGBoost training with cross-validation |
 | 4. Allocation Parameter Calibration | `submit_calibrate_allocation_parameters.sh` | 2–4 h | Monte-Carlo calibration of Dinamica patch parameters |
 | 5. Scenario Preparation | `submit_simulation_trans_rates_estimation.sh` | 4–8 h | CVXR-optimised transition rate tables per scenario |
-| 6. Spatial Interventions | `submit_spatial_interventions_prep.sh` | 2–4 h | Per-SSP spatial probability perturbation layer assembly |
+| 6. Spatial Interventions | — (retired; legacy code in `src/old/`) | — | Interventions now run inside allocation (Stage 7) from `config/{BAU,NAT,CUL,SOC}_interventions.yml` |
 | 7. Dinamica Simulations | `submit_allocation_scenario.sh` (per-region fan-out; `submit_allocation_all_scenarios.sh` for the full sweep) | 12–48 h | Spatially-explicit LULC simulation 2022–2060 |
 
 ## Usage

@@ -90,7 +90,8 @@ src_files <- c(
   "src/utils.r",
   "src/dinamica_utils.r",
   "src/saturation_diagnostics.r",
-  "src/allocation.r"
+  "src/allocation.r",
+  "src/implement_spatial_interventions.R"
 )
 
 for (src_file in src_files) {
@@ -102,9 +103,15 @@ for (src_file in src_files) {
     },
     error = function(e) {
       cat(sprintf("ERROR sourcing %s: %s\n", src_file, e$message))
+      # A broken engine must fail at start, not hours into a run (T-05-12).
+      quit(save = "no", status = 1)
     }
   )
 }
+stopifnot(
+  exists("implement_spatial_interventions", mode = "function"),
+  exists("resolve_intervention_masks", mode = "function")
+)
 cat("\n")
 
 # ---------------------------------------------------------------------------

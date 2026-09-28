@@ -45,6 +45,17 @@ TODO.md
 PLAN_filter_unmodelled_transitions.md
 .planning/HANDOFF.json
 .planning/config.json
-.planning/HANDOFF.json
-.planning/config.json
-.planning/HANDOFF.json
+
+# spatial-interventions working / planning files (local-only)
+spatial_interventions_integration_protocol.md
+
+# spatial_masks_misc/: preparation inputs, build scripts, build logs, and
+# temp dirs. Everything here is local-only — needed to (re)build the masks
+# but not at simulation time. Already covered by individual extension
+# rules above (*.tif, *.log, *.R, etc.) but kept as a folder-level rule
+# for clarity.
+spatial_masks_misc/
+
+# config/old/: legacy SSPx_interventions.yml files kept locally for
+# reference. The active YAMLs are config/{BAU,NAT,CUL,SOC}_interventions.yml.
+config/old/

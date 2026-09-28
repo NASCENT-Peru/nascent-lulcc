@@ -24,6 +24,7 @@ Decimal phases appear between their surrounding integers in numeric order.
  (completed 2026-06-24)
 - [x] **Phase 3.6: Complete Single-Scenario End-to-End Run** *(INSERTED 2026-06-24)* (completed 2026-06-28) - A single scenario (NAT) runs to completion across all regions and all timesteps, producing posterior rasters for every region/timestep — capstone proof of the Phase 3 machinery at scale.
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port; parallelise the full scenario sweep across Rundeck nodes (S2 multi-scenario packing)
+- [ ] **Phase 5: Integrate spatial_interventions branch and stage intervention masks** - Port the colleague's `spatial_interventions` branch onto the much-advanced `main`; check the `spat_prob_perturb` masks against the intervention configs and plan where they go on HPC (mainline 6/6 complete 2026-09-23; reopened for gap closure 2026-09-23 - 21 review findings + new delta telemetry + 2 operator actions)
 
 ## Phase Details
 
@@ -281,3 +282,59 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 3.6. Complete Single-Scenario End-to-End Run | 5/5 | Complete — NAT capstone run verdict=PASS (40/40 cells, 10/10 national mosaics); RUN-01..06 | 2026-06-28 |
 | 4. End-to-End Correctness & Performance | 0/TBD | Not started | - |
 
+
+### Phase 5: Integrate spatial_interventions branch and stage intervention masks
+
+**Goal:** Merge the colleague-authored `spatial_interventions` branch into `main`. That branch completes a major allocation step: `implement_spatial_interventions` is wired into allocation, and it adds per-scenario intervention YAMLs, an `interventions_dir` config and DT-native refactoring. `main` has moved on a long way since the branch point (about 270 commits on `main` vs 4 on the branch), so the port has to fit the current allocation architecture: lazy per-from-class predictor reads, threaded prediction, the int32 Dinamica cube and the transition-pipeline consistency checks. The spatial-intervention input masks are currently staged locally at `D:\C.3_Modelling\nascent-lulcc-agg\inputs\spat_prob_perturb`. Check them against the intervention config files (every referenced mask exists and every mask is referenced) and write down a target layout on the HPC file system.
+
+**Success Criteria** (what must be TRUE):
+  1. The `spatial_interventions` changes are on `main` (merge or port), all conflicts are resolved against current allocation code, and existing tests still pass.
+  2. Every mask path referenced by the per-scenario intervention YAMLs maps to a file in `spat_prob_perturb` (or a documented gap). Orphan masks are listed, and CRS, extent and resolution are checked against the model's reference grid.
+  3. A documented HPC placement plan exists for the masks: the target directory under the HPC inputs tree, how `interventions_dir` resolves on HPC vs local, and the transfer/staging steps.
+  4. An allocation smoke run with interventions enabled completes for at least one scenario × region × timestep.
+
+**Requirements**: TBD
+**Depends on:** Phase 3.6 (allocation runs end-to-end on `main`)
+**Plans:** 9/16 plans executed
+
+Plans:
+
+**Wave 1**
+- [x] 05-01-PLAN.md — Real git merge of origin/spatial_interventions into feature branch `spatial-interventions-integration`; resolve .gitignore / hpc_config / run_allocation.r conflicts; baseline test gate (D-01, D-02).
+
+**Wave 2** *(parallel — no files_modified overlap)*
+- [x] 05-02-PLAN.md — Intervention engine fix-ups: shared mask resolver, cached cell-number LUT, fail-fast, NaN guard, AUDIT logging + fixture tests (D-05, D-07, D-14, D-15).
+- [x] 05-03-PLAN.md — Housekeeping: bare-filename YAMLs + headers, legacy code to src/old/, docs to docs/spatial_interventions/ as Markdown (D-02..D-06).
+
+**Wave 3** *(parallel — no files_modified overlap)*
+- [x] 05-04-PLAN.md — Allocation wiring: year_post into generate_probability_maps() hook, fatal sourcing, Stage 7 pre-flight mask checks (D-07, D-14).
+- [x] 05-05-PLAN.md — Mask validator + local report, smoke assertion script, sha256 manifest, README_HPC placement/staging (D-08..D-13, D-15).
+
+**Wave 4** *(operator-gated)*
+- [x] 05-06-PLAN.md — Hand-off gate, HPC mask staging + validation, NAT x costa_peruana x 2032 intervention smoke, merge to main (D-11, D-15, SC4). *(job 838021 COMPLETED 0:0, verifier PASS; merge to main PENDING — PR #2 open)*
+
+**Gap closure** *(planned 2026-09-23 from 05-REVIEW.md 3 critical / 11 warning / 7 info, 05-VERIFICATION.md gaps, and CONTEXT.md D-16..D-23)*
+
+**Wave 5** *(parallel - no files_modified overlap)*
+- [x] 05-07-PLAN.md - Resolver as single source of intervention identity and Prob_adjust schema; applier stops re-parsing the YAML (CR-01, CR-03, WR-06, IN-01, IN-02).
+- [x] 05-08-PLAN.md - In-repo parameter provenance record for the four scenario YAMLs + case-insensitive validator orphan detection (WR-11, IN-05).
+
+**Wave 6**
+- [x] 05-09-PLAN.md - Runtime mask geometry validation (compareGeom/nlyr/cell-range), degenerate cell_index guards, TOCTOU wrap, mtime-aware LUT cache (CR-02, WR-10, IN-03, IN-07).
+
+**Wave 7** *(parallel - no files_modified overlap)*
+- [x] 05-10-PLAN.md - Stage 7 pre-flight fails closed, checks mask geometry, honours profile_timestep_index (CR-02, WR-04, WR-05).
+- [x] 05-11-PLAN.md - Relative-adjustment semantics: >= percentile alignment, Perc_diff == 0 threshold, scoped clamps, honest threshold/valency logs (WR-01, WR-02, WR-03, IN-04).
+
+**Wave 8**
+- [x] 05-12-PLAN.md - Per-target-class delta statistics from both adjusters and eight appended AUDIT fields (D-18, D-19, D-20).
+
+**Wave 9**
+- [x] 05-13-PLAN.md - intervention_prob_deltas CSV, hook wiring, non-fatal write and pre-flight writability check (D-18, D-21).
+
+**Wave 10** *(parallel - no files_modified overlap)*
+- [x] 05-14-PLAN.md - Smoke verifier: non-vacuous zone assertions, extended forbidden markers, telemetry assertions (WR-07, CR-03, D-22).
+- [x] 05-15-PLAN.md - Test coverage: Increase_inside_decrease_outside and Relative zone=Outside, corrected zero-preservation test, helper hoist (WR-08, WR-09, IN-06).
+
+**Wave 11** *(operator-gated)*
+- [ ] 05-16-PLAN.md - Operator merges PR #2 and runs the HPC sha256sum -c plus the post-fix intervention smoke (D-17).

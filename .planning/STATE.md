@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Phase 03.6 complete (5/5) — ready to discuss Phase 4
-last_updated: 2026-06-28T17:13:26.874Z
-last_activity: 2026-06-25 -- Phase 03.6 execution started
+status: executing
+stopped_at: "Completed 05-15-PLAN.md (waves 1-6 done; 05-16 is the OPERATOR GATE, autonomous: false)"
+last_updated: "2026-09-28T09:40:00.000Z"
+last_activity: 2026-09-28 -- Phase 05 wave 6 complete (05-14, 05-15); 15/16 plans done
 progress:
-  total_phases: 11
-  completed_phases: 8
-  total_plans: 36
-  completed_plans: 35
-  percent: 73
+  total_phases: 12
+  completed_phases: 9
+  total_plans: 52
+  completed_plans: 47
+  percent: 75
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** allocation.r completes reliably for all scenarios × regions × timesteps, producing simulated LULC maps without crashing.
-**Current focus:** Phase 4 — end to end correctness & performance
+**Current focus:** Phase 05 — integrate-spatial-interventions-branch-and-stage-interventio
 
 ## Current Position
 
-Phase: 4
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-06-28
+Phase: 05 (integrate-spatial-interventions-branch-and-stage-interventio) — EXECUTING
+Plan: 15 of 16 (05-16 pending - operator gate)
+Status: Executing Phase 05
+Last activity: 2026-09-28 -- Phase 05 wave 6 complete (05-14, 05-15); 15/16 plans done
 
 ### Roadmap Evolution
 
@@ -37,9 +37,10 @@ Last activity: 2026-06-28
 - Phase 3.3 inserted after Phase 3.2 (2026-05-26, URGENT): Dinamica allocation throughput observed at ~1% in Phase 3.1 (4,477 of hundreds of thousands of requested cells placed); root cause likely probability maps with too few non-zero values to support the demanded volume; phase diagnoses and remediates
 - Phase 3.5 inserted after Phase 3 (2026-06-22): Reduce the allocation memory floor — (a) lazy per-transition Parquet predictor reads to cut the ~80GB preload floor to ~10–20GB (memory-bound → core-bound), and (b) threaded ranger prediction using spare cores. Multi-scenario node packing (S2) folded into Phase 4's goal + success criteria. (Replaces the briefly-added Phase 5, which was split: Goals 2+3 → Phase 3.5, Goal 1 → Phase 4.)
 
-Progress: [█████████░] 94%
+Progress: [██████████] 98%
 
 - Phase 03.6 inserted after Phase 3: Complete single-scenario end-to-end run (all regions x all timesteps) (URGENT)
+- Phase 5 added (2026-09-22): Integrate colleague's `spatial_interventions` branch into the much-advanced `main`; check spatial-intervention masks (`D:\C.3_Modelling\nascent-lulcc-agg\inputs\spat_prob_perturb`) against the intervention config files and plan their HPC file-system placement
 
 ## Performance Metrics
 
@@ -71,6 +72,18 @@ Progress: [█████████░] 94%
 | Phase 03.6 P02 | 4 min | 2 tasks | 2 files |
 | Phase 03.6 P03 | 7 min | 2 tasks | 2 files |
 | Phase 03.6 P04 | ~15 min | 2 tasks | 2 files |
+| Phase 05 P01 | 10 min | 2 tasks | 18 files |
+| Phase 05 P02 | 25min | 2 tasks | 2 files |
+| Phase 05 P03 | 12 min | 3 tasks | 27 files |
+| Phase 05 P04 | 20min | 2 tasks | 3 files |
+| Phase 05 P05 | 35min | 3 tasks | 6 files |
+| Phase 05 P06 | ~2h | 3 tasks | 0 files |
+| Phase 05 P10 | ~6 min | 2 tasks | 3 files |
+| Phase 05 P11 | ~40 min | 3 tasks | 3 files |
+| Phase 05 P12 | ~35 min | 3 tasks | 3 files |
+| Phase 05 P13 | ~50 min | 3 tasks | 5 files |
+| Phase 05 P14 | ~40 min | 3 tasks | 3 files |
+| Phase 05 P15 | ~35 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -100,6 +113,38 @@ Recent decisions affecting current work:
 - [Phase ?]: Phase 03.6 (03.6-03): assembler refuses partial mosaics — any missing region posterior for a year emits AUDIT stage=mosaic status=missing and skips that year (no partial national raster); partial completeness is Plan 04's manifest job (T-036-08)
 - [Phase 03.6]: Run completion declared by data not logs: run_manifest.r PASS only when the full region x timestep matrix exists + valid GeoTIFFs + differs-from-anterior + national mosaics present + count==regions*timesteps + no hard degeneracy; saturation reported (AUDIT) but never gates (D-06/D-07/D-08)
 - [Phase 03.6]: Plausibility (D-08b) via terra::freq: per-cell hard all-one-class degeneracy => INCOMPLETE; national final-year per-class fraction mismatch vs tools/simulation_lulc_areas_2060.csv => soft warning (absent table skipped, never INCOMPLETE)
+- [Phase ?]: Phase 5: merged origin/spatial_interventions (a917ba1) into feature branch spatial-interventions-integration via --no-ff merge f22bce8 (D-01); hook fix deferred to Plans 02/04
+- [Phase ?]: 05-02: resolve_intervention_masks is base R + yaml:: only; engine never renormalises, only logs cells_sum_gt1
+- [Phase ?]: 05-02: allocation.r caller keeps old implement_spatial_interventions signature until 05-04 rewires it
+- [Phase 05]: 05-03: Stage 6 spatial-interventions prep retired; interventions run inside allocation (Stage 7), legacy code parked in src/old/
+- [Phase 05]: 05-03: Scenario YAML Intervention_mask values are bare filenames resolved under spat_prob_perturb_dir (D-05); intervention prose lives in docs/spatial_interventions/
+- [Phase 05]: 05-04: Intervention pre-flight lines (D-14) collected separately and appended after file checks; fixture mode never emits them
+- [Phase 05]: 05-04: generate_probability_maps() hook uses year_post (D-07); normalized re-keyed on row_idx after the engine call
+- [Phase 05]: 05-05: smoke verifier judges newest worker log with AUDIT summary; mlr3 .__Task__col_info fallback line whitelisted from forbidden markers; masks.sha256 forced eol=lf
+- [Phase 05]: 05-06: branch landed via PR #2 (open, not merged) rather than a local --no-ff merge; SC1/D-01 'changes on main' remains PENDING until the operator merges
+- [Phase 05]: 05-06: intervention allocation is a highmem-only workload (MaxRSS 95.7 GB on job 838021 vs the 93 GB compute limit)
+- [Phase 05]: 05-06: .env must be sourced in the submitting shell before sbatch; --export=ALL alone exports an unconfigured environment (job 838019 died in 2s on the Stage 7 path contract)
+- [Phase 05]: 05-06: HPC mask integrity accepted via the validator's compareGeom/value checks on all 14 masks; a separate sha256sum -c result was not reported back
+
+- [Phase 05]: 05-10: pre-flight error lines keep the `intervention mask: ` / `intervention config: ` prefix (with colon) that D-14 established, so they differ deliberately from 05-09's runtime stop() strings; the geometry line also omits the runtime's trailing `; cell-number lookup would be silently wrong` because no lookup has been attempted at pre-flight time
+- [Phase 05]: 05-10: WR-04 implemented as two sibling `if`s keyed on interventions_configured / engine_loaded rather than the review's nested `else` — identical behaviour, guard-only diff, no whole-block reflow
+- [Phase 05]: 05-11: engine still never renormalises — the two table-wide clamps were replaced by seven per-index-set clamps (1 absolute + 6 relative), so no pass rewrites rows outside its own declared target class and zone
+- [Phase 05]: 05-11 CHANGES NUMERICAL BEHAVIOUR: tied-percentile interventions go from rows_changed=0 to positive and exact-zero-difference interventions now apply Prob_adjust_threshold. 05-16's operator smoke re-run MUST be judged against the new semantics, NOT diffed against job 838021. AUDIT field set/order unchanged, so verify_intervention_smoke.r's parser needs no change — only the expected values move.
+- [Phase 05]: Wave 3 executors were killed mid-task by a transient API auth error and were RESUMED in place via SendMessage, not re-dispatched — both worktrees held uncommitted work (130 lines in allocation.r, 25 in the engine) that a fresh agent would have discarded
+
+- [Phase 05]: 05-12: AUDIT line extended APPEND-ONLY from 13 to 21 tokens (delta_mean/med/sd/min/max, n_inc, n_dec, sum_abs_delta). Verified: the shipped verify_intervention_smoke.r parser extracts id and rows_changed identically from old and extended lines, so the verifier needs no parser change. Non-finite stats render as literal NA.
+- [Phase 05]: 05-12: plan's literal formatC(format="g") left-pads to `digits`, which exploded the AUDIT body to 41 tokens - threat T-05-46 materialising out of its own mitigation; fixed with trimws(formatC(..., width=1L))
+- [Phase 05]: 05-13 handoff: res$stats' 19 columns are a superset of the D-18 CSV per-class columns; the writer only needs to prepend scenario, region, year, intervention_id, rank, type, zone, mask
+
+- [Phase 05]: 05-13: telemetry CSV is `intervention_prob_deltas_<scenario>_<region>_<year>.csv` in work_dir, 25 columns; `<region>` is the slug gsub(" ","_",tolower(label)). AUDIT `region=` keeps the label verbatim, the CSV `region` column is the slug - they differ BY DESIGN.
+- [Phase 05]: 05-13: rows_target vs sum(n_target) is NOT an equality for Relative interventions - relative_prob_adjust() adds length(sub_idx) to rows_target before its three `next` paths, so a skipped class counts toward AUDIT rows_target while its CSV row correctly reports n_target=0. Any cross-check must scope to Absolute or to n_target>0 rows. sum_abs_delta and rows_changed reconcile unconditionally.
+- [Phase 05]: 05-13: plan's sanitiser gsub("[^A-Za-z0-9_.-]","_") keeps `.` so `../` survived as `.._`; a second pass gsub("\.{2,}","_") was added. Verified empirically: 0 traversal survivals across ../, backslash and ....// vectors, SSP2.6 preserved.
+
+- [Phase 05]: 05-14: PASS banner extended APPEND-ONLY - prefix through `maps_checked=%d` byte-identical, `telemetry_rows=%d` appended. New banner: `PASS verify_intervention_smoke scenario=.. region=.. year=.. interventions=.. maps_checked=.. telemetry_rows=..`. Exit codes 0/1/2 unchanged.
+- [Phase 05]: 05-14: WR-07 reproduced against the UNMODIFIED shipped script (all-NA mask gave maps_checked=2, exit 0, zero cells asserted); now n_zone is counted before the max and a zero/non-finite zone fails without incrementing maps_checked.
+- [Phase 05]: 05-14: AUDIT-vs-CSV cross-check scoped to Absolute only for rows_target vs sum(n_target); rows_changed and sum_abs_delta carry the unconditional checks (rel tol 1e-5). CSV region slug and AUDIT region label deliberately NOT compared.
+- [Phase 05]: 05-15: verified independently from config/*.yml - 14 Allocation entries, 6 distinct valency/zone combos. Confirms 05-REVIEW.md WR-11 is WRONG: the Outside+value:0 pairing is NAT Mining_freeze_post_2030 and SOC Mining_in_low_ES_areas, NOT CUL Mining_outside_restraint (which is Relative/Decrease/Outside with no Prob_adjust_value).
+- [Phase 05]: DEFERRED (out of phase scope): tests/testthat/test-prep-paths.R carries the same sys.frame(1)$ofile defect 05-15 removed and is the sole source of all 4 standing suite errors. It is now a one-line fix - delete its bootstrap and consume helper-spatial-interventions.R's .repo_root.
 
 ### Pending Todos
 
@@ -109,6 +154,7 @@ None yet.
 
 - `MultisessionFuture interrupted` (OOM SIGKILL) at ~3 minutes locally — the project's defining failure mode; addressed structurally across Phases 2–3.
 - Phase 1 HPC-only verification gates (live Euler smoke test, live env solve, live SIGKILL test) pending operator confirmation — tracked in 01-HUMAN-UAT.md. **Phase 1.1 now closed** — the INFRA-01 live smoke gate is satisfied (exit 0).
+- Phase 05 SC1/D-01 PENDING: PR #2 (spatial-interventions-integration -> main) is open but NOT merged; main still has no intervention support
 
 ## Deferred Items
 
@@ -119,6 +165,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-25T13:23:29.289Z
-Stopped at: Completed 03.6-04-PLAN.md
+Last session: 2026-09-23T08:42:13.549Z
+Stopped at: Completed 05-06-PLAN.md (main merge pending: PR #2)
 Resume file: None

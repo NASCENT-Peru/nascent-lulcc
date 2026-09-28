@@ -54,8 +54,8 @@ nascent-lulcc is a spatially-explicit Land Use/Land Cover Change (LULCC) modelli
                        ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │  Stage 6 – Simulation Setup                                           │
-│  spatial_interventions_prep                                           │
-│  (SSP-specific spatial probability perturbation layers)               │
+│  (spatial interventions retired here: now applied in Stage 7          │
+│   by implement_spatial_interventions; legacy code in src/old/)        │
 └──────────────────────┬───────────────────────────────────────────────┘
                        │
                        ▼
@@ -97,7 +97,7 @@ A typical end-to-end run follows this sequence:
 
 9. **Simulation transition rate preparation** — `simulation_trans_rates_prep()` uses CVXR convex optimisation to derive per-scenario, per-region transition probability matrices that balance historic trends against scenario-specific area demand targets. Scale factors `[1.0, 3.0, 5.0, 9.0]` are applied for scenarios BAU, NAT, CUL, SOC respectively. Output tables go to `outputs/transition_tables/`.
 
-10. **Spatial interventions** — `spatial_interventions_prep()` builds SSP-indexed raster layers that spatially modulate transition probabilities (e.g., protected areas, building zones) at each simulation timestep. Configurations are defined per-scenario in `config/SSP*_interventions.yml`.
+10. **Spatial interventions** — Applied inside `generate_probability_maps()` (Stage 7 allocation) by `implement_spatial_interventions()`, which modulates the predicted transition probabilities (e.g., protected areas, mining concessions, indigenous lands, urban settlement zones) at each simulation timestep. Configurations are defined per-scenario in `config/{BAU,NAT,CUL,SOC}_interventions.yml`; masks are referenced by bare filename and resolved under `spat_prob_perturb_dir`. The legacy SSP-indexed prep (`spatial_interventions_prep()`, `lulcc.spatprobmanipulation()`) is retired to `src/old/`. See `docs/spatial_interventions/`.
 
 11. **Dinamica simulations** — `allocation()` iterates over scenarios, timesteps, and regions, calling `exec_dinamica()` for each combination. Dinamica EGO executes the `.ego` model file (`dinamica/dinamica_model/allocation.ego-decoded`) and writes simulated LULC rasters to `outputs/simulations/`.
 
@@ -114,7 +114,7 @@ A typical end-to-end run follows this sequence:
 | `transition_modelling()` | `src/transition_modelling.r` | mlr3 model training loop (GLM, RF, XGBoost) with cross-validation |
 | `calibrate_allocation_parameters()` | `src/calibrate_allocation_parameters.r` | Derives and calibrates Dinamica EGO Patcher/Expander parameters |
 | `simulation_trans_rates_prep()` | `src/simulation_trans_rates_prep.r` | CVXR-based scenario transition rate optimisation |
-| `spatial_interventions_prep()` | `src/spatial_interventions_prep.r` | Builds SSP-specific spatial probability perturbation rasters |
+| `implement_spatial_interventions()` | `src/implement_spatial_interventions.R` | Applies per-scenario YAML spatial interventions to predicted transition probabilities inside allocation |
 | `allocation()` | `src/allocation.r` | Stage 7 orchestrator: scenario × region simulation loop with profiling |
 | `exec_dinamica()` | `src/dinamica_utils.r` | Unified Dinamica EGO launch (local `DinamicaConsole` or HPC Apptainer/Singularity) |
 | `detect_dinamica_backend()` | `src/dinamica_utils.r` | Resolves `DINAMICA_BACKEND` env override or auto-detects from environment |

@@ -399,6 +399,7 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
   packages_expected <- character(0)
   files_expected <- character(0)
   dinamica_expected <- NULL
+  intervention_errors <- character(0)
 
   if (!is.null(fixture)) {
     env_expected <- as.character(fixture[["env"]] %||% character(0))
@@ -437,6 +438,224 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
         maybe("lulc_aggregation_path"),
         regions_json
       )
+
+      # D-14: every intervention mask the active scenarios x active posterior
+      # years will read must exist. Check files, not the directory
+      # (build_full_config auto-creates spat_prob_perturb_dir). run_allocation.r
+      # has already narrowed scenario_names by ALLOCATION_PROFILE_SCENARIO.
+      interventions_dir <- maybe("interventions_dir")
+      mask_dir <- maybe("spat_prob_perturb_dir")
+      # WR-04: fail CLOSED. The engine check used to be a third && term on the
+      # condition below, so a caller that had not sourced
+      # src/implement_spatial_interventions.R got the whole intervention gate
+      # skipped and a PASS — the exact fail-open shape the rest of the phase
+      # removes. A missing mask file is fatal; a missing resolver must be too.
+      interventions_configured <- !is.null(interventions_dir) && !is.null(mask_dir)
+      engine_loaded <- exists("resolve_intervention_masks", mode = "function")
+      if (interventions_configured && !engine_loaded) {
+        intervention_errors <- c(
+          intervention_errors,
+          "intervention config: resolve_intervention_masks() not loaded - source src/implement_spatial_interventions.R"
+        )
+      }
+      # D-21: the per-intervention delta CSV (D-18) is written into each region
+      # work directory under the simulation output root. The engine degrades a
+      # failed write to a WARN so a multi-hour run is never lost to telemetry,
+      # which is exactly why an unwritable root has to be reported HERE — the
+      # runtime symptom is a warning an operator will not see until the run is
+      # over. Nothing is created: the run makes its own directories.
+      if (interventions_configured) {
+        out_root <- config[["simulation_output_dir"]]
+        if (is.character(out_root) && length(out_root) == 1L && nzchar(out_root)) {
+          probe <- out_root
+          blocked <- FALSE
+          guard <- 0L
+          while (!dir.exists(probe) && guard < 64L) {
+            # An existing NON-directory in the path: walking further up would
+            # find a writable ancestor and wrongly pass.
+            if (file.exists(probe)) {
+              blocked <- TRUE
+              break
+            }
+            parent <- dirname(probe)
+            if (identical(parent, probe)) break
+            probe <- parent
+            guard <- guard + 1L
+          }
+          writable <- !blocked && dir.exists(probe) &&
+            isTRUE(unname(file.access(probe, 2L) == 0L))
+          if (!writable) {
+            intervention_errors <- c(
+              intervention_errors,
+              sprintf(
+                "intervention telemetry: output directory not writable: %s",
+                out_root
+              )
+            )
+          }
+        }
+      }
+      if (interventions_configured && engine_loaded) {
+        years <- utils::tail(
+          as.integer(unlist(config[["simulation_year_steps"]])), -1L
+        )
+        # Mirror filter_allocation_timesteps(): a non-integer value is
+        # reported here; a non-posterior year leaves nothing to check (that
+        # function stops on it later).
+        year_post_filter <- Sys.getenv("ALLOCATION_YEAR_POST_FILTER", unset = "")
+        if (nzchar(year_post_filter)) {
+          year_post <- suppressWarnings(as.integer(year_post_filter))
+          if (is.na(year_post)) {
+            intervention_errors <- c(
+              intervention_errors,
+              "intervention config: ALLOCATION_YEAR_POST_FILTER must be an integer posterior year"
+            )
+            years <- integer(0)
+          } else {
+            years <- years[years == year_post]
+          }
+        }
+        # WR-05: mirror the driver's profile_timestep_index narrowing
+        # (run_allocation_dinamica(), "Profile mode: restricting scenario ...").
+        # It is applied AFTER filter_allocation_timesteps() there, so it is
+        # applied after the ALLOCATION_YEAR_POST_FILTER mirror here. Without
+        # this the gate over-demands masks and rejects a legitimate
+        # single-timestep profile run on a partially staged mask directory.
+        pti <- config[["profile_timestep_index"]]
+        if (!is.null(pti) && length(years) > 0L) {
+          pti_int <- suppressWarnings(as.integer(pti))
+          if (length(pti_int) != 1L || is.na(pti_int) || pti_int < 1L) {
+            intervention_errors <- c(
+              intervention_errors,
+              "intervention config: profile_timestep_index must be a positive integer"
+            )
+            years <- integer(0)
+          } else if (pti_int > length(years)) {
+            intervention_errors <- c(
+              intervention_errors,
+              sprintf(
+                "intervention config: profile_timestep_index=%d is outside the valid range 1..%d",
+                pti_int, length(years)
+              )
+            )
+            years <- integer(0)
+          } else {
+            years <- years[pti_int]
+          }
+        }
+        # Every mask that DOES exist, deduplicated across scenarios, so the
+        # geometry pass below opens each file at most once (CR-02).
+        existing_masks <- character(0)
+        if (length(years) > 0L) {
+          for (scenario in as.character(unlist(config[["scenario_names"]]))) {
+            resolved <- tryCatch(
+              resolve_intervention_masks(interventions_dir, mask_dir, scenario, years),
+              error = function(e) {
+                intervention_errors <<- c(
+                  intervention_errors,
+                  sprintf("intervention config: %s", conditionMessage(e))
+                )
+                NULL
+              }
+            )
+            if (is.null(resolved) || nrow(resolved) == 0L) next
+            missing_rows <- resolved[!resolved$exists, , drop = FALSE]
+            if (nrow(missing_rows) > 0L) {
+              intervention_errors <- c(
+                intervention_errors,
+                sprintf(
+                  "intervention mask: missing %s (scenario=%s id=%s year=%d)",
+                  missing_rows$mask_path, scenario,
+                  missing_rows$intervention_id, missing_rows$year
+                )
+              )
+            }
+            existing_masks <- c(
+              existing_masks, as.character(resolved$mask_path[resolved$exists])
+            )
+          }
+        }
+
+        # CR-02 (pre-flight half): a mask that exists but is not on the
+        # reference grid is silently wrong at runtime, because the engine
+        # samples it with raw national cell numbers computed from
+        # config[["ref_grid_path"]]. .mask_inside_lut() now aborts on it, but
+        # only at the first intervention of the first region. Assert the same
+        # condition here, while it is a header read, so a mis-staged mask is
+        # rejected before any region work starts.
+        #
+        # D-13: terra::rast() reads the header only — no values, no resample,
+        # no reproject. A grid mismatch is a hard failure, never a repair.
+        existing_masks <- unique(existing_masks)
+        if (length(existing_masks) > 0L) {
+          ref_grid_path <- config[["ref_grid_path"]]
+          ref_grid_label <- if (is.character(ref_grid_path) &&
+                                length(ref_grid_path) == 1L &&
+                                nzchar(ref_grid_path)) {
+            ref_grid_path
+          } else {
+            "<config[[\"ref_grid_path\"]] unset>"
+          }
+          ref_grid <- NULL
+          if (is.character(ref_grid_path) && length(ref_grid_path) == 1L &&
+              nzchar(ref_grid_path) && file.exists(ref_grid_path)) {
+            ref_grid <- suppressWarnings(tryCatch(
+              terra::rast(ref_grid_path), error = function(e) NULL
+            ))
+          }
+          if (is.null(ref_grid)) {
+            # Never silently skip the geometry pass: an unverifiable grid is
+            # itself a gap the operator has to close.
+            intervention_errors <- c(
+              intervention_errors,
+              sprintf(
+                "intervention mask: cannot verify mask geometry, reference grid missing: %s",
+                ref_grid_label
+              )
+            )
+          } else {
+            for (mask_path in existing_masks) {
+              m <- suppressWarnings(tryCatch(
+                terra::rast(mask_path),
+                error = function(e) conditionMessage(e)
+              ))
+              if (is.character(m)) {
+                intervention_errors <- c(
+                  intervention_errors,
+                  sprintf("intervention mask: unreadable %s (%s)", mask_path, m)
+                )
+                next
+              }
+              # nlyr BEFORE compareGeom: compareGeom() ignores layer count, so
+              # a 2-band mask on the correct grid passes it (see 05-09).
+              n_layers <- as.integer(terra::nlyr(m))
+              if (!identical(n_layers, 1L)) {
+                intervention_errors <- c(
+                  intervention_errors,
+                  sprintf(
+                    "intervention mask: %s has %d layers (expected 1)",
+                    mask_path, n_layers
+                  )
+                )
+                next
+              }
+              geom_ok <- suppressWarnings(tryCatch(
+                isTRUE(terra::compareGeom(m, ref_grid, stopOnError = FALSE)),
+                error = function(e) FALSE
+              ))
+              if (!geom_ok) {
+                intervention_errors <- c(
+                  intervention_errors,
+                  sprintf(
+                    "intervention mask: %s is not on the reference grid (crs/res/extent mismatch)",
+                    mask_path
+                  )
+                )
+              }
+            }
+          }
+        }
+      }
     }
     dinamica_backend <- Sys.getenv("DINAMICA_BACKEND", unset = "auto")
     dinamica_artifact <- Sys.getenv("DINAMICA_EGO_8_HOME", unset = "")
@@ -473,6 +692,9 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
       errors <- c(errors, sprintf("file: missing %s", f))
     }
   }
+
+  # 3b. intervention masks / config (D-14; non-fixture mode only)
+  errors <- c(errors, intervention_errors)
 
   # 4. Dinamica backend availability
   if (!is.null(dinamica_expected)) {
@@ -2314,6 +2536,7 @@ setup_allocation_inputs <- function(
     region_val = region_val,
     scenario = scenario,
     year_ant = year_ant,
+    year_post = year_post,
     calibration_period = calibration_period,
     anterior_path = anterior_path,
     trans_rates_df = trans_rates_df,
@@ -2461,6 +2684,7 @@ load_from_class_predictor_data <- function(
 #'   `config$scenario_to_ssp_mapping` before being passed to the dynamic
 #'   predictor parquet.
 #' @param year_ant Anterior year
+#' @param year_post Posterior year of the current (year_ant, year_post) pair from simulation_year_steps; used as the intervention time step.
 #' @param calibration_period Calibration period string
 #' @param anterior_path Path to the anterior LULC raster
 #' @param trans_rates_df Data frame of transition rates (From*, To*, Rate)
@@ -2473,6 +2697,7 @@ generate_probability_maps <- function(
   region_val,
   scenario,
   year_ant,
+  year_post,
   calibration_period,
   anterior_path,
   trans_rates_df,
@@ -2879,8 +3104,40 @@ generate_probability_maps <- function(
   normalized[, tot_prob := NULL]
   data.table::setkey(normalized, row_idx)
 
-  #todo integrate more recent approach to spatial intervention from NCCS project
-  # (placeholder retained from previous implementation)
+  # Apply scenario-specific spatial-policy interventions to the
+  # per-transition probability surface before writing per-transition TIFs
+  # (D-07: posterior year). Masks are bare filenames under
+  # config$spat_prob_perturb_dir (D-05/D-06); cell_index maps region cell_id
+  # to the national ref_cell_id used for the mask lookup.
+  #
+  # ref_grid_path is the grid those ref_cell_id values were computed against
+  # (terra::cellFromXY above). The engine re-reads it and validates EVERY mask
+  # against it at runtime — single-layer, matching crs/res/extent — so a
+  # mis-gridded mask aborts the region instead of applying an intervention to a
+  # fictional cell set (D-13, CR-02). This is in addition to, not instead of,
+  # the Stage 7 pre-flight: nothing here is ever resampled or reprojected.
+  #
+  # telemetry_dir is this region's work directory, so the per-intervention
+  # delta CSV (intervention_prob_deltas_<scenario>_<region>_<year>.csv, D-18)
+  # lands here next to probability_map_dir — the same directory
+  # scripts/verify_intervention_smoke.r resolves from --output-root,
+  # --scenario, --year and --region. The write is non-fatal: a telemetry
+  # failure warns and the region run continues (D-21).
+  class_name_to_value <- load_allocation_class_map(config)
+  normalized <- implement_spatial_interventions(
+    normalized           = normalized,
+    cell_index           = anterior_dt[, .(cell_id, ref_cell_id)],
+    class_name_to_value  = class_name_to_value,
+    interventions_dir    = config[["interventions_dir"]],
+    mask_dir             = config[["spat_prob_perturb_dir"]],
+    ref_grid_path        = config[["ref_grid_path"]],
+    scenario             = scenario,
+    simulation_time_step = year_post,
+    log_file             = log_file,
+    region_label         = region_label,
+    telemetry_dir = work_dir
+  )
+  data.table::setkey(normalized, row_idx)
 
   # Write one TIF per trans_rates row, preserving the numeric prefix required
   # by Dinamica's CreateCubeOfProbabilityMaps submodel.

@@ -77,7 +77,6 @@ The project has no `package.json` build system. All entry points are R scripts u
 | `Rscript scripts/run_transition_modelling.r` | Run Stage 3 transition modelling locally |
 | `Rscript scripts/run_calibrate_allocation_parameters.r` | Run Stage 4 allocation parameter calibration |
 | `Rscript scripts/run_simulation_trans_rates_prep.r` | Run Stage 5 scenario transition rate preparation |
-| `Rscript scripts/run_spatial_interventions_prep.r` | Run Stage 6 spatial interventions preparation |
 | `Rscript scripts/run_allocation.r` | Run Stage 7 allocation simulations |
 | `Rscript -e 'testthat::test_dir("tests/testthat")'` | Run testthat unit test suite |
 | `bash tests/shell/test-setup-environments-hpc-refusal.sh` | Run shell-level integration tests |
@@ -130,7 +129,7 @@ Every pipeline stage has a paired run script and SLURM submit script. The table 
 | 3. Transition modelling | `run_transition_modelling.r` | `submit_transition_modelling.sh` | `transition_model_env` | 3 | 42 GB/CPU | 72 h |
 | 4. Allocation param calibration | `run_calibrate_allocation_parameters.r` | `submit_calibrate_allocation_parameters.sh` | `allocation_params_env` | 4 | 28 GB/CPU | 6 h |
 | 5. Transition rate prep | `run_simulation_trans_rates_prep.r` | `submit_simulation_trans_rates_estimation.sh` | `trans_rate_estimation_env` | 6 | 16 GB/CPU | 4 h |
-| 6. Spatial interventions prep | `run_spatial_interventions_prep.r` | `submit_spatial_interventions_prep.sh` | `transition_model_env` | 4 | 16 GB/CPU | 4 h |
+| 6. Spatial interventions prep | retired (legacy code in `src/old/`); interventions now run inside allocation (Stage 7) | — | — | — | — | — |
 | 7. Allocation simulations | `run_allocation.r` | `submit_allocation_scenario.sh` (bash launcher → one `submit_allocation_region.sh` per region + `afterok` mosaic) | `allocation_env` | 160 (fat) / 80 (highmem) | whole node | 24 h/region |
 | 7. Dinamica simulations | `run_dinamica_simulations.r` | `submit_dinamica_simulations.sh` | `allocation_env` | 8 | 8 GB/CPU | 48 h |
 
