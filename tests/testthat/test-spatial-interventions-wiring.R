@@ -201,7 +201,8 @@ sys.source(file.path(.repo_root, "src", "allocation.r"), envir = .wenv_noengine)
 .wiring_config <- function(dir,
                            ref_grid_path = .write_wiring_ref_grid(dir),
                            simulation_year_steps = c(2024L, 2028L, 2032L),
-                           profile_timestep_index = NULL) {
+                           profile_timestep_index = NULL,
+                           simulation_output_dir = NULL) {
   cfg <- list(
     interventions_dir = dir,
     spat_prob_perturb_dir = dir,
@@ -211,6 +212,11 @@ sys.source(file.path(.repo_root, "src", "allocation.r"), envir = .wenv_noengine)
   )
   if (!is.null(profile_timestep_index)) {
     cfg[["profile_timestep_index"]] <- profile_timestep_index
+  }
+  # Absent by default so every pre-existing block keeps exercising the
+  # "key not configured -> check skipped silently" path (D-21).
+  if (!is.null(simulation_output_dir)) {
+    cfg[["simulation_output_dir"]] <- simulation_output_dir
   }
   cfg
 }
@@ -516,3 +522,83 @@ for (.cfg_name in c("local_config.yaml", "hpc_config.yaml")) {
     })
   }
 }
+
+# --- Plan 13: probability-delta telemetry wiring (D-18, D-21) ---------------
+
+test_that("D-18: the hook passes telemetry_dir = work_dir", {
+  hook_pos <- regexpr(
+    "normalized <- implement_spatial_interventions(", allocation_text, fixed = TRUE
+  )[[1L]]
+  write_pos <- regexpr("Saving probability maps", allocation_text, fixed = TRUE)[[1L]]
+  expect_gt(hook_pos, 0L)
+  expect_gt(write_pos, hook_pos)
+  hook_text <- substr(allocation_text, hook_pos, write_pos)
+  expect_match(hook_text, "telemetry_dir = work_dir", fixed = TRUE)
+
+  # work_dir IS the region directory: prob_map_dir is built under it, and the
+  # smoke verifier resolves the same directory from --output-root / --scenario
+  # / --year / --region. The CSV therefore lands next to probability_map_dir.
+  expect_match(
+    allocation_text,
+    'prob_map_dir <- file.path(work_dir, "probability_map_dir")',
+    fixed = TRUE
+  )
+  expect_match(
+    allocation_text,
+    'region_suffix <- gsub(" ", "_", tolower(region_label))',
+    fixed = TRUE
+  )
+})
+
+test_that("D-21: pre-flight reports an unwritable simulation output root", {
+  withr::local_envvar(ALLOCATION_YEAR_POST_FILTER = NA)
+  dir <- withr::local_tempdir()
+  .write_nat_yaml(dir)
+  .write_wiring_masks(dir, c("nat_mask_2028.tif", "nat_mask_2032.tif"))
+  # A regular file standing where a directory must be: no ancestor of
+  # <blocker>/runs is a writable directory, which is the shape an operator
+  # gets from a typo'd or stale simulation_output_dir on shared scratch.
+  blocker <- file.path(dir, "not_a_directory")
+  writeLines("regular file", blocker)
+
+  res <- .wenv$validate_allocation_runtime(
+    config = .wiring_config(dir, simulation_output_dir = file.path(blocker, "runs"))
+  )
+  lines <- .intervention_lines(res)
+  expect_length(lines, 1L)
+  expect_match(
+    lines, "intervention telemetry: output directory not writable", fixed = TRUE
+  )
+  expect_match(lines, "runs", fixed = TRUE)
+})
+
+test_that("D-21: a writable simulation output root adds no telemetry line", {
+  withr::local_envvar(ALLOCATION_YEAR_POST_FILTER = NA)
+  dir <- withr::local_tempdir()
+  .write_nat_yaml(dir)
+  .write_wiring_masks(dir, c("nat_mask_2028.tif", "nat_mask_2032.tif"))
+  out_root <- file.path(dir, "sim_out")
+  dir.create(out_root)
+
+  res <- .wenv$validate_allocation_runtime(
+    config = .wiring_config(dir, simulation_output_dir = out_root)
+  )
+  expect_length(.intervention_lines(res), 0L)
+})
+
+test_that("D-21: an output root that does not exist yet is judged by its nearest ancestor", {
+  withr::local_envvar(ALLOCATION_YEAR_POST_FILTER = NA)
+  dir <- withr::local_tempdir()
+  .write_nat_yaml(dir)
+  .write_wiring_masks(dir, c("nat_mask_2028.tif", "nat_mask_2032.tif"))
+
+  # The run creates <out_root>/<scenario>/<year>/region_<region> itself, so a
+  # not-yet-created root under a writable parent is NOT a gap — and the
+  # pre-flight must not create it either.
+  out_root <- file.path(dir, "sim_out_not_created_yet")
+  res <- .wenv$validate_allocation_runtime(
+    config = .wiring_config(dir, simulation_output_dir = out_root)
+  )
+  expect_length(.intervention_lines(res), 0L)
+  expect_false(dir.exists(out_root))
+})

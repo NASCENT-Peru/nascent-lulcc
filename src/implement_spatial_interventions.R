@@ -448,6 +448,32 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
   trimws(formatC(v, format = "g", digits = 6, width = 1L))
 }
 
+# Reduce a scenario / region label to a token that is safe to interpolate into
+# the telemetry CSV filename (T-05-47). Both tokens come from configuration,
+# and configuration reaches this process from YAML the operator edits by hand,
+# so neither may be able to steer the write out of the region work directory.
+#
+# Two passes, and BOTH are load-bearing:
+#   1. everything outside [A-Za-z0-9_.-] becomes "_", which removes "/", "\"
+#      and every other separator;
+#   2. any run of two or more dots becomes "_". Pass 1 alone leaves "../"
+#      as ".._", i.e. the traversal survives the character class that was
+#      supposed to remove it. A single dot is kept so a version-like scenario
+#      label ("SSP2.6") stays readable.
+.safe_path_token <- function(x) {
+  x <- gsub("[^A-Za-z0-9_.-]", "_", as.character(x))
+  gsub("\\.{2,}", "_", x)
+}
+
+# The region token in the telemetry filename and in the CSV's `region` column.
+# Identical to the `region_suffix` generate_probability_maps() builds and to
+# the --region value scripts/verify_intervention_smoke.r resolves
+# <output_root>/<scenario>/<year>/region_<region> from, so the CSV is named
+# after the directory it lands in.
+.region_slug <- function(region_label) {
+  gsub(" ", "_", tolower(as.character(region_label)))
+}
+
 #' @title Implement Spatial Interventions on per-transition Probabilities
 #' @description
 #' Implement all Allocation-stage spatial interventions whose
@@ -512,7 +538,30 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
 #'   interventions.
 #' @param log_file Path to per-region log file used by log_msg(...).
 #' @param region_label Region label written into the AUDIT lines.
+#' @param telemetry_dir Directory to write the per-intervention delta CSV
+#'   into; NULL disables the CSV (fixture mode). The allocation hook passes the
+#'   region work directory, so the file lands next to `probability_map_dir`.
 #' @return The `normalized` data.table with updated probabilities.
+#' @section Probability-delta telemetry CSV:
+#' When `telemetry_dir` is not NULL and at least one intervention was applied,
+#' one `intervention_prob_deltas_<scenario>_<region>_<year>.csv` is written
+#' into it, with one row per intervention x target class and these 25 columns
+#' in this order (D-18):
+#' \preformatted{
+#' scenario, region, year, intervention_id, rank, type, zone, mask,
+#' target_class, n_target, n_changed, mean_before, mean_after, sd_before,
+#' sd_after, p05_delta, p25_delta, p50_delta, p75_delta, p95_delta, min_delta,
+#' max_delta, sum_abs_delta, prob_mass_before, prob_mass_after
+#' }
+#' The trailing 17 columns are the [.delta_stats()] contract minus its
+#' AUDIT-only `n_inc` / `n_dec`, so the CSV and the AUDIT line describe the
+#' same numbers; `region` is the slug (`gsub(" ", "_", tolower(region_label))`)
+#' while the AUDIT `region=` field keeps `region_label` verbatim. The write is
+#' staged to a `.tmp` path and renamed, so a partial file is never visible
+#' under the final name, and the whole write is non-fatal (D-21): any failure
+#' is logged as a `WARN intervention telemetry` line and the call still returns the
+#' adjusted table. Scenario and region are sanitised by [.safe_path_token()]
+#' and the composed basename is re-asserted separator-free before any write.
 implement_spatial_interventions <- function(
   normalized,
   cell_index,
@@ -523,10 +572,12 @@ implement_spatial_interventions <- function(
   scenario,
   simulation_time_step,
   log_file,
-  region_label = NA_character_
+  region_label = NA_character_,
+  telemetry_dir = NULL
 ) {
   year <- as.integer(simulation_time_step)
   region_label <- as.character(region_label)
+  region_slug <- .region_slug(region_label)
 
   # Resolve every mask referenced for this year up front and fail fast on any
   # missing file before touching probabilities (D-05, D-14).
@@ -624,6 +675,11 @@ implement_spatial_interventions <- function(
 
   cache <- new.env(parent = emptyenv())
   n_applied <- 0L
+  # D-18: the per-intervention x per-target-class rows of the telemetry CSV,
+  # accumulated in rank order (the order this loop applies them). One small
+  # data.frame per intervention — length(Target_classes) rows — so this never
+  # scales with the probability table (D-20). Stays NULL in fixture mode.
+  telemetry_rows <- if (is.null(telemetry_dir)) NULL else list()
 
   # loop over interventions
   for (k in ord) {
@@ -644,6 +700,9 @@ implement_spatial_interventions <- function(
     mask_path <- resolved$mask_path[k]
     mask_name <- resolved$mask_name[k]
     rank_k <- resolved$rank[k]
+    # Rendered once so the AUDIT line and the telemetry CSV can never disagree
+    # about an absent ranking (both report the literal "NA").
+    rank_str <- if (is.na(rank_k)) "NA" else as.character(rank_k)
     log_msg(paste("Applying intervention:", iv_id), log_file)
 
     # Translate Transition_target_classes (class_name strings) to integer
@@ -774,7 +833,7 @@ implement_spatial_interventions <- function(
         scenario,
         year,
         iv_id,
-        if (is.na(rank_k)) "NA" else as.character(rank_k),
+        rank_str,
         intervention[["Prob_adjust_type"]],
         intervention[["Prob_adjust_zone"]],
         paste(Target_classes, collapse = ","),
@@ -795,10 +854,107 @@ implement_spatial_interventions <- function(
     # The per-class table is the only telemetry that outlives the line, and it
     # is one small row per target class. Drop the pooled delta with it.
     attr(iv_stats, "delta") <- NULL
+
+    # D-18 (CSV half): prepend the eight identifying columns onto this
+    # intervention's per-target-class rows. `res$stats` is a superset of the
+    # CSV's per-class columns, so the only reshaping is dropping n_inc / n_dec,
+    # which are AUDIT-only roll-up inputs. cbind() recycles the one-row
+    # identity frame across every class row.
+    if (!is.null(telemetry_rows)) {
+      per_class <- iv_stats[
+        , setdiff(names(iv_stats), c("n_inc", "n_dec")), drop = FALSE
+      ]
+      telemetry_rows[[length(telemetry_rows) + 1L]] <- cbind(
+        data.frame(
+          scenario = as.character(scenario),
+          region = region_slug,
+          year = year,
+          intervention_id = as.character(iv_id),
+          rank = rank_str,
+          type = as.character(intervention[["Prob_adjust_type"]]),
+          zone = as.character(intervention[["Prob_adjust_zone"]]),
+          mask = as.character(mask_name),
+          stringsAsFactors = FALSE
+        ),
+        per_class,
+        stringsAsFactors = FALSE
+      )
+      rm(per_class)
+    }
     rm(iv_stats)
   } # end of intervention loop
 
   write_summary(n_applied)
+
+  # D-18/D-21: the per-intervention delta CSV, written last and non-fatally.
+  # An allocation run is hours long on HPC; losing one to a telemetry write
+  # that an operator can re-derive from the AUDIT lines is not an acceptable
+  # trade, so every failure below degrades to a WARN and the adjusted table is
+  # still returned. An unwritable output root is separately reported by the
+  # Stage 7 pre-flight, before any region work starts.
+  if (!is.null(telemetry_rows) && length(telemetry_rows) > 0L) {
+    csv_path <- NA_character_
+    tmp_path <- NA_character_
+    tryCatch(
+      {
+        tel <- do.call(rbind, telemetry_rows)
+        rownames(tel) <- NULL
+        base_name <- sprintf(
+          "intervention_prob_deltas_%s_%s_%d.csv",
+          .safe_path_token(scenario),
+          .safe_path_token(region_slug),
+          year
+        )
+        # Belt and braces (T-05-47): assert the composed basename after
+        # sanitisation rather than trusting the sanitiser, so a future edit to
+        # .safe_path_token() cannot silently reopen the traversal.
+        if (grepl("[/\\\\]", base_name) || grepl("..", base_name, fixed = TRUE)) {
+          stop(sprintf("unsafe telemetry filename: %s", base_name), call. = FALSE)
+        }
+        if (!dir.exists(telemetry_dir)) {
+          stop(
+            sprintf(
+              "telemetry_dir is not an existing directory: %s",
+              paste(telemetry_dir, collapse = ", ")
+            ),
+            call. = FALSE
+          )
+        }
+        csv_path <- file.path(telemetry_dir, base_name)
+        tmp_path <- paste0(csv_path, ".tmp")
+        # Stage then rename, mirroring write_raster_atomic(): a partially
+        # written CSV must never be visible under the final name (T-05-49).
+        data.table::fwrite(tel, tmp_path)
+        if (!file.rename(tmp_path, csv_path)) {
+          stop(
+            sprintf("could not rename '%s' -> '%s'", tmp_path, csv_path),
+            call. = FALSE
+          )
+        }
+        log_msg(
+          sprintf(
+            "intervention telemetry: wrote %d rows to %s", nrow(tel), csv_path
+          ),
+          log_file
+        )
+      },
+      error = function(e) {
+        if (!is.na(tmp_path)) unlink(tmp_path)
+        log_msg(
+          sprintf(
+            "WARN intervention telemetry: failed to write %s: %s",
+            if (is.na(csv_path)) {
+              paste(telemetry_dir, collapse = ", ")
+            } else {
+              csv_path
+            },
+            conditionMessage(e)
+          ),
+          log_file
+        )
+      }
+    )
+  }
 
   # return the updated normalized data.table
   return(normalized)

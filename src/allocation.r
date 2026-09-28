@@ -458,6 +458,43 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
           "intervention config: resolve_intervention_masks() not loaded - source src/implement_spatial_interventions.R"
         )
       }
+      # D-21: the per-intervention delta CSV (D-18) is written into each region
+      # work directory under the simulation output root. The engine degrades a
+      # failed write to a WARN so a multi-hour run is never lost to telemetry,
+      # which is exactly why an unwritable root has to be reported HERE — the
+      # runtime symptom is a warning an operator will not see until the run is
+      # over. Nothing is created: the run makes its own directories.
+      if (interventions_configured) {
+        out_root <- config[["simulation_output_dir"]]
+        if (is.character(out_root) && length(out_root) == 1L && nzchar(out_root)) {
+          probe <- out_root
+          blocked <- FALSE
+          guard <- 0L
+          while (!dir.exists(probe) && guard < 64L) {
+            # An existing NON-directory in the path: walking further up would
+            # find a writable ancestor and wrongly pass.
+            if (file.exists(probe)) {
+              blocked <- TRUE
+              break
+            }
+            parent <- dirname(probe)
+            if (identical(parent, probe)) break
+            probe <- parent
+            guard <- guard + 1L
+          }
+          writable <- !blocked && dir.exists(probe) &&
+            isTRUE(unname(file.access(probe, 2L) == 0L))
+          if (!writable) {
+            intervention_errors <- c(
+              intervention_errors,
+              sprintf(
+                "intervention telemetry: output directory not writable: %s",
+                out_root
+              )
+            )
+          }
+        }
+      }
       if (interventions_configured && engine_loaded) {
         years <- utils::tail(
           as.integer(unlist(config[["simulation_year_steps"]])), -1L
@@ -3079,6 +3116,13 @@ generate_probability_maps <- function(
   # mis-gridded mask aborts the region instead of applying an intervention to a
   # fictional cell set (D-13, CR-02). This is in addition to, not instead of,
   # the Stage 7 pre-flight: nothing here is ever resampled or reprojected.
+  #
+  # telemetry_dir is this region's work directory, so the per-intervention
+  # delta CSV (intervention_prob_deltas_<scenario>_<region>_<year>.csv, D-18)
+  # lands here next to probability_map_dir — the same directory
+  # scripts/verify_intervention_smoke.r resolves from --output-root,
+  # --scenario, --year and --region. The write is non-fatal: a telemetry
+  # failure warns and the region run continues (D-21).
   class_name_to_value <- load_allocation_class_map(config)
   normalized <- implement_spatial_interventions(
     normalized           = normalized,
@@ -3090,7 +3134,8 @@ generate_probability_maps <- function(
     scenario             = scenario,
     simulation_time_step = year_post,
     log_file             = log_file,
-    region_label         = region_label
+    region_label         = region_label,
+    telemetry_dir = work_dir
   )
   data.table::setkey(normalized, row_idx)
 

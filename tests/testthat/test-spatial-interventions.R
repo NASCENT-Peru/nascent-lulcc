@@ -437,8 +437,12 @@ test_that("IN-07: a mask removed after resolution reports the forbidden marker",
   )
 }
 
-.run_engine <- function(fx, normalized, year = 2028L) {
-  implement_spatial_interventions(
+#' `telemetry_dir` is only forwarded when the caller supplies it, so the blocks
+#' that predate plan 05-13 keep calling the engine with its original formals and
+#' the D-18 CSV stays opt-in (NULL = fixture mode).
+.run_engine <- function(fx, normalized, year = 2028L, telemetry_dir = NULL,
+                        region_label = "R1") {
+  args <- list(
     normalized = normalized,
     cell_index = .cell_index(),
     class_name_to_value = .class_map,
@@ -448,8 +452,10 @@ test_that("IN-07: a mask removed after resolution reports the forbidden marker",
     scenario = fx$scenario,
     simulation_time_step = year,
     log_file = fx$log_file,
-    region_label = "R1"
+    region_label = region_label
   )
+  if (!is.null(telemetry_dir)) args$telemetry_dir <- telemetry_dir
+  do.call(implement_spatial_interventions, args)
 }
 
 .abs_entry <- function(id = "iv_abs", zone = "Inside", value = 0,
@@ -1150,5 +1156,184 @@ test_that("D-20: no full-table copy per intervention", {
   # D-13 stays closed too: the engine never resamples or reprojects.
   expect_false(any(grepl("resample(", src, fixed = TRUE)))
   expect_false(any(grepl("project(", src, fixed = TRUE)))
+})
+
+# --------------------------------------------------------------------------
+# Phase 5 Plan 13 gap closure: the per-intervention x per-target-class
+# telemetry CSV (D-18 part 2), its non-fatal write rule (D-21) and filename
+# safety (T-05-47), with regression tests that fail against the pre-plan
+# engine (D-23).
+
+# The D-18 CSV contract, in order. The trailing 17 columns are res$stats minus
+# the AUDIT-only n_inc / n_dec; the leading 8 identify the intervention.
+.csv_cols <- c(
+  "scenario", "region", "year", "intervention_id", "rank", "type", "zone",
+  "mask", "target_class", "n_target", "n_changed", "mean_before", "mean_after",
+  "sd_before", "sd_after", "p05_delta", "p25_delta", "p50_delta", "p75_delta",
+  "p95_delta", "min_delta", "max_delta", "sum_abs_delta", "prob_mass_before",
+  "prob_mass_after"
+)
+
+# Paths are returned RELATIVE to `dir`, which is what makes the "nothing
+# escaped the directory" assertion in D-18d meaningful.
+.telemetry_csvs <- function(dir) {
+  list.files(dir, pattern = "^intervention_prob_deltas_", recursive = TRUE)
+}
+
+.two_class_targets <- list(
+  "built_up_and_barren_lands", "high_intensity_agricultural_areas"
+)
+
+.two_abs_entries <- function() {
+  list(
+    .abs_entry(id = "iv_a", rank = 1L, targets = .two_class_targets),
+    .abs_entry(id = "iv_b", rank = 2L, targets = .two_class_targets)
+  )
+}
+
+test_that("D-18: the telemetry CSV is written with the exact 25-column contract", {
+  fx <- .engine_fixture(.two_abs_entries(), scenario = "BAU")
+  tdir <- withr::local_tempdir()
+  .run_engine(fx, .norm(), telemetry_dir = tdir)
+
+  path <- file.path(tdir, "intervention_prob_deltas_BAU_r1_2028.csv")
+  expect_true(file.exists(path))
+  csv <- utils::read.csv(path, stringsAsFactors = FALSE)
+  expect_identical(names(csv), .csv_cols)
+
+  # The staging file never survives a successful write (atomic rename).
+  expect_false(file.exists(paste0(path, ".tmp")))
+
+  expect_identical(unique(csv$scenario), "BAU")
+  expect_identical(unique(csv$region), "r1")
+  expect_identical(unique(csv$year), 2028L)
+  expect_identical(unique(csv$type), "Absolute")
+  expect_identical(unique(csv$zone), "Inside")
+  expect_identical(unique(csv$mask), "mask_a.tif")
+
+  wrote <- grep(
+    "intervention telemetry: wrote ", .log_lines(fx$log_file),
+    value = TRUE, fixed = TRUE
+  )
+  expect_length(wrote, 1L)
+  expect_match(wrote, "wrote 4 rows to ", fixed = TRUE)
+})
+
+test_that("D-18b: one row per intervention x target class", {
+  fx <- .engine_fixture(.two_abs_entries(), scenario = "CARD")
+  tdir <- withr::local_tempdir()
+  .run_engine(fx, .norm(), telemetry_dir = tdir)
+
+  csv <- utils::read.csv(
+    file.path(tdir, "intervention_prob_deltas_CARD_r1_2028.csv"),
+    stringsAsFactors = FALSE
+  )
+  expect_identical(nrow(csv), 4L)
+  expect_identical(sort(unique(csv$intervention_id)), c("iv_a", "iv_b"))
+  expect_identical(sort(unique(csv$target_class)), c(104L, 105L))
+  expect_identical(
+    anyDuplicated(paste(csv$intervention_id, csv$target_class)), 0L
+  )
+
+  # The CSV and the AUDIT line may never disagree about what was targeted or
+  # how far it moved; plan 05-14 cross-checks the same two numbers.
+  a <- .audit_lines(fx$log_file)$iv
+  expect_length(a, 2L)
+  for (ln in a) {
+    id <- .audit_field(ln, "id")
+    rows <- csv$intervention_id == id
+    expect_identical(
+      sum(csv$n_target[rows]), as.integer(.audit_field(ln, "rows_target"))
+    )
+    expect_identical(
+      sum(csv$n_changed[rows]), as.integer(.audit_field(ln, "rows_changed"))
+    )
+    expect_equal(
+      sum(csv$sum_abs_delta[rows]),
+      as.numeric(.audit_field(ln, "sum_abs_delta")),
+      tolerance = 1e-6
+    )
+  }
+})
+
+test_that("D-18c: Absolute-to-0 rows report mean_after = 0", {
+  fx <- .engine_fixture(.two_abs_entries(), scenario = "ABSZERO")
+  tdir <- withr::local_tempdir()
+  .run_engine(fx, .norm(), telemetry_dir = tdir)
+
+  csv <- utils::read.csv(
+    file.path(tdir, "intervention_prob_deltas_ABSZERO_r1_2028.csv"),
+    stringsAsFactors = FALSE
+  )
+  adjusted <- csv$n_target > 0L
+  expect_true(any(adjusted))
+  expect_true(all(csv$mean_after[adjusted] == 0))
+  expect_true(all(csv$prob_mass_after[adjusted] == 0))
+  # A skipped class carries the NA shape rather than a misleading 0.
+  expect_true(all(is.na(csv$mean_after[!adjusted])))
+})
+
+test_that("D-21: a failing CSV write warns and does not abort the run", {
+  fx <- .engine_fixture(list(.abs_entry()), scenario = "NOWRITE")
+  scratch <- withr::local_tempdir()
+  blocker <- file.path(scratch, "blocker")
+  writeLines("not a directory", blocker)
+  dead_dir <- file.path(blocker, "telemetry")
+
+  out <- NULL
+  expect_no_error(out <- .run_engine(fx, .norm(), telemetry_dir = dead_dir))
+
+  # The allocation work itself still landed: inside rows of class 105 zeroed,
+  # outside rows untouched. A telemetry failure costs telemetry, not the run.
+  expect_true(all(out[to_val == 105L & cell_id %in% c(1L, 3L, 5L), prob] == 0))
+  expect_true(all(out[to_val == 105L & cell_id %in% c(2L, 4L, 6L), prob] > 0))
+
+  warn_lines <- grep(
+    "WARN intervention telemetry:", .log_lines(fx$log_file),
+    value = TRUE, fixed = TRUE
+  )
+  expect_length(warn_lines, 1L)
+  expect_match(warn_lines, "failed to write ", fixed = TRUE)
+  expect_length(.telemetry_csvs(scratch), 0L)
+
+  # The whole-call summary AUDIT line is still written.
+  expect_length(.audit_lines(fx$log_file)$summary, 1L)
+})
+
+test_that("D-21b: telemetry_dir = NULL writes nothing and does not warn", {
+  fx <- .engine_fixture(list(.abs_entry()), scenario = "NOTEL")
+  expect_no_error(.run_engine(fx, .norm(), telemetry_dir = NULL))
+  l <- .log_lines(fx$log_file)
+  expect_false(any(grepl("WARN intervention telemetry:", l, fixed = TRUE)))
+  expect_false(any(grepl("intervention telemetry: wrote", l, fixed = TRUE)))
+  expect_length(.telemetry_csvs(fx$interventions_dir), 0L)
+})
+
+test_that("D-18d: the filename is sanitised (T-05-47)", {
+  # The region token is the slug the allocation driver builds
+  # (gsub(" ", "_", tolower(region_label))) and the smoke verifier passes as
+  # --region, so a labelled region lands where --output-root resolves it.
+  fx <- .engine_fixture(list(.abs_entry()), scenario = "BAU")
+  tdir <- withr::local_tempdir()
+  .run_engine(fx, .norm(), telemetry_dir = tdir, region_label = "Costa Peruana")
+  expect_true(file.exists(
+    file.path(tdir, "intervention_prob_deltas_BAU_costa_peruana_2028.csv")
+  ))
+
+  # A hostile scenario label. `masks/../EVIL` resolves to the same YAML the
+  # fixture wrote (masks/ exists inside the fixture scratch), so the engine
+  # genuinely runs; the name it composes must not be able to climb out of
+  # telemetry_dir.
+  fx2 <- .engine_fixture(list(.abs_entry()), scenario = "masks/../EVIL")
+  tdir2 <- withr::local_tempdir()
+  .run_engine(fx2, .norm(), telemetry_dir = tdir2)
+
+  rel <- .telemetry_csvs(tdir2)
+  expect_length(rel, 1L)
+  expect_identical(basename(rel), rel)
+  expect_false(grepl("/", rel, fixed = TRUE))
+  expect_false(grepl("\\", rel, fixed = TRUE))
+  expect_false(grepl("..", rel, fixed = TRUE))
+  expect_true(file.exists(file.path(tdir2, rel)))
 })
 
