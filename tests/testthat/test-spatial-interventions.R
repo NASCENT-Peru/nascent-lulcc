@@ -814,3 +814,130 @@ test_that("CR-02: an unreadable reference grid stops the engine", {
   expect_equal(as.data.frame(dt), as.data.frame(before))
 })
 
+# --------------------------------------------------------------------------
+# Phase 5 Plan 11 gap closure: adjustment semantics inside
+# relative_prob_adjust() and absolute_prob_adjust()
+# (05-REVIEW.md WR-01, WR-02, WR-03, IN-04).
+
+# Rewrite only the to_val 105 rows: region cells 1, 3, 5 are inside the mask,
+# 2, 4, 6 outside. The to_val 104 rows keep .norm()'s 0.1 so they can double as
+# out-of-scope witnesses.
+.norm_split <- function(inside, outside) {
+  dt <- .norm()
+  dt[to_val == 105L & cell_id %in% c(1L, 3L, 5L), prob := inside]
+  dt[to_val == 105L & cell_id %in% c(2L, 4L, 6L), prob := outside]
+  dt
+}
+
+.because_lines <- function(log_file) {
+  grep(
+    "because the Prob_adjust_valency is", .log_lines(log_file),
+    fixed = TRUE, value = TRUE
+  )
+}
+
+test_that("WR-01a: a Relative intervention with probabilities tied at the percentile still adjusts rows", {
+  # quantile(c(0.4, 0.4, 0.4), 0.5) IS 0.4, so Intervention_ptile_mean was taken
+  # over all three inside rows while the strict `>` selection matched none: the
+  # AUDIT line reported an applied intervention with rows_changed=0.
+  fx <- .engine_fixture(list(.rel_entry(valency = "Decrease")), scenario = "TIE")
+  dt <- .norm_split(inside = 0.4, outside = 0.1)
+  before <- copy(dt)
+  out <- .run_engine(fx, dt)
+  inside <- out$to_val == 105L & out$cell_id %in% c(1L, 3L, 5L)
+  expect_true(any(out$prob[inside] != before$prob[inside]))
+  a <- .audit_lines(fx$log_file)
+  expect_length(a$iv, 1L)
+  expect_false(grepl("rows_changed=0", a$iv[1], fixed = TRUE))
+})
+
+test_that("WR-01b: an exactly zero percentage difference applies the threshold (Decrease)", {
+  # Identical inside/outside distributions -> Perc_diff is exactly 0, which fell
+  # between `if (Perc_diff > 0)` and `else if (Perc_diff < 0)`: the threshold,
+  # whose whole purpose is to guarantee a nudge when the zones are
+  # indistinguishable, was silently skipped.
+  fx <- .engine_fixture(list(.rel_entry(valency = "Decrease")), scenario = "ZERODEC")
+  dt <- .norm_split(inside = 0.3, outside = 0.3)
+  before <- copy(dt)
+  out <- .run_engine(fx, dt)
+  inside <- out$to_val == 105L & out$cell_id %in% c(1L, 3L, 5L)
+  expect_true(all(out$prob[inside] < before$prob[inside]))
+  a <- .audit_lines(fx$log_file)
+  expect_length(a$iv, 1L)
+  expect_false(grepl("rows_changed=0", a$iv[1], fixed = TRUE))
+  expect_true(any(grepl(
+    "The Percentage difference is below the threshold", a$all, fixed = TRUE
+  )))
+})
+
+test_that("WR-01c: an exactly zero percentage difference applies the threshold (Increase)", {
+  fx <- .engine_fixture(list(.rel_entry(valency = "Increase")), scenario = "ZEROINC")
+  dt <- .norm_split(inside = 0.3, outside = 0.3)
+  before <- copy(dt)
+  out <- .run_engine(fx, dt)
+  inside <- out$to_val == 105L & out$cell_id %in% c(1L, 3L, 5L)
+  expect_true(all(out$prob[inside] > before$prob[inside]))
+  expect_true(any(grepl(
+    "The Percentage difference is below the threshold",
+    .log_lines(fx$log_file), fixed = TRUE
+  )))
+})
+
+test_that("WR-02: an Absolute intervention does not rewrite rows outside its target class", {
+  # The 104 row is outside the mask and outside the declared target class, and
+  # carries a deliberately out-of-range 1.7. The table-wide clamp rewrote it to
+  # 1 without counting it in rows_changed.
+  fx <- .engine_fixture(list(.abs_entry()), scenario = "SCOPEABS")
+  dt <- .norm()
+  dt[to_val == 104L & cell_id == 2L, prob := 1.7]
+  out <- .run_engine(fx, dt)
+  expect_equal(out$prob[out$to_val == 104L & out$cell_id == 2L], 1.7)
+  inside <- out$to_val == 105L & out$cell_id %in% c(1L, 3L, 5L)
+  expect_true(all(out$prob[inside] == 0))
+})
+
+test_that("WR-02: a Relative intervention does not rewrite rows outside its target class", {
+  fx <- .engine_fixture(list(.rel_entry(valency = "Decrease")), scenario = "SCOPEREL")
+  dt <- .norm()
+  dt[to_val == 104L & cell_id == 2L, prob := 1.7]
+  before <- copy(dt)
+  out <- .run_engine(fx, dt)
+  expect_equal(out$prob[out$to_val == 104L & out$cell_id == 2L], 1.7)
+  inside <- out$to_val == 105L & out$cell_id %in% c(1L, 3L, 5L)
+  expect_true(any(out$prob[inside] < before$prob[inside]))
+})
+
+test_that("WR-03: the threshold log reports the signed value actually assigned (Increase)", {
+  # Perc_diff = (0.30 - 0.31) / 0.305 * 100 = -3.279, below the threshold of 5.
+  # The Increase / Perc_diff < 0 branch assigns -(threshold) but logged the
+  # pre-threshold Perc_diff.
+  fx <- .engine_fixture(list(.rel_entry(valency = "Increase")), scenario = "SIGNINC")
+  .run_engine(fx, .norm_split(inside = 0.30, outside = 0.31))
+  l <- .log_lines(fx$log_file)
+  expect_true(any(grepl("setting to threshold value: -5", l, fixed = TRUE)))
+  expect_false(any(grepl("setting to threshold value: -3", l, fixed = TRUE)))
+})
+
+test_that("WR-03: the threshold log reports the signed value actually assigned (Decrease)", {
+  # Same Perc_diff < 0 magnitude; the Decrease branch assigns -(threshold) while
+  # logging the positive threshold.
+  fx <- .engine_fixture(list(.rel_entry(valency = "Decrease")), scenario = "SIGNDEC")
+  .run_engine(fx, .norm_split(inside = 0.30, outside = 0.31))
+  l <- .log_lines(fx$log_file)
+  expect_true(any(grepl("setting to threshold value: -5", l, fixed = TRUE)))
+  expect_false(any(grepl("setting to threshold value: 5", l, fixed = TRUE)))
+})
+
+test_that("IN-04: the valency explanation line is not an orphan fragment", {
+  fx <- .engine_fixture(list(.rel_entry(valency = "Decrease")), scenario = "ORPHAN")
+  .run_engine(fx, .norm())
+  b <- .because_lines(fx$log_file)
+  expect_gt(length(b), 0L)
+  for (ln in b) {
+    tv <- as.integer(regexpr("to_val=", ln, fixed = TRUE))
+    bc <- as.integer(regexpr("because the Prob_adjust_valency is", ln, fixed = TRUE))
+    expect_gt(tv, 0L)
+    expect_lt(tv, bc)
+  }
+})
+
