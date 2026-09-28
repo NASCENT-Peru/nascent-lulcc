@@ -14,13 +14,15 @@
 library(testthat)
 library(data.table)
 
-.repo_root <- (function() {
-  here <- tryCatch(normalizePath(sys.frame(1)$ofile %||% "."), error = function(e) ".")
-  if (is.null(here) || identical(here, "")) here <- "."
-  is_dir <- tryCatch(file.info(here)$isdir, error = function(e) NA)
-  if (isTRUE(is_dir)) here <- file.path(here, "x")
-  normalizePath(file.path(dirname(dirname(dirname(here)))), mustWork = FALSE)
-})()
+# IN-06: `.repo_root` is defined once in
+# tests/testthat/helper-spatial-interventions.R, which testthat loads before
+# this file under both `test_file()` and `test_dir()`. The guard keeps a bare
+# `source()` of this file working WITHOUT reintroducing the sourcing-frame
+# `ofile` bootstrap this plan removed - see the helper's header for why that
+# bootstrap was wrong twice over.
+if (!exists(".repo_root", inherits = TRUE)) {
+  source(testthat::test_path("helper-spatial-interventions.R"))
+}
 
 # Source into the global env (not a baseenv child) so data.table's cedta check
 # treats the engine code as data.table-aware.
@@ -505,6 +507,27 @@ test_that("IN-07: a mask removed after resolution reports the forbidden marker",
   )
 }
 
+# The intervention AUDIT line is written through log_msg(), so every log line
+# carries a "<timestamp> | " prefix. Telemetry assertions are made over the
+# AUDIT body only, so the frozen field order can be pinned with one regex and
+# the field count is comparable across runs. These three live here rather than
+# in the plan 05-12 section below because test bodies execute in file order and
+# blocks above that section read AUDIT fields too.
+.audit_body <- function(line) {
+  at <- regexpr("AUDIT stage=intervention ", line, fixed = TRUE)
+  substring(line, at)
+}
+
+.audit_nfields <- function(line) {
+  length(strsplit(.audit_body(line), " ", fixed = TRUE)[[1L]])
+}
+
+.audit_field <- function(line, name) {
+  m <- regmatches(line, regexpr(paste0("(^| )", name, "=[^ ]+"), line))
+  if (length(m) == 0L) return(NA_character_)
+  sub(paste0("^ ?", name, "="), "", m)
+}
+
 test_that("engine: Absolute=0 Inside with From filter edits only inside from-class rows", {
   fx <- .engine_fixture(list(.abs_entry(from = list("forested_areas"))))
   dt <- .norm()
@@ -573,14 +596,64 @@ test_that("engine: Relative Decrease lowers inside values and never raises any",
   expect_true(all(out$prob <= before$prob + 1e-12))
 })
 
-test_that("engine: zeros from Absolute=0 stay zero after a Relative Increase", {
+test_that("WR-09: zeros from Absolute=0 survive a Relative Increase that actually runs", {
+  # This block used to pass for the wrong reason (05-REVIEW.md WR-09). Its
+  # rank-1 entry was an unfiltered .abs_entry(), which zeroes EVERY inside row
+  # of the target class, so the rank-2 Relative Increase found no positive
+  # probabilities in its intervention zone, the NaN guard fired, and the
+  # adjuster returned via `next` without touching anything. What the block
+  # actually proved was "a skipped intervention changes nothing" - the zeros
+  # were never at risk.
+  #
+  # The fix is to zero only PART of one zone, so both zones still hold
+  # positives and the guard cannot fire. `from = "forested_areas"` restricts
+  # rank 1 to from_val 101, and inside cell 5 carries from_val 102, so after
+  # rank 1 the inside rows of class 105 are (cell 1) 0, (cell 3) 0,
+  # (cell 5) 0.6 while the outside rows keep 0.3, 0.5, 0.1.
+  #
+  # Rank 2 then computes, by hand:
+  #   Intervention_ptile_val  = quantile(0.6, .5)         = 0.6
+  #     (the percentile is taken over the POSITIVE intervention values only,
+  #      which is the first reason a zeroed row can never be selected)
+  #   Intervention_ptile_mean = mean(0.6)                 = 0.60
+  #   Non_int_ptile_val       = quantile(c(.3,.5,.1), .5) = 0.3
+  #   Non_int_ptile_mean      = mean(.3, .5)              = 0.40
+  #   Perc_diff = (0.60 - 0.40) / 0.50 * 100 = 40 -> Increase / Perc_diff >= 0
+  # so cell 5 rises to 0.84 and the zeros at cells 1 and 3 stay zero.
   fx <- .engine_fixture(list(
-    .abs_entry(id = "iv_zero", rank = 1L),
+    .abs_entry(id = "iv_zero", rank = 1L, from = list("forested_areas")),
     .rel_entry(id = "iv_inc", valency = "Increase", rank = 2L)
-  ))
-  out <- .run_engine(fx, .norm())
-  inside <- out$to_val == 105L & out$cell_id %in% c(1L, 3L, 5L)
-  expect_true(all(out$prob[inside] == 0))
+  ), scenario = "ZEROSURVIVE")
+  dt <- .norm()
+  before <- copy(dt)
+  out <- .run_engine(fx, dt)
+
+  # 1. Zero preservation: the rows rank 1 zeroed are still exactly 0 after the
+  #    Relative pass wrote to the same target class and zone.
+  zeroed <- out$to_val == 105L & out$cell_id %in% c(1L, 3L)
+  expect_true(all(out$prob[zeroed] == 0))
+
+  # 2. The table changed at all.
+  expect_false(identical(out$prob, before$prob))
+
+  # 3. The RANK-2 pass specifically ran and moved rows. This is the assertion
+  #    the old block lacked: the engine writes an AUDIT line even for an
+  #    adjuster that skipped every target class, so the line count alone is
+  #    necessary but NOT sufficient. rows_changed / sum_abs_delta are read off
+  #    the rank-2 line only.
+  a <- .audit_lines(fx$log_file)
+  expect_length(a$iv, 2L)
+  expect_match(a$iv[1], "id=iv_zero", fixed = TRUE)
+  expect_match(a$iv[2], "id=iv_inc", fixed = TRUE)
+  expect_identical(.audit_field(a$iv[2], "rows_changed"), "1")
+  expect_identical(.audit_field(a$iv[2], "n_inc"), "1")
+  expect_gt(as.numeric(.audit_field(a$iv[2], "sum_abs_delta")), 0)
+  expect_equal(
+    out$prob[out$to_val == 105L & out$cell_id == 5L], 0.84, tolerance = 1e-9
+  )
+
+  # 4. No intervention was skipped, for either rank.
+  expect_false(any(grepl("intervention skip:", a$all, fixed = TRUE)))
 })
 
 test_that("engine: interventions are applied in rank order with one AUDIT line each", {
@@ -951,24 +1024,9 @@ test_that("IN-04: the valency explanation line is not an orphan fragment", {
 # Phase 5 Plan 12 gap closure: probability-change telemetry (D-18, D-19, D-20)
 # with regression tests that fail against the pre-plan engine (D-23).
 
-# The intervention AUDIT line is written through log_msg(), so every log line
-# carries a "<timestamp> | " prefix. Telemetry assertions are made over the
-# AUDIT body only, so the frozen field order can be pinned with one regex and
-# the field count is comparable across runs.
-.audit_body <- function(line) {
-  at <- regexpr("AUDIT stage=intervention ", line, fixed = TRUE)
-  substring(line, at)
-}
-
-.audit_nfields <- function(line) {
-  length(strsplit(.audit_body(line), " ", fixed = TRUE)[[1L]])
-}
-
-.audit_field <- function(line, name) {
-  m <- regmatches(line, regexpr(paste0("(^| )", name, "=[^ ]+"), line))
-  if (length(m) == 0L) return(NA_character_)
-  sub(paste0("^ ?", name, "="), "", m)
-}
+# .audit_body(), .audit_nfields() and .audit_field() are defined next to
+# .audit_lines() above, because test bodies run in file order and the WR-09
+# block earlier in this file reads AUDIT fields too.
 
 # Field count of the AUDIT body BEFORE plan 05-12 appended the delta fields:
 #   AUDIT stage=intervention region= scenario= year= id= rank= type= zone=
@@ -1335,5 +1393,149 @@ test_that("D-18d: the filename is sanitised (T-05-47)", {
   expect_false(grepl("\\", rel, fixed = TRUE))
   expect_false(grepl("..", rel, fixed = TRUE))
   expect_true(file.exists(file.path(tdir2, rel)))
+})
+
+# --------------------------------------------------------------------------
+# Phase 5 Plan 15 gap closure: the valency / zone combinations the four
+# shipped production configs actually use (05-REVIEW.md WR-08), and the
+# rejection guard that pairs with them.
+#
+# Enumerated from config/{BAU,NAT,CUL,SOC}_interventions.yml and
+# docs/spatial_interventions/parameter_provenance.md - NOT from review prose,
+# whose WR-11 text misattributes the `Outside` + `Prob_adjust_value: 0`
+# pairing. The 14 shipped Allocation entries use six distinct combinations:
+#
+#   type     | valency                          | zone    | covered by
+#   ---------+----------------------------------+---------+---------------------
+#   Absolute | n/a (value 0)                    | Inside  | "engine: Absolute=0 Inside with From filter ..."
+#   Absolute | n/a (value 0)                    | Outside | "engine: Absolute=0 Outside only changes outside rows"
+#   Relative | Decrease                         | Inside  | "engine: Relative Decrease lowers inside values ..."
+#   Relative | Increase                         | Inside  | "WR-01c: ... applies the threshold (Increase)"
+#   Relative | Decrease                         | Outside | WR-08b, below   <- was uncovered
+#   Relative | Increase_inside_decrease_outside | Inside  | WR-08, below    <- was uncovered
+#
+# Shipped users of the two formerly uncovered rows:
+#   NAT/SOC `Urban_densification`  -> Relative Increase_inside_decrease_outside, Inside
+#   CUL `Mining_outside_restraint` -> Relative Decrease, Outside (no Prob_adjust_value key)
+#
+# Expectations are written against the post-05-11 semantics (`>=` percentile
+# alignment, `Perc_diff >= 0` dispatch, per-index-set clamps).
+
+# `.norm()` for to_val 105: inside cells 1, 3, 5 hold 0.2, 0.4, 0.6 and
+# outside cells 2, 4, 6 hold 0.3, 0.5, 0.1. Under a 50th-percentile
+# Increase_inside_decrease_outside that means, by hand:
+#   Intervention_ptile_val  = quantile(c(.2,.4,.6), .5) = 0.4
+#   Intervention_ptile_mean = mean(.4, .6)              = 0.50
+#   Non_int_ptile_val       = quantile(c(.3,.5,.1), .5) = 0.3
+#   Non_int_ptile_mean      = mean(.3, .5)              = 0.40
+#   Perc_diff = (0.50 - 0.40) / 0.45 * 100 = 22.222 -> above the threshold of 5
+# so the inside rows at/above 0.4 (cells 3, 5) rise and the outside rows
+# at/above 0.3 (cells 2, 4) fall, in the SAME pass.
+test_that("WR-08: Relative Increase_inside_decrease_outside moves both zones (NAT/SOC Urban_densification)", {
+  fx <- .engine_fixture(
+    list(.rel_entry(valency = "Increase_inside_decrease_outside")),
+    scenario = "BOTHZONES"
+  )
+  dt <- .norm()
+  before <- copy(dt)
+  out <- .run_engine(fx, dt)
+
+  tgt <- out$to_val == 105L
+  rose <- tgt & out$cell_id %in% c(3L, 5L)
+  fell <- tgt & out$cell_id %in% c(2L, 4L)
+  expect_true(all(out$prob[rose] > before$prob[rose]))
+  expect_true(all(out$prob[fell] < before$prob[fell]))
+
+  # Below their respective percentiles, so untouched by either half.
+  untouched <- tgt & out$cell_id %in% c(1L, 6L)
+  expect_equal(out$prob[untouched], before$prob[untouched])
+  # A class this intervention does not declare is never written (WR-02).
+  expect_equal(out$prob[out$to_val == 104L], before$prob[before$to_val == 104L])
+
+  a <- .audit_lines(fx$log_file)
+  expect_length(a$iv, 1L)
+  expect_match(
+    a$iv, "id=iv_rel rank=1 type=Relative zone=Inside to_vals=105", fixed = TRUE
+  )
+  expect_identical(.audit_field(a$iv, "rows_target"), "6")
+  expect_identical(.audit_field(a$iv, "rows_changed"), "4")
+  expect_gt(as.integer(.audit_field(a$iv, "rows_changed")), 0L)
+  # The signature of this valency: one pass, both directions.
+  expect_identical(.audit_field(a$iv, "n_inc"), "2")
+  expect_identical(.audit_field(a$iv, "n_dec"), "2")
+
+  # The branch RAN. Neither the one-zone-empty skip nor the NaN guard fired,
+  # so this is not a vacuous "nothing happened and nothing changed" pass.
+  expect_false(any(grepl("intervention skip:", a$all, fixed = TRUE)))
+  expect_true(any(grepl(
+    "increasing the probability of the intervention pixels and decreasing the probability of the non-intervention pixels",
+    a$all,
+    fixed = TRUE
+  )))
+})
+
+# CUL `Mining_outside_restraint`: Relative / Decrease with the intervention
+# zone OUTSIDE the mask, which swaps Intervention_idx and Non_intervention_idx.
+# Fixture: outside 0.5, inside 0.2, so
+#   Intervention (outside) ptile mean = 0.50
+#   Non-intervention (inside) ptile mean = 0.20
+#   Perc_diff = (0.50 - 0.20) / 0.35 * 100 = 85.71 -> Decrease, Perc_diff >= 0
+# decreases the INTERVENTION (outside) rows. The same fixture with
+# zone = "Inside" would take the Perc_diff < 0 arm and RAISE those outside
+# rows instead, so the direction asserted here genuinely pins the swap rather
+# than merely observing that something moved.
+test_that("WR-08b: Relative zone=Outside swaps the intervention zone (CUL Mining_outside_restraint)", {
+  fx <- .engine_fixture(
+    list(.rel_entry(valency = "Decrease", zone = "Outside")),
+    scenario = "ZONESWAP"
+  )
+  dt <- .norm_split(inside = 0.2, outside = 0.5)
+  before <- copy(dt)
+  out <- .run_engine(fx, dt)
+
+  tgt <- out$to_val == 105L
+  outside <- tgt & out$cell_id %in% c(2L, 4L, 6L)
+  inside <- tgt & out$cell_id %in% c(1L, 3L, 5L)
+  expect_true(all(out$prob[outside] < before$prob[outside]))
+  expect_equal(out$prob[inside], before$prob[inside])
+  expect_equal(out$prob[out$to_val == 104L], before$prob[before$to_val == 104L])
+
+  a <- .audit_lines(fx$log_file)
+  expect_length(a$iv, 1L)
+  expect_match(
+    a$iv, "id=iv_rel rank=1 type=Relative zone=Outside to_vals=105", fixed = TRUE
+  )
+  expect_identical(.audit_field(a$iv, "rows_target"), "6")
+  expect_identical(.audit_field(a$iv, "rows_changed"), "3")
+  expect_identical(.audit_field(a$iv, "n_dec"), "3")
+  expect_identical(.audit_field(a$iv, "n_inc"), "0")
+
+  # The branch RAN.
+  expect_false(any(grepl("intervention skip:", a$all, fixed = TRUE)))
+  expect_true(any(grepl(
+    "then decreasing the probability of the intervention pixels", a$all,
+    fixed = TRUE
+  )))
+})
+
+test_that("WR-08c: Increase_inside_decrease_outside with zone=Outside is rejected", {
+  # No shipped config writes this pairing, and the guard is what keeps it that
+  # way: the valency names the two zones itself, so an Outside zone would
+  # silently invert the intervention's meaning.
+  fx <- .engine_fixture(
+    list(.rel_entry(
+      valency = "Increase_inside_decrease_outside", zone = "Outside"
+    )),
+    scenario = "BADZONE"
+  )
+  dt <- .norm()
+  before <- copy(dt)
+  expect_error(.run_engine(fx, dt), "must be 'Inside'", fixed = TRUE)
+  # The guard fires before any write, so nothing is half-adjusted.
+  expect_equal(as.data.frame(dt), as.data.frame(before))
+  expect_length(
+    grep("AUDIT stage=intervention region=", .log_lines(fx$log_file), fixed = TRUE),
+    0L
+  )
 })
 

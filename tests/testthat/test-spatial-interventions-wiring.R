@@ -6,13 +6,15 @@ library(testthat)
 # lock the generate_probability_maps() hook shape and the fatal sourcing guard
 # in scripts/run_allocation.r. They never run allocation itself.
 
-.repo_root <- (function() {
-  here <- tryCatch(normalizePath(sys.frame(1)$ofile %||% "."), error = function(e) ".")
-  if (is.null(here) || identical(here, "")) here <- "."
-  is_dir <- tryCatch(file.info(here)$isdir, error = function(e) NA)
-  if (isTRUE(is_dir)) here <- file.path(here, "x")
-  normalizePath(file.path(dirname(dirname(dirname(here)))), mustWork = FALSE)
-})()
+# IN-06: `.repo_root` is defined once in
+# tests/testthat/helper-spatial-interventions.R, which testthat loads before
+# this file under both `test_file()` and `test_dir()`. The guard keeps a bare
+# `source()` of this file working WITHOUT reintroducing the sourcing-frame
+# `ofile` bootstrap this plan removed - see the helper's header for why that
+# bootstrap was wrong twice over.
+if (!exists(".repo_root", inherits = TRUE)) {
+  source(testthat::test_path("helper-spatial-interventions.R"))
+}
 
 allocation_text <- paste(
   readLines(file.path(.repo_root, "src", "allocation.r"), warn = FALSE),
