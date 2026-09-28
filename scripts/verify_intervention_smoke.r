@@ -21,6 +21,20 @@
 #'       mask that lands entirely outside the region (WR-07).
 #'   (d) No forbidden marker appears in any log under the region dir (or in
 #'       --extra-log, e.g. the SLURM stdout file).
+#'   (e) The plan 05-13 telemetry CSV
+#'       <region_dir>/intervention_prob_deltas_<scenario>_<region>_<year>.csv
+#'       exists, carries the 25-column contract in order, covers exactly the
+#'       active intervention ids, and reconciles with the AUDIT lines of (b):
+#'       per intervention its target_class set equals the AUDIT to_vals set,
+#'       sum(n_changed) equals rows_changed and sum(sum_abs_delta) equals the
+#'       AUDIT sum_abs_delta. sum(n_target) is compared to rows_target for
+#'       Absolute interventions ONLY: relative_prob_adjust() adds the target
+#'       rows to rows_target BEFORE its skip paths, so a skipped class
+#'       legitimately shows rows_target > 0 with n_target = 0 (05-13). Finally
+#'       every Absolute Prob_adjust_value 0 row with n_target > 0 must report
+#'       mean_after = 0 (D-22). Note the CSV `region` column is the slug while
+#'       the AUDIT `region=` field is the verbatim region label; they are not
+#'       compared.
 #'
 #' Pitfall 4: with ALLOCATION_YEAR_POST_FILTER set, the anterior map is the
 #' initial 2022 map rather than the simulated map for year_post - step, so
@@ -208,6 +222,9 @@ is_iv <- function(l) {
   grepl("AUDIT stage=intervention region=", l, fixed = TRUE) &
     grepl(year_pat, l, fixed = TRUE) & grepl(scen_pat, l, fixed = TRUE)
 }
+# Declared before the branch so section (e) can consume the AUDIT lines rather
+# than re-parse the logs, even on the "no summary line" path.
+iv_lines <- character(0)
 with_summary <- log_files[vapply(log_lines, function(l) any(is_summary(l)), logical(1))]
 if (length(with_summary) == 0L) {
   fail(sprintf(
@@ -363,6 +380,146 @@ if (length(abs0) > 0L) {
 }
 cat("\n")
 
+# (e) telemetry CSV (D-22) -----------------------------------------------------
+# Reuses region_dir, active_ids, iv_lines and abs0 from the sections above: the
+# point of this section is to prove the telemetry describes the SAME run the
+# AUDIT lines describe, so it must not re-derive either side.
+tel_cols <- c(
+  "scenario", "region", "year", "intervention_id", "rank", "type", "zone",
+  "mask", "target_class", "n_target", "n_changed", "mean_before", "mean_after",
+  "sd_before", "sd_after", "p05_delta", "p25_delta", "p50_delta", "p75_delta",
+  "p95_delta", "min_delta", "max_delta", "sum_abs_delta", "prob_mass_before",
+  "prob_mass_after"
+)
+tel_path <- file.path(
+  region_dir,
+  sprintf("intervention_prob_deltas_%s_%s_%d.csv", scenario, region, year)
+)
+# Same extraction style as seen_ids above: the key appears once per AUDIT line
+# and no value contains a space.
+audit_field <- function(lines, key) {
+  pat <- sprintf("^.* %s=([^ ]*).*$", key)
+  out <- rep(NA_character_, length(lines))
+  hit <- grepl(pat, lines)
+  out[hit] <- sub(pat, "\\1", lines[hit])
+  out
+}
+tel_errs0 <- length(errors)
+telemetry_rows <- 0L
+if (n_active == 0L) {
+  cat("Info: no active Allocation interventions; telemetry CSV not asserted\n")
+} else if (!file.exists(tel_path)) {
+  fail(sprintf("telemetry CSV missing: %s", tel_path))
+} else {
+  tel <- tryCatch(
+    utils::read.csv(tel_path, check.names = FALSE, stringsAsFactors = FALSE),
+    error = function(e) {
+      fail(sprintf("cannot read telemetry CSV %s: %s", tel_path, conditionMessage(e)))
+      NULL
+    }
+  )
+  if (!is.null(tel) && !identical(names(tel), tel_cols)) {
+    fail(sprintf(
+      "telemetry CSV %s violates the 25-column contract: expected [%s], found [%s]",
+      basename(tel_path), paste(tel_cols, collapse = ","),
+      paste(names(tel), collapse = ",")
+    ))
+    tel <- NULL
+  }
+  if (!is.null(tel)) {
+    telemetry_rows <- nrow(tel)
+    tel_ids <- unique(as.character(tel[["intervention_id"]]))
+    if (!setequal(tel_ids, active_ids)) {
+      fail(sprintf(
+        "telemetry intervention ids {%s} differ from active ids {%s}",
+        paste(sort(tel_ids), collapse = ","), paste(sort(active_ids), collapse = ",")
+      ))
+    }
+    a_id <- audit_field(iv_lines, "id")
+    a_type <- audit_field(iv_lines, "type")
+    a_to <- audit_field(iv_lines, "to_vals")
+    a_rows_target <- suppressWarnings(as.numeric(audit_field(iv_lines, "rows_target")))
+    a_rows_changed <- suppressWarnings(as.numeric(audit_field(iv_lines, "rows_changed")))
+    a_sum_abs <- suppressWarnings(as.numeric(audit_field(iv_lines, "sum_abs_delta")))
+    close_enough <- function(a, b) abs(a - b) <= 1e-5 * max(1, abs(a), abs(b))
+    for (j in seq_along(a_id)) {
+      idj <- a_id[[j]]
+      rows_j <- which(as.character(tel[["intervention_id"]]) == idj)
+      if (length(rows_j) == 0L) {
+        fail(sprintf("telemetry CSV has no rows for AUDIT intervention id=%s", idj))
+        next
+      }
+      want <- suppressWarnings(as.integer(
+        strsplit(as.character(a_to[[j]]), ",", fixed = TRUE)[[1]]
+      ))
+      got <- suppressWarnings(as.integer(tel[["target_class"]][rows_j]))
+      if (!setequal(want, got)) {
+        fail(sprintf(
+          "%s: telemetry target_class {%s} differs from AUDIT to_vals {%s}",
+          idj, paste(sort(got), collapse = ","), paste(sort(want), collapse = ",")
+        ))
+      }
+      if (anyDuplicated(got) > 0L) {
+        fail(sprintf(
+          "%s: telemetry has duplicate (intervention_id, target_class) rows", idj
+        ))
+      }
+      n_tgt <- sum(suppressWarnings(as.numeric(tel[["n_target"]][rows_j])), na.rm = TRUE)
+      n_chg <- sum(suppressWarnings(as.numeric(tel[["n_changed"]][rows_j])), na.rm = TRUE)
+      s_abs <- sum(suppressWarnings(as.numeric(tel[["sum_abs_delta"]][rows_j])), na.rm = TRUE)
+      if (is.finite(a_rows_changed[[j]]) && n_chg != a_rows_changed[[j]]) {
+        fail(sprintf(
+          "%s: telemetry sum(n_changed)=%g differs from AUDIT rows_changed=%g",
+          idj, n_chg, a_rows_changed[[j]]
+        ))
+      }
+      if (is.finite(a_sum_abs[[j]]) && !close_enough(s_abs, a_sum_abs[[j]])) {
+        fail(sprintf(
+          "%s: telemetry sum(sum_abs_delta)=%g differs from AUDIT sum_abs_delta=%g",
+          idj, s_abs, a_sum_abs[[j]]
+        ))
+      }
+      # Absolute only: relative_prob_adjust() increments rows_target BEFORE its
+      # three `next` paths, so a skipped class contributes to the AUDIT
+      # rows_target while its stats row correctly reports n_target = 0. Both
+      # numbers are correct under their own definitions (05-13), so equality
+      # here would be a false alarm on every Relative intervention.
+      if (identical(a_type[[j]], "Absolute") &&
+            is.finite(a_rows_target[[j]]) && n_tgt != a_rows_target[[j]]) {
+        fail(sprintf(
+          "%s: telemetry sum(n_target)=%g differs from AUDIT rows_target=%g",
+          idj, n_tgt, a_rows_target[[j]]
+        ))
+      }
+    }
+    # D-22: an Absolute Prob_adjust_value 0 intervention must have driven every
+    # target class it actually touched to exactly 0.
+    for (x in abs0) {
+      idx <- as.character(x[["Intervention_ID"]])
+      n_t <- suppressWarnings(as.numeric(tel[["n_target"]]))
+      rows_x <- which(as.character(tel[["intervention_id"]]) == idx &
+                        !is.na(n_t) & n_t > 0)
+      for (rr in rows_x) {
+        ma <- suppressWarnings(as.numeric(tel[["mean_after"]][rr]))
+        if (!is.finite(ma) || abs(ma) > 1e-12) {
+          fail(sprintf(
+            "%s: telemetry mean_after=%s for target_class=%s (expected 0 for Absolute Prob_adjust_value 0)",
+            idx, as.character(tel[["mean_after"]][rr]),
+            as.character(tel[["target_class"]][rr])
+          ))
+        }
+      }
+    }
+    if (length(errors) == tel_errs0) {
+      cat(sprintf(
+        "telemetry: %d rows, %d interventions, %d classes [ok]\n",
+        nrow(tel), length(tel_ids), length(unique(tel[["target_class"]]))
+      ))
+    }
+  }
+}
+cat("\n")
+
 # (d) Forbidden markers -------------------------------------------------------
 forbidden <- c(
   # Generic R crash signatures. The length-zero message below is the EXACT
@@ -439,7 +596,7 @@ if (length(errors) > 0L) {
   quit(status = 1)
 }
 cat(sprintf(
-  "PASS verify_intervention_smoke scenario=%s region=%s year=%d interventions=%d maps_checked=%d\n",
-  scenario, region, year, n_active, maps_checked
+  "PASS verify_intervention_smoke scenario=%s region=%s year=%d interventions=%d maps_checked=%d telemetry_rows=%d\n",
+  scenario, region, year, n_active, maps_checked, telemetry_rows
 ))
 quit(status = 0)
