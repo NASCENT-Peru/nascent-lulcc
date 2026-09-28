@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 05-06-PLAN.md (main merge pending: PR #2)"
-last_updated: "2026-09-23T10:46:15.828Z"
-last_activity: 2026-09-23 -- Phase 05 execution started
+stopped_at: "Completed 05-11-PLAN.md (wave 3 of 7 merged; next: 05-12)"
+last_updated: "2026-09-28T09:40:00.000Z"
+last_activity: 2026-09-28 -- Phase 05 wave 3 complete (05-10, 05-11)
 progress:
   total_phases: 12
   completed_phases: 9
   total_plans: 52
-  completed_plans: 41
+  completed_plans: 43
   percent: 75
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 ## Current Position
 
 Phase: 05 (integrate-spatial-interventions-branch-and-stage-interventio) — EXECUTING
-Plan: 1 of 16
+Plan: 11 of 16
 Status: Executing Phase 05
-Last activity: 2026-09-23 -- Phase 05 execution started
+Last activity: 2026-09-28 -- Phase 05 wave 3 complete (05-10, 05-11)
 
 ### Roadmap Evolution
 
@@ -78,6 +78,8 @@ Progress: [██████████] 98%
 | Phase 05 P04 | 20min | 2 tasks | 3 files |
 | Phase 05 P05 | 35min | 3 tasks | 6 files |
 | Phase 05 P06 | ~2h | 3 tasks | 0 files |
+| Phase 05 P10 | ~6 min | 2 tasks | 3 files |
+| Phase 05 P11 | ~40 min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -119,6 +121,12 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-06: intervention allocation is a highmem-only workload (MaxRSS 95.7 GB on job 838021 vs the 93 GB compute limit)
 - [Phase 05]: 05-06: .env must be sourced in the submitting shell before sbatch; --export=ALL alone exports an unconfigured environment (job 838019 died in 2s on the Stage 7 path contract)
 - [Phase 05]: 05-06: HPC mask integrity accepted via the validator's compareGeom/value checks on all 14 masks; a separate sha256sum -c result was not reported back
+
+- [Phase 05]: 05-10: pre-flight error lines keep the `intervention mask: ` / `intervention config: ` prefix (with colon) that D-14 established, so they differ deliberately from 05-09's runtime stop() strings; the geometry line also omits the runtime's trailing `; cell-number lookup would be silently wrong` because no lookup has been attempted at pre-flight time
+- [Phase 05]: 05-10: WR-04 implemented as two sibling `if`s keyed on interventions_configured / engine_loaded rather than the review's nested `else` — identical behaviour, guard-only diff, no whole-block reflow
+- [Phase 05]: 05-11: engine still never renormalises — the two table-wide clamps were replaced by seven per-index-set clamps (1 absolute + 6 relative), so no pass rewrites rows outside its own declared target class and zone
+- [Phase 05]: 05-11 CHANGES NUMERICAL BEHAVIOUR: tied-percentile interventions go from rows_changed=0 to positive and exact-zero-difference interventions now apply Prob_adjust_threshold. 05-16's operator smoke re-run MUST be judged against the new semantics, NOT diffed against job 838021. AUDIT field set/order unchanged, so verify_intervention_smoke.r's parser needs no change — only the expected values move.
+- [Phase 05]: Wave 3 executors were killed mid-task by a transient API auth error and were RESUMED in place via SendMessage, not re-dispatched — both worktrees held uncommitted work (130 lines in allocation.r, 25 in the engine) that a fresh agent would have discarded
 
 ### Pending Todos
 

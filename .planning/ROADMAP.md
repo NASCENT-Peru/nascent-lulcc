@@ -323,8 +323,8 @@ Plans:
 - [x] 05-09-PLAN.md - Runtime mask geometry validation (compareGeom/nlyr/cell-range), degenerate cell_index guards, TOCTOU wrap, mtime-aware LUT cache (CR-02, WR-10, IN-03, IN-07).
 
 **Wave 7** *(parallel - no files_modified overlap)*
-- [ ] 05-10-PLAN.md - Stage 7 pre-flight fails closed, checks mask geometry, honours profile_timestep_index (CR-02, WR-04, WR-05).
-- [ ] 05-11-PLAN.md - Relative-adjustment semantics: >= percentile alignment, Perc_diff == 0 threshold, scoped clamps, honest threshold/valency logs (WR-01, WR-02, WR-03, IN-04).
+- [x] 05-10-PLAN.md - Stage 7 pre-flight fails closed, checks mask geometry, honours profile_timestep_index (CR-02, WR-04, WR-05).
+- [x] 05-11-PLAN.md - Relative-adjustment semantics: >= percentile alignment, Perc_diff == 0 threshold, scoped clamps, honest threshold/valency logs (WR-01, WR-02, WR-03, IN-04).
 
 **Wave 8**
 - [ ] 05-12-PLAN.md - Per-target-class delta statistics from both adjusters and eight appended AUDIT fields (D-18, D-19, D-20).
