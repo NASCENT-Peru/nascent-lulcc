@@ -337,6 +337,117 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
   sum((na_b != na_a) | (!na_b & !na_a & before != after))
 }
 
+# The 19-column per-target-class statistics contract (D-18), in its
+# "this class was never adjusted" shape. Every element of Target_classes
+# contributes exactly one row, including the classes an adjuster skips, so the
+# stats table always lines up 1:1 with Target_classes and a downstream consumer
+# can tell "no rows" apart from "rows that did not move".
+.delta_stats_skipped <- function(target_class) {
+  out <- data.frame(
+    target_class = as.integer(target_class),
+    n_target = 0L,
+    n_changed = 0L,
+    mean_before = NA_real_,
+    mean_after = NA_real_,
+    sd_before = NA_real_,
+    sd_after = NA_real_,
+    p05_delta = NA_real_,
+    p25_delta = NA_real_,
+    p50_delta = NA_real_,
+    p75_delta = NA_real_,
+    p95_delta = NA_real_,
+    min_delta = NA_real_,
+    max_delta = NA_real_,
+    sum_abs_delta = 0,
+    prob_mass_before = NA_real_,
+    prob_mass_after = NA_real_,
+    n_inc = 0L,
+    n_dec = 0L,
+    stringsAsFactors = FALSE
+  )
+  attr(out, "delta") <- numeric(0)
+  out
+}
+
+# Per-target-class probability-change statistics for ONE intervention (D-18).
+#
+# `before` and `after` are the probability values of the rows this intervention
+# targeted (`Target_area_idx` for Absolute, `sub_idx` for Relative — the same
+# index sets rows_target counts), sampled immediately before and immediately
+# after that single intervention's adjustment. Interventions are sequential, so
+# a later intervention's `before` is the earlier one's output (D-19).
+#
+# D-20: the only memory this holds is the three length(rows_target) vectors
+# `before`, `after` and `d`. It never sees, and must never be given, a copy of
+# the probability table. The class's delta vector is returned as
+# `attr(<row>, "delta")` so the caller can pool it for the intervention-level
+# AUDIT roll-up without recomputing it from a second snapshot.
+#
+# `n_changed` is a lazily-defaulted argument: callers that already computed
+# `.count_prob_changes(before, after)` for their rows_changed accumulator pass
+# it in, so the comparison runs once per class rather than twice.
+.delta_stats <- function(
+  target_class, before, after,
+  n_changed = .count_prob_changes(before, after)
+) {
+  ok <- !is.na(before) & !is.na(after)
+  d <- after[ok] - before[ok]
+  if (length(d) == 0L) return(.delta_stats_skipped(target_class))
+  q <- stats::quantile(
+    d, c(0.05, 0.25, 0.5, 0.75, 0.95), names = FALSE, na.rm = TRUE
+  )
+  out <- data.frame(
+    target_class = as.integer(target_class),
+    n_target = length(before),
+    n_changed = as.integer(n_changed),
+    mean_before = mean(before, na.rm = TRUE),
+    mean_after = mean(after, na.rm = TRUE),
+    sd_before = stats::sd(before, na.rm = TRUE),
+    sd_after = stats::sd(after, na.rm = TRUE),
+    p05_delta = q[[1L]],
+    p25_delta = q[[2L]],
+    p50_delta = q[[3L]],
+    p75_delta = q[[4L]],
+    p95_delta = q[[5L]],
+    min_delta = min(d),
+    max_delta = max(d),
+    sum_abs_delta = sum(abs(d)),
+    prob_mass_before = sum(before, na.rm = TRUE),
+    prob_mass_after = sum(after, na.rm = TRUE),
+    n_inc = sum(d > 0),
+    n_dec = sum(d < 0),
+    stringsAsFactors = FALSE
+  )
+  attr(out, "delta") <- d
+  out
+}
+
+# Bind the per-class rows into the stats table an adjuster returns, pooling the
+# per-class delta vectors onto `attr(., "delta")` exactly once (D-20: one
+# unlist, no per-class growing vector).
+.bind_delta_stats <- function(stats_rows, delta_parts) {
+  out <- do.call(rbind, stats_rows)
+  rownames(out) <- NULL
+  pooled <- unlist(delta_parts, use.names = FALSE)
+  if (is.null(pooled)) pooled <- numeric(0)
+  attr(out, "delta") <- pooled
+  out
+}
+
+# Render one numeric AUDIT field. Every appended field must stay a single
+# whitespace-delimited token or the shipped log parsers break, so a non-finite
+# statistic is written as the literal NA and formatC()'s "g" format is used
+# (no thousands separator, no embedded space).
+#
+# `width = 1L` is NOT cosmetic: formatC() defaults `width` to `digits` for the
+# "g" format, so the default would render -0.4 as "   -0.4" and split one field
+# into four tokens. trimws() is kept as a second guard so the invariant holds
+# whatever a future formatC()/locale does.
+.fmt_num <- function(v) {
+  if (length(v) != 1L || !is.finite(v)) return("NA")
+  trimws(formatC(v, format = "g", digits = 6, width = 1L))
+}
+
 #' @title Implement Spatial Interventions on per-transition Probabilities
 #' @description
 #' Implement all Allocation-stage spatial interventions whose
@@ -355,6 +466,33 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
 #' AUDIT line to `log_file` (D-15). Probabilities
 #' are NOT renormalised; the number of cells whose summed probability exceeds 1
 #' is only logged (`cells_sum_gt1`).
+#'
+#' @section Intervention AUDIT line contract:
+#' The per-intervention line is
+#' \preformatted{
+#' AUDIT stage=intervention region=<r> scenario=<s> year=<y> id=<id> rank=<n>
+#'   type=<t> zone=<z> to_vals=<v,..> mask=<f> rows_target=<n> rows_changed=<n>
+#'   delta_mean=<x> delta_med=<x> delta_sd=<x> delta_min=<x> delta_max=<x>
+#'   n_inc=<n> n_dec=<n> sum_abs_delta=<x>
+#' }
+#' written on one physical line. The fields up to and including `rows_changed`
+#' are FROZEN: `scripts/verify_intervention_smoke.r` parses them by fixed
+#' string and by `sub("^.* id=([^ ]+) .*$", ...)`, so they must never be
+#' reordered, renamed or removed. The eight `delta_*` / `n_inc` / `n_dec` /
+#' `sum_abs_delta` fields (D-18) are ADDITIVE and are appended at the end;
+#' any future telemetry is appended the same way.
+#'
+#' The eight appended fields describe the distribution of the probability
+#' change THIS intervention made, pooled across its target classes, over the
+#' rows it targeted (`Target_area_idx` for Absolute, `sub_idx` for Relative —
+#' the same index sets `rows_target` counts) against the values immediately
+#' before it ran. Interventions are applied in rank order, so a later
+#' intervention's "before" is the earlier one's output (D-19). Every numeric
+#' field is rendered by [.fmt_num()], which emits the literal `NA` for a
+#' non-finite value and never emits a space, so each field stays a single
+#' whitespace-delimited token. When every target class was skipped the five
+#' `delta_*` fields are `NA` and `n_inc`, `n_dec` and `sum_abs_delta` are `0`.
+#' `AUDIT stage=intervention_summary` remains the unchanged whole-call roll-up.
 #' @param normalized data.table with columns row_idx, from_val, to_val,
 #'   cell_id (region), prob. Modified in place by reference. The engine never
 #'   reads `x`/`y`: mask membership is looked up by national cell number
@@ -602,9 +740,36 @@ implement_spatial_interventions <- function(
     normalized <- res$normalized
     n_applied <- n_applied + 1L
 
+    # D-18: roll the per-target-class statistics up to one intervention-level
+    # record. The pooled delta vector rides on attr(res$stats, "delta") — it is
+    # the concatenation of the per-class deltas the adjuster already computed,
+    # so nothing is recomputed and nothing beyond O(rows_target) doubles is
+    # held; it is dropped as soon as the line is written (D-20).
+    iv_stats <- res$stats
+    d_pool <- attr(iv_stats, "delta")
+    if (is.null(d_pool)) d_pool <- numeric(0)
+    if (length(d_pool) == 0L) {
+      # Every target class was skipped: there is no distribution to describe.
+      d_mean <- NA_real_
+      d_med <- NA_real_
+      d_sd <- NA_real_
+      d_min <- NA_real_
+      d_max <- NA_real_
+    } else {
+      d_mean <- mean(d_pool)
+      d_med <- stats::median(d_pool)
+      d_sd <- stats::sd(d_pool)
+      d_min <- min(d_pool)
+      d_max <- max(d_pool)
+    }
+    n_inc_k <- as.integer(sum(iv_stats$n_inc))
+    n_dec_k <- as.integer(sum(iv_stats$n_dec))
+    sum_abs_k <- sum(iv_stats$sum_abs_delta)
+    rm(d_pool)
+
     log_msg(
       sprintf(
-        "AUDIT stage=intervention region=%s scenario=%s year=%d id=%s rank=%s type=%s zone=%s to_vals=%s mask=%s rows_target=%d rows_changed=%d",
+        "AUDIT stage=intervention region=%s scenario=%s year=%d id=%s rank=%s type=%s zone=%s to_vals=%s mask=%s rows_target=%d rows_changed=%d delta_mean=%s delta_med=%s delta_sd=%s delta_min=%s delta_max=%s n_inc=%d n_dec=%d sum_abs_delta=%s",
         region_label,
         scenario,
         year,
@@ -615,10 +780,22 @@ implement_spatial_interventions <- function(
         paste(Target_classes, collapse = ","),
         mask_name,
         as.integer(res$rows_target),
-        as.integer(res$rows_changed)
+        as.integer(res$rows_changed),
+        .fmt_num(d_mean),
+        .fmt_num(d_med),
+        .fmt_num(d_sd),
+        .fmt_num(d_min),
+        .fmt_num(d_max),
+        n_inc_k,
+        n_dec_k,
+        .fmt_num(sum_abs_k)
       ),
       log_file
     )
+    # The per-class table is the only telemetry that outlives the line, and it
+    # is one small row per target class. Drop the pooled delta with it.
+    attr(iv_stats, "delta") <- NULL
+    rm(iv_stats)
   } # end of intervention loop
 
   write_summary(n_applied)
@@ -641,8 +818,12 @@ implement_spatial_interventions <- function(
 #' @param inside_lut Logical vector indexed by region cell_id (TRUE = inside
 #'   the mask), from [.mask_inside_lut()].
 #' @param log_file Optional per-region log file for log_msg(...).
-#' @return list(normalized, rows_target, rows_changed): rows_target counts the
-#'   rows in the target zone, rows_changed those whose prob changed.
+#' @return list(normalized, rows_target, rows_changed, stats): rows_target
+#'   counts the rows in the target zone, rows_changed those whose prob changed.
+#'   `stats` is the 19-column per-target-class delta table from
+#'   [.delta_stats()] with exactly `length(Target_classes)` rows in
+#'   `Target_classes` order (skipped classes included), carrying the pooled
+#'   delta vector on `attr(stats, "delta")` (D-18, D-19).
 absolute_prob_adjust <- function(
   normalized,
   Prob_adjust_zone,
@@ -657,9 +838,19 @@ absolute_prob_adjust <- function(
   }
   rows_target <- 0L
   rows_changed <- 0L
+  # D-18: one statistics row and one delta vector slot per target class,
+  # allocated up front so the table always lines up 1:1 with Target_classes.
+  stats_rows <- vector("list", length(Target_classes))
+  delta_parts <- vector("list", length(Target_classes))
 
   # loop over the target classes
-  for (lulc_class in Target_classes) {
+  for (i in seq_along(Target_classes)) {
+    lulc_class <- Target_classes[[i]]
+    # Seeded with the skipped-class shape before any `next` can fire, so a
+    # class with no rows still contributes its row (D-18).
+    stats_rows[[i]] <- .delta_stats_skipped(lulc_class)
+    delta_parts[[i]] <- numeric(0)
+
     log_msg(
       paste(
         "Adjusting pixels values of class:", lulc_class, ",",
@@ -699,12 +890,29 @@ absolute_prob_adjust <- function(
     # NA rows stay NA exactly as the old `!is.na(prob)` guard intended.
     normalized[ix, prob := pmin(pmax(prob, 0), 1)]
 
+    # D-19/D-20: read the post-adjustment values of the targeted rows ONCE and
+    # reuse that one vector for both the delta statistics and the rows_changed
+    # accounting, instead of indexing the table a second time. Peak extra
+    # memory for this class is the three length(Target_area_idx) vectors
+    # `before`, `after` and the delta - never a copy of the table.
+    after <- normalized$prob[Target_area_idx]
+    n_changed_k <- .count_prob_changes(before, after)
+    st <- .delta_stats(lulc_class, before, after, n_changed_k)
+    rm(after)
+    delta_parts[[i]] <- attr(st, "delta")
+    attr(st, "delta") <- NULL
+    stats_rows[[i]] <- st
+
     rows_target <- rows_target + length(Target_area_idx)
-    rows_changed <- rows_changed +
-      .count_prob_changes(before, normalized$prob[Target_area_idx])
+    rows_changed <- rows_changed + n_changed_k
   }
 
-  list(normalized = normalized, rows_target = rows_target, rows_changed = rows_changed)
+  list(
+    normalized = normalized,
+    rows_target = rows_target,
+    rows_changed = rows_changed,
+    stats = .bind_delta_stats(stats_rows, delta_parts)
+  )
 }
 
 #' @title Perform relative probability adjustment for target land use classes
@@ -727,9 +935,12 @@ absolute_prob_adjust <- function(
 #' @param normalized A long-format data.table with columns to_val, from_val,
 #'   cell_id, prob. Modified by reference.
 #' @param log_file Optional per-region log file for log_msg(...).
-#' @return list(normalized, rows_target, rows_changed): rows_target counts the
-#'   rows of the target classes (both zones), rows_changed those whose prob
-#'   changed.
+#' @return list(normalized, rows_target, rows_changed, stats): rows_target
+#'   counts the rows of the target classes (both zones), rows_changed those
+#'   whose prob changed. `stats` is the 19-column per-target-class delta table
+#'   from [.delta_stats()] with exactly `length(Target_classes)` rows in
+#'   `Target_classes` order (all three skip paths included), carrying the
+#'   pooled delta vector on `attr(stats, "delta")` (D-18, D-19).
 relative_prob_adjust <- function(
   Prob_adjust_valency,
   Prob_adjust_intervention_percentile,
@@ -760,6 +971,10 @@ relative_prob_adjust <- function(
 
   rows_target <- 0L
   rows_changed <- 0L
+  # D-18: one statistics row and one delta vector slot per target class,
+  # allocated up front so the table always lines up 1:1 with Target_classes.
+  stats_rows <- vector("list", length(Target_classes))
+  delta_parts <- vector("list", length(Target_classes))
 
   threshold_msg <- function(lulc_class, value) {
     log_msg(
@@ -784,7 +999,14 @@ relative_prob_adjust <- function(
   }
 
   # loop over the target classes
-  for (lulc_class in Target_classes) {
+  for (i in seq_along(Target_classes)) {
+    lulc_class <- Target_classes[[i]]
+    # D-18: seeded with the skipped-class shape before any of this loop's three
+    # `next` paths (no rows, one empty zone, NaN guard) can fire, so every
+    # target class contributes exactly one statistics row.
+    stats_rows[[i]] <- .delta_stats_skipped(lulc_class)
+    delta_parts[[i]] <- numeric(0)
+
     # Subset to rows of this target class (and from-filter if applicable)
     hit <- normalized$to_val == lulc_class
     if (!is.null(From_filter_vals)) {
@@ -985,8 +1207,26 @@ relative_prob_adjust <- function(
       normalized[ix, prob := pmin(pmax(prob, 0), 1)]
     }
 
-    rows_changed <- rows_changed + .count_prob_changes(before, normalized$prob[sub_idx])
+    # D-19/D-20: one read of the post-adjustment values of the targeted rows,
+    # reused for both the delta statistics and rows_changed. `before` was taken
+    # over the same `sub_idx` set immediately before this intervention's
+    # adjustment, so the delta describes this intervention alone; a later
+    # intervention's `before` is this one's output.
+    after <- normalized$prob[sub_idx]
+    n_changed_k <- .count_prob_changes(before, after)
+    st <- .delta_stats(lulc_class, before, after, n_changed_k)
+    rm(after)
+    delta_parts[[i]] <- attr(st, "delta")
+    attr(st, "delta") <- NULL
+    stats_rows[[i]] <- st
+
+    rows_changed <- rows_changed + n_changed_k
   }
 
-  list(normalized = normalized, rows_target = rows_target, rows_changed = rows_changed)
+  list(
+    normalized = normalized,
+    rows_target = rows_target,
+    rows_changed = rows_changed,
+    stats = .bind_delta_stats(stats_rows, delta_parts)
+  )
 }
