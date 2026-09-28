@@ -692,10 +692,12 @@ absolute_prob_adjust <- function(
     ix <- Target_area_idx[!is.na(before) & before > 0]
     normalized[ix, prob := Prob_adjust_value]
 
-    # set any values that are greater than 1 to 1
-    normalized[prob > 1, prob := 1]
-    # set any values that are less than 0 to 0 excluding NAs
-    normalized[!is.na(prob) & prob < 0, prob := 0]
+    # WR-02: clamp ONLY the rows this intervention just wrote. The previous
+    # table-wide clamp reached rows of every other transition, in both zones,
+    # uncounted by rows_changed. Clamping must never touch a row outside the
+    # intervention's declared target class and zone. pmin/pmax propagate NA, so
+    # NA rows stay NA exactly as the old `!is.na(prob)` guard intended.
+    normalized[ix, prob := pmin(pmax(prob, 0), 1)]
 
     rows_target <- rows_target + length(Target_area_idx)
     rows_changed <- rows_changed +
@@ -903,6 +905,9 @@ relative_prob_adjust <- function(
         # strict `>` the mean was taken over rows that were then never adjusted.
         ix <- Intervention_idx[Intervention_vals >= Intervention_ptile_val]
         normalized[ix, prob := prob + (prob / 100) * Perc_diff]
+        # WR-02: clamp only the rows just written, never rows outside this
+        # intervention's declared target class and zone.
+        normalized[ix, prob := pmin(pmax(prob, 0), 1)]
       } else if (Perc_diff < 0) {
         if (abs(Perc_diff) < Prob_adjust_threshold) {
           # WR-03: log the signed value actually assigned on the next line.
@@ -915,6 +920,9 @@ relative_prob_adjust <- function(
           Non_Intervention_vals >= Non_intervention_ptile_val
         ]
         normalized[ix, prob := prob + (prob / 100) * Perc_diff]
+        # WR-02: clamp only the rows just written, never rows outside this
+        # intervention's declared target class and zone.
+        normalized[ix, prob := pmin(pmax(prob, 0), 1)]
       }
     } else if (Prob_adjust_valency == "Decrease") {
       # Goal: decrease the probability of change for the target class in the
@@ -931,6 +939,9 @@ relative_prob_adjust <- function(
         # (WR-01(a): `>=`, mirroring Intervention_ptile_mean).
         ix <- Intervention_idx[Intervention_vals >= Intervention_ptile_val]
         normalized[ix, prob := prob + (prob / 100) * -(Perc_diff)]
+        # WR-02: clamp only the rows just written, never rows outside this
+        # intervention's declared target class and zone.
+        normalized[ix, prob := pmin(pmax(prob, 0), 1)]
       } else if (Perc_diff < 0) {
         if (abs(Perc_diff) < Prob_adjust_threshold) {
           # WR-03: the assignment below is -(Prob_adjust_threshold); log that.
@@ -943,6 +954,9 @@ relative_prob_adjust <- function(
           Non_Intervention_vals >= Non_intervention_ptile_val
         ]
         normalized[ix, prob := prob + (prob / 100) * abs(Perc_diff)]
+        # WR-02: clamp only the rows just written, never rows outside this
+        # intervention's declared target class and zone.
+        normalized[ix, prob := pmin(pmax(prob, 0), 1)]
       }
     } else if (Prob_adjust_valency == "Increase_inside_decrease_outside") {
       # Simultaneously increase the probability in the intervention area and
@@ -957,18 +971,19 @@ relative_prob_adjust <- function(
       # the intervention area (WR-01(a): `>=`, mirroring the percentile mean).
       ix <- Intervention_idx[Intervention_vals >= Intervention_ptile_val]
       normalized[ix, prob := prob + (prob / 100) * abs(Perc_diff)]
+      # WR-02: clamp only the rows just written, never rows outside this
+      # intervention's declared target class and zone.
+      normalized[ix, prob := pmin(pmax(prob, 0), 1)]
 
       # Decrease the probability of instances above the specified percentile in the non-intervention area
       ix <- Non_intervention_idx[
         Non_Intervention_vals >= Non_intervention_ptile_val
       ]
       normalized[ix, prob := prob + (prob / 100) * -(abs(Perc_diff))]
+      # WR-02: this valency writes two index sets, so it clamps twice; neither
+      # clamp may reach a row outside the declared target class and zone.
+      normalized[ix, prob := pmin(pmax(prob, 0), 1)]
     }
-
-    # set any values in prob that are greater than 1 to 1
-    normalized[prob > 1, prob := 1]
-    # set any values in prob that are less than 0 to 0 excluding NAs
-    normalized[!is.na(prob) & prob < 0, prob := 0]
 
     rows_changed <- rows_changed + .count_prob_changes(before, normalized$prob[sub_idx])
   }
