@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 05-11-PLAN.md (wave 3 of 7 merged; next: 05-12)"
+stopped_at: "Completed 05-12-PLAN.md (wave 4 of 7 merged; next: 05-13)"
 last_updated: "2026-09-28T09:40:00.000Z"
-last_activity: 2026-09-28 -- Phase 05 wave 3 complete (05-10, 05-11)
+last_activity: 2026-09-28 -- Phase 05 wave 4 complete (05-12)
 progress:
   total_phases: 12
   completed_phases: 9
   total_plans: 52
-  completed_plans: 43
+  completed_plans: 44
   percent: 75
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 ## Current Position
 
 Phase: 05 (integrate-spatial-interventions-branch-and-stage-interventio) — EXECUTING
-Plan: 11 of 16
+Plan: 12 of 16
 Status: Executing Phase 05
-Last activity: 2026-09-28 -- Phase 05 wave 3 complete (05-10, 05-11)
+Last activity: 2026-09-28 -- Phase 05 wave 4 complete (05-12)
 
 ### Roadmap Evolution
 
@@ -80,6 +80,7 @@ Progress: [██████████] 98%
 | Phase 05 P06 | ~2h | 3 tasks | 0 files |
 | Phase 05 P10 | ~6 min | 2 tasks | 3 files |
 | Phase 05 P11 | ~40 min | 3 tasks | 3 files |
+| Phase 05 P12 | ~35 min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -127,6 +128,10 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-11: engine still never renormalises — the two table-wide clamps were replaced by seven per-index-set clamps (1 absolute + 6 relative), so no pass rewrites rows outside its own declared target class and zone
 - [Phase 05]: 05-11 CHANGES NUMERICAL BEHAVIOUR: tied-percentile interventions go from rows_changed=0 to positive and exact-zero-difference interventions now apply Prob_adjust_threshold. 05-16's operator smoke re-run MUST be judged against the new semantics, NOT diffed against job 838021. AUDIT field set/order unchanged, so verify_intervention_smoke.r's parser needs no change — only the expected values move.
 - [Phase 05]: Wave 3 executors were killed mid-task by a transient API auth error and were RESUMED in place via SendMessage, not re-dispatched — both worktrees held uncommitted work (130 lines in allocation.r, 25 in the engine) that a fresh agent would have discarded
+
+- [Phase 05]: 05-12: AUDIT line extended APPEND-ONLY from 13 to 21 tokens (delta_mean/med/sd/min/max, n_inc, n_dec, sum_abs_delta). Verified: the shipped verify_intervention_smoke.r parser extracts id and rows_changed identically from old and extended lines, so the verifier needs no parser change. Non-finite stats render as literal NA.
+- [Phase 05]: 05-12: plan's literal formatC(format="g") left-pads to `digits`, which exploded the AUDIT body to 41 tokens - threat T-05-46 materialising out of its own mitigation; fixed with trimws(formatC(..., width=1L))
+- [Phase 05]: 05-13 handoff: res$stats' 19 columns are a superset of the D-18 CSV per-class columns; the writer only needs to prepend scenario, region, year, intervention_id, rank, type, zone, mask
 
 ### Pending Todos
 
