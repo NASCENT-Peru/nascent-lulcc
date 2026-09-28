@@ -445,8 +445,20 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
       # has already narrowed scenario_names by ALLOCATION_PROFILE_SCENARIO.
       interventions_dir <- maybe("interventions_dir")
       mask_dir <- maybe("spat_prob_perturb_dir")
-      if (!is.null(interventions_dir) && !is.null(mask_dir) &&
-          exists("resolve_intervention_masks", mode = "function")) {
+      # WR-04: fail CLOSED. The engine check used to be a third && term on the
+      # condition below, so a caller that had not sourced
+      # src/implement_spatial_interventions.R got the whole intervention gate
+      # skipped and a PASS — the exact fail-open shape the rest of the phase
+      # removes. A missing mask file is fatal; a missing resolver must be too.
+      interventions_configured <- !is.null(interventions_dir) && !is.null(mask_dir)
+      engine_loaded <- exists("resolve_intervention_masks", mode = "function")
+      if (interventions_configured && !engine_loaded) {
+        intervention_errors <- c(
+          intervention_errors,
+          "intervention config: resolve_intervention_masks() not loaded - source src/implement_spatial_interventions.R"
+        )
+      }
+      if (interventions_configured && engine_loaded) {
         years <- utils::tail(
           as.integer(unlist(config[["simulation_year_steps"]])), -1L
         )
@@ -466,6 +478,37 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
             years <- years[years == year_post]
           }
         }
+        # WR-05: mirror the driver's profile_timestep_index narrowing
+        # (run_allocation_dinamica(), "Profile mode: restricting scenario ...").
+        # It is applied AFTER filter_allocation_timesteps() there, so it is
+        # applied after the ALLOCATION_YEAR_POST_FILTER mirror here. Without
+        # this the gate over-demands masks and rejects a legitimate
+        # single-timestep profile run on a partially staged mask directory.
+        pti <- config[["profile_timestep_index"]]
+        if (!is.null(pti) && length(years) > 0L) {
+          pti_int <- suppressWarnings(as.integer(pti))
+          if (length(pti_int) != 1L || is.na(pti_int) || pti_int < 1L) {
+            intervention_errors <- c(
+              intervention_errors,
+              "intervention config: profile_timestep_index must be a positive integer"
+            )
+            years <- integer(0)
+          } else if (pti_int > length(years)) {
+            intervention_errors <- c(
+              intervention_errors,
+              sprintf(
+                "intervention config: profile_timestep_index=%d is outside the valid range 1..%d",
+                pti_int, length(years)
+              )
+            )
+            years <- integer(0)
+          } else {
+            years <- years[pti_int]
+          }
+        }
+        # Every mask that DOES exist, deduplicated across scenarios, so the
+        # geometry pass below opens each file at most once (CR-02).
+        existing_masks <- character(0)
         if (length(years) > 0L) {
           for (scenario in as.character(unlist(config[["scenario_names"]]))) {
             resolved <- tryCatch(
@@ -489,6 +532,89 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
                   missing_rows$intervention_id, missing_rows$year
                 )
               )
+            }
+            existing_masks <- c(
+              existing_masks, as.character(resolved$mask_path[resolved$exists])
+            )
+          }
+        }
+
+        # CR-02 (pre-flight half): a mask that exists but is not on the
+        # reference grid is silently wrong at runtime, because the engine
+        # samples it with raw national cell numbers computed from
+        # config[["ref_grid_path"]]. .mask_inside_lut() now aborts on it, but
+        # only at the first intervention of the first region. Assert the same
+        # condition here, while it is a header read, so a mis-staged mask is
+        # rejected before any region work starts.
+        #
+        # D-13: terra::rast() reads the header only — no values, no resample,
+        # no reproject. A grid mismatch is a hard failure, never a repair.
+        existing_masks <- unique(existing_masks)
+        if (length(existing_masks) > 0L) {
+          ref_grid_path <- config[["ref_grid_path"]]
+          ref_grid_label <- if (is.character(ref_grid_path) &&
+                                length(ref_grid_path) == 1L &&
+                                nzchar(ref_grid_path)) {
+            ref_grid_path
+          } else {
+            "<config[[\"ref_grid_path\"]] unset>"
+          }
+          ref_grid <- NULL
+          if (is.character(ref_grid_path) && length(ref_grid_path) == 1L &&
+              nzchar(ref_grid_path) && file.exists(ref_grid_path)) {
+            ref_grid <- suppressWarnings(tryCatch(
+              terra::rast(ref_grid_path), error = function(e) NULL
+            ))
+          }
+          if (is.null(ref_grid)) {
+            # Never silently skip the geometry pass: an unverifiable grid is
+            # itself a gap the operator has to close.
+            intervention_errors <- c(
+              intervention_errors,
+              sprintf(
+                "intervention mask: cannot verify mask geometry, reference grid missing: %s",
+                ref_grid_label
+              )
+            )
+          } else {
+            for (mask_path in existing_masks) {
+              m <- suppressWarnings(tryCatch(
+                terra::rast(mask_path),
+                error = function(e) conditionMessage(e)
+              ))
+              if (is.character(m)) {
+                intervention_errors <- c(
+                  intervention_errors,
+                  sprintf("intervention mask: unreadable %s (%s)", mask_path, m)
+                )
+                next
+              }
+              # nlyr BEFORE compareGeom: compareGeom() ignores layer count, so
+              # a 2-band mask on the correct grid passes it (see 05-09).
+              n_layers <- as.integer(terra::nlyr(m))
+              if (!identical(n_layers, 1L)) {
+                intervention_errors <- c(
+                  intervention_errors,
+                  sprintf(
+                    "intervention mask: %s has %d layers (expected 1)",
+                    mask_path, n_layers
+                  )
+                )
+                next
+              }
+              geom_ok <- suppressWarnings(tryCatch(
+                isTRUE(terra::compareGeom(m, ref_grid, stopOnError = FALSE)),
+                error = function(e) FALSE
+              ))
+              if (!geom_ok) {
+                intervention_errors <- c(
+                  intervention_errors,
+                  sprintf(
+                    "intervention mask: %s is not on the reference grid (crs/res/extent mismatch)",
+                    mask_path
+                  )
+                )
+              }
             }
           }
         }
