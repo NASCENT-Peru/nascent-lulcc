@@ -1339,3 +1339,147 @@ test_that("D-18d: the filename is sanitised (T-05-47)", {
   expect_true(file.exists(file.path(tdir2, rel)))
 })
 
+# --------------------------------------------------------------------------
+# Phase 5 Plan 15 gap closure: the valency / zone combinations the four
+# shipped production configs actually use (05-REVIEW.md WR-08), and the
+# rejection guard that pairs with them.
+#
+# Enumerated from config/{BAU,NAT,CUL,SOC}_interventions.yml and
+# docs/spatial_interventions/parameter_provenance.md - NOT from review prose,
+# whose WR-11 text misattributes the `Outside` + `Prob_adjust_value: 0`
+# pairing. The 14 shipped Allocation entries use six distinct combinations:
+#
+#   type     | valency                          | zone    | covered by
+#   ---------+----------------------------------+---------+---------------------
+#   Absolute | n/a (value 0)                    | Inside  | "engine: Absolute=0 Inside with From filter ..."
+#   Absolute | n/a (value 0)                    | Outside | "engine: Absolute=0 Outside only changes outside rows"
+#   Relative | Decrease                         | Inside  | "engine: Relative Decrease lowers inside values ..."
+#   Relative | Increase                         | Inside  | "WR-01c: ... applies the threshold (Increase)"
+#   Relative | Decrease                         | Outside | WR-08b, below   <- was uncovered
+#   Relative | Increase_inside_decrease_outside | Inside  | WR-08, below    <- was uncovered
+#
+# Shipped users of the two formerly uncovered rows:
+#   NAT/SOC `Urban_densification`  -> Relative Increase_inside_decrease_outside, Inside
+#   CUL `Mining_outside_restraint` -> Relative Decrease, Outside (no Prob_adjust_value key)
+#
+# Expectations are written against the post-05-11 semantics (`>=` percentile
+# alignment, `Perc_diff >= 0` dispatch, per-index-set clamps).
+
+# `.norm()` for to_val 105: inside cells 1, 3, 5 hold 0.2, 0.4, 0.6 and
+# outside cells 2, 4, 6 hold 0.3, 0.5, 0.1. Under a 50th-percentile
+# Increase_inside_decrease_outside that means, by hand:
+#   Intervention_ptile_val  = quantile(c(.2,.4,.6), .5) = 0.4
+#   Intervention_ptile_mean = mean(.4, .6)              = 0.50
+#   Non_int_ptile_val       = quantile(c(.3,.5,.1), .5) = 0.3
+#   Non_int_ptile_mean      = mean(.3, .5)              = 0.40
+#   Perc_diff = (0.50 - 0.40) / 0.45 * 100 = 22.222 -> above the threshold of 5
+# so the inside rows at/above 0.4 (cells 3, 5) rise and the outside rows
+# at/above 0.3 (cells 2, 4) fall, in the SAME pass.
+test_that("WR-08: Relative Increase_inside_decrease_outside moves both zones (NAT/SOC Urban_densification)", {
+  fx <- .engine_fixture(
+    list(.rel_entry(valency = "Increase_inside_decrease_outside")),
+    scenario = "BOTHZONES"
+  )
+  dt <- .norm()
+  before <- copy(dt)
+  out <- .run_engine(fx, dt)
+
+  tgt <- out$to_val == 105L
+  rose <- tgt & out$cell_id %in% c(3L, 5L)
+  fell <- tgt & out$cell_id %in% c(2L, 4L)
+  expect_true(all(out$prob[rose] > before$prob[rose]))
+  expect_true(all(out$prob[fell] < before$prob[fell]))
+
+  # Below their respective percentiles, so untouched by either half.
+  untouched <- tgt & out$cell_id %in% c(1L, 6L)
+  expect_equal(out$prob[untouched], before$prob[untouched])
+  # A class this intervention does not declare is never written (WR-02).
+  expect_equal(out$prob[out$to_val == 104L], before$prob[before$to_val == 104L])
+
+  a <- .audit_lines(fx$log_file)
+  expect_length(a$iv, 1L)
+  expect_match(
+    a$iv, "id=iv_rel rank=1 type=Relative zone=Inside to_vals=105", fixed = TRUE
+  )
+  expect_identical(.audit_field(a$iv, "rows_target"), "6")
+  expect_identical(.audit_field(a$iv, "rows_changed"), "4")
+  expect_gt(as.integer(.audit_field(a$iv, "rows_changed")), 0L)
+  # The signature of this valency: one pass, both directions.
+  expect_identical(.audit_field(a$iv, "n_inc"), "2")
+  expect_identical(.audit_field(a$iv, "n_dec"), "2")
+
+  # The branch RAN. Neither the one-zone-empty skip nor the NaN guard fired,
+  # so this is not a vacuous "nothing happened and nothing changed" pass.
+  expect_false(any(grepl("intervention skip:", a$all, fixed = TRUE)))
+  expect_true(any(grepl(
+    "increasing the probability of the intervention pixels and decreasing the probability of the non-intervention pixels",
+    a$all,
+    fixed = TRUE
+  )))
+})
+
+# CUL `Mining_outside_restraint`: Relative / Decrease with the intervention
+# zone OUTSIDE the mask, which swaps Intervention_idx and Non_intervention_idx.
+# Fixture: outside 0.5, inside 0.2, so
+#   Intervention (outside) ptile mean = 0.50
+#   Non-intervention (inside) ptile mean = 0.20
+#   Perc_diff = (0.50 - 0.20) / 0.35 * 100 = 85.71 -> Decrease, Perc_diff >= 0
+# decreases the INTERVENTION (outside) rows. The same fixture with
+# zone = "Inside" would take the Perc_diff < 0 arm and RAISE those outside
+# rows instead, so the direction asserted here genuinely pins the swap rather
+# than merely observing that something moved.
+test_that("WR-08b: Relative zone=Outside swaps the intervention zone (CUL Mining_outside_restraint)", {
+  fx <- .engine_fixture(
+    list(.rel_entry(valency = "Decrease", zone = "Outside")),
+    scenario = "ZONESWAP"
+  )
+  dt <- .norm_split(inside = 0.2, outside = 0.5)
+  before <- copy(dt)
+  out <- .run_engine(fx, dt)
+
+  tgt <- out$to_val == 105L
+  outside <- tgt & out$cell_id %in% c(2L, 4L, 6L)
+  inside <- tgt & out$cell_id %in% c(1L, 3L, 5L)
+  expect_true(all(out$prob[outside] < before$prob[outside]))
+  expect_equal(out$prob[inside], before$prob[inside])
+  expect_equal(out$prob[out$to_val == 104L], before$prob[before$to_val == 104L])
+
+  a <- .audit_lines(fx$log_file)
+  expect_length(a$iv, 1L)
+  expect_match(
+    a$iv, "id=iv_rel rank=1 type=Relative zone=Outside to_vals=105", fixed = TRUE
+  )
+  expect_identical(.audit_field(a$iv, "rows_target"), "6")
+  expect_identical(.audit_field(a$iv, "rows_changed"), "3")
+  expect_identical(.audit_field(a$iv, "n_dec"), "3")
+  expect_identical(.audit_field(a$iv, "n_inc"), "0")
+
+  # The branch RAN.
+  expect_false(any(grepl("intervention skip:", a$all, fixed = TRUE)))
+  expect_true(any(grepl(
+    "then decreasing the probability of the intervention pixels", a$all,
+    fixed = TRUE
+  )))
+})
+
+test_that("WR-08c: Increase_inside_decrease_outside with zone=Outside is rejected", {
+  # No shipped config writes this pairing, and the guard is what keeps it that
+  # way: the valency names the two zones itself, so an Outside zone would
+  # silently invert the intervention's meaning.
+  fx <- .engine_fixture(
+    list(.rel_entry(
+      valency = "Increase_inside_decrease_outside", zone = "Outside"
+    )),
+    scenario = "BADZONE"
+  )
+  dt <- .norm()
+  before <- copy(dt)
+  expect_error(.run_engine(fx, dt), "must be 'Inside'", fixed = TRUE)
+  # The guard fires before any write, so nothing is half-adjusted.
+  expect_equal(as.data.frame(dt), as.data.frame(before))
+  expect_length(
+    grep("AUDIT stage=intervention region=", .log_lines(fx$log_file), fixed = TRUE),
+    0L
+  )
+})
+
