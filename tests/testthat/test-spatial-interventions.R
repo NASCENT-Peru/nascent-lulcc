@@ -941,3 +941,214 @@ test_that("IN-04: the valency explanation line is not an orphan fragment", {
   }
 })
 
+# --------------------------------------------------------------------------
+# Phase 5 Plan 12 gap closure: probability-change telemetry (D-18, D-19, D-20)
+# with regression tests that fail against the pre-plan engine (D-23).
+
+# The intervention AUDIT line is written through log_msg(), so every log line
+# carries a "<timestamp> | " prefix. Telemetry assertions are made over the
+# AUDIT body only, so the frozen field order can be pinned with one regex and
+# the field count is comparable across runs.
+.audit_body <- function(line) {
+  at <- regexpr("AUDIT stage=intervention ", line, fixed = TRUE)
+  substring(line, at)
+}
+
+.audit_nfields <- function(line) {
+  length(strsplit(.audit_body(line), " ", fixed = TRUE)[[1L]])
+}
+
+.audit_field <- function(line, name) {
+  m <- regmatches(line, regexpr(paste0("(^| )", name, "=[^ ]+"), line))
+  if (length(m) == 0L) return(NA_character_)
+  sub(paste0("^ ?", name, "="), "", m)
+}
+
+# Field count of the AUDIT body BEFORE plan 05-12 appended the delta fields:
+#   AUDIT stage=intervention region= scenario= year= id= rank= type= zone=
+#   to_vals= mask= rows_target= rows_changed=
+.AUDIT_FIELDS_PRE_05_12 <- 13L
+
+# The per-target-class statistics contract returned by both adjusters (D-18).
+.stats_cols <- c(
+  "target_class", "n_target", "n_changed", "mean_before", "mean_after",
+  "sd_before", "sd_after", "p05_delta", "p25_delta", "p50_delta", "p75_delta",
+  "p95_delta", "min_delta", "max_delta", "sum_abs_delta", "prob_mass_before",
+  "prob_mass_after", "n_inc", "n_dec"
+)
+
+# inside_lut for the .norm() fixture: region cell_ids 1, 3, 5 are inside.
+.inside_lut <- function() {
+  lut <- logical(6L)
+  lut[c(1L, 3L, 5L)] <- TRUE
+  lut
+}
+
+test_that("D-18: the AUDIT intervention line keeps its shipped prefix and appends delta fields", {
+  fx <- .engine_fixture(list(.abs_entry()))
+  .run_engine(fx, .norm())
+  a <- .audit_lines(fx$log_file)
+  expect_length(a$iv, 1L)
+
+  # The shipped prefix, byte for byte, exactly as the pre-05-12 tests pin it.
+  expect_match(
+    a$iv,
+    "region=R1 scenario=BAU year=2028 id=iv_abs rank=1 type=Absolute zone=Inside to_vals=105 mask=mask_a.tif",
+    fixed = TRUE
+  )
+
+  # One regex over the whole line so the appended order is genuinely pinned:
+  # no field may be reordered, renamed or dropped.
+  expect_match(
+    a$iv,
+    paste0(
+      "AUDIT stage=intervention region=R1 scenario=BAU year=2028 id=iv_abs ",
+      "rank=1 type=Absolute zone=Inside to_vals=105 mask=mask_a\\.tif ",
+      "rows_target=3 rows_changed=3 ",
+      "delta_mean=\\S+ delta_med=\\S+ delta_sd=\\S+ delta_min=\\S+ delta_max=\\S+ ",
+      "n_inc=[0-9]+ n_dec=[0-9]+ sum_abs_delta=\\S+$"
+    )
+  )
+
+  # Exactly eight appended whitespace-delimited fields, no more, no fewer.
+  expect_identical(.audit_nfields(a$iv), .AUDIT_FIELDS_PRE_05_12 + 8L)
+
+  # The shipped smoke verifier's own id extraction must still work.
+  expect_identical(sub("^.* id=([^ ]+) .*$", "\\1", a$iv), "iv_abs")
+})
+
+test_that("D-19: delta statistics describe only this intervention's change", {
+  # Inside rows of to_val 105 are cell_ids 1, 3, 5 with probs 0.2, 0.4, 0.6.
+  # Absolute=0 drives all three to 0, so by hand:
+  #   deltas   = -0.2, -0.4, -0.6
+  #   mean     = -0.4      median = -0.4      sd = 0.2
+  #   min      = -0.6      max    = -0.2
+  #   n_inc    = 0         n_dec  = 3         sum|d| = 1.2
+  fx <- .engine_fixture(list(.abs_entry()), scenario = "DELTA")
+  .run_engine(fx, .norm())
+  ln <- .audit_lines(fx$log_file)$iv
+  expect_length(ln, 1L)
+
+  expect_identical(.audit_field(ln, "delta_min"), "-0.6")
+  expect_identical(.audit_field(ln, "delta_max"), "-0.2")
+  expect_identical(.audit_field(ln, "n_dec"), "3")
+  expect_identical(.audit_field(ln, "n_inc"), "0")
+  expect_identical(.audit_field(ln, "sum_abs_delta"), "1.2")
+  expect_equal(as.numeric(.audit_field(ln, "delta_mean")), -0.4, tolerance = 1e-6)
+  expect_equal(as.numeric(.audit_field(ln, "delta_med")), -0.4, tolerance = 1e-6)
+  expect_equal(as.numeric(.audit_field(ln, "delta_sd")), 0.2, tolerance = 1e-6)
+})
+
+test_that("D-19b: a second intervention's before values are the first intervention's output", {
+  # Rank 1 zeroes the inside rows; rank 2 targets the same rows with the same
+  # Absolute value. If "before" were the call-entry snapshot, rank 2 would
+  # report the rank-1 movement again. It must report that nothing moved.
+  fx <- .engine_fixture(
+    list(
+      .abs_entry(id = "iv_r1", rank = 1L, value = 0),
+      .abs_entry(id = "iv_r2", rank = 2L, value = 0)
+    ),
+    scenario = "SEQ"
+  )
+  .run_engine(fx, .norm())
+  a <- .audit_lines(fx$log_file)
+  expect_length(a$iv, 2L)
+  expect_match(a$iv[1], "id=iv_r1", fixed = TRUE)
+  expect_match(a$iv[2], "id=iv_r2", fixed = TRUE)
+
+  # Rank 1 sees the untouched probabilities.
+  expect_identical(.audit_field(a$iv[1], "sum_abs_delta"), "1.2")
+  expect_identical(.audit_field(a$iv[1], "n_dec"), "3")
+
+  # Rank 2 sees rank 1's output: nothing left to move.
+  expect_identical(.audit_field(a$iv[2], "sum_abs_delta"), "0")
+  expect_identical(.audit_field(a$iv[2], "n_dec"), "0")
+  expect_identical(.audit_field(a$iv[2], "n_inc"), "0")
+  expect_equal(as.numeric(.audit_field(a$iv[2], "delta_max")), 0)
+  expect_equal(as.numeric(.audit_field(a$iv[2], "delta_min")), 0)
+})
+
+test_that("D-18b: a skipped target class still produces a statistics row", {
+  dt <- .norm()
+  res <- absolute_prob_adjust(
+    normalized = dt,
+    Prob_adjust_zone = "Inside",
+    Prob_adjust_value = 0,
+    Target_classes = c(105L, 999L),
+    From_filter_vals = NULL,
+    inside_lut = .inside_lut(),
+    log_file = NULL
+  )
+  expect_true(is.data.frame(res$stats))
+  expect_identical(nrow(res$stats), 2L)
+  expect_identical(res$stats$target_class, c(105L, 999L))
+
+  # Class 105 was adjusted.
+  expect_identical(res$stats$n_target[1], 3L)
+  expect_identical(res$stats$n_changed[1], 3L)
+  expect_equal(res$stats$mean_before[1], 0.4)
+  expect_equal(res$stats$mean_after[1], 0)
+  expect_equal(res$stats$sum_abs_delta[1], 1.2)
+  expect_identical(res$stats$n_dec[1], 3L)
+  expect_identical(res$stats$n_inc[1], 0L)
+
+  # Class 999 has no rows: it still contributes a row, with the skipped shape.
+  expect_identical(res$stats$n_target[2], 0L)
+  expect_identical(res$stats$n_changed[2], 0L)
+  expect_identical(res$stats$n_inc[2], 0L)
+  expect_identical(res$stats$n_dec[2], 0L)
+  expect_equal(res$stats$sum_abs_delta[2], 0)
+  expect_true(is.na(res$stats$mean_before[2]))
+  expect_true(is.na(res$stats$sd_after[2]))
+  expect_true(is.na(res$stats$p50_delta[2]))
+  expect_true(is.na(res$stats$prob_mass_before[2]))
+})
+
+test_that("D-18c: the helper statistics contract", {
+  res_abs <- absolute_prob_adjust(
+    normalized = .norm(),
+    Prob_adjust_zone = "Inside",
+    Prob_adjust_value = 0,
+    Target_classes = c(105L, 999L),
+    From_filter_vals = NULL,
+    inside_lut = .inside_lut(),
+    log_file = NULL
+  )
+  expect_identical(names(res_abs$stats), .stats_cols)
+  expect_type(res_abs$stats$target_class, "integer")
+  expect_type(res_abs$stats$n_target, "integer")
+  expect_type(res_abs$stats$n_changed, "integer")
+  expect_type(res_abs$stats$n_inc, "integer")
+  expect_type(res_abs$stats$n_dec, "integer")
+  expect_type(res_abs$stats$mean_before, "double")
+
+  res_rel <- relative_prob_adjust(
+    Prob_adjust_valency = "Decrease",
+    Prob_adjust_intervention_percentile = 0.5,
+    Prob_adjust_non_intervention_percentile = 0.5,
+    Prob_adjust_threshold = 5,
+    Prob_adjust_zone = "Inside",
+    Target_classes = c(105L, 999L),
+    From_filter_vals = NULL,
+    inside_lut = .inside_lut(),
+    normalized = .norm(),
+    log_file = NULL
+  )
+  expect_identical(names(res_rel$stats), .stats_cols)
+  expect_identical(nrow(res_rel$stats), 2L)
+  expect_identical(res_rel$stats$target_class, c(105L, 999L))
+  expect_identical(res_rel$stats$n_target[2], 0L)
+})
+
+test_that("D-20: no full-table copy per intervention", {
+  src <- readLines(
+    file.path(.repo_root, "src", "implement_spatial_interventions.R"),
+    warn = FALSE
+  )
+  expect_false(any(grepl("copy(normalized", src, fixed = TRUE)))
+  expect_false(any(grepl("data.table::copy(", src, fixed = TRUE)))
+  # D-13 stays closed too: the engine never resamples or reprojects.
+  expect_false(any(grepl("resample(", src, fixed = TRUE)))
+  expect_false(any(grepl("project(", src, fixed = TRUE)))
+})
+
