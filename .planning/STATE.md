@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: "Completed 05-16-PLAN.md (operator gate closed; all 16 plans done, awaiting phase verification)"
-last_updated: "2026-09-28T09:40:00.000Z"
-last_activity: 2026-09-28 -- Phase 05 all 16 plans complete; operator gate closed
+status: phase_complete
+stopped_at: "Phase 05 COMPLETE - verification passed 24/24 must-haves (2026-09-28)"
+last_updated: "2026-09-28T11:00:00.000Z"
+last_activity: 2026-09-28 -- Phase 05 COMPLETE and verified (24/24 must-haves)
 progress:
   total_phases: 12
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 52
   completed_plans: 48
-  percent: 75
+  percent: 83
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** allocation.r completes reliably for all scenarios × regions × timesteps, producing simulated LULC maps without crashing.
-**Current focus:** Phase 05 — integrate-spatial-interventions-branch-and-stage-interventio
+**Current focus:** Phase 05 COMPLETE. Next open phases: 4 (End-to-End Correctness & Performance), plus stale-looking checkboxes on 1.1 and 3 — see Blockers.
 
 ## Current Position
 
-Phase: 05 (integrate-spatial-interventions-branch-and-stage-interventio) — EXECUTING
+Phase: 05 (integrate-spatial-interventions-branch-and-stage-interventio) — COMPLETE (verified 2026-09-28, 24/24)
 Plan: 16 of 16
-Status: Executing Phase 05
+Status: Phase 05 complete and verified; awaiting next phase selection
 Last activity: 2026-09-28 -- Phase 05 all 16 plans complete; operator gate closed
 
 ### Roadmap Evolution
@@ -156,6 +156,13 @@ Recent decisions affecting current work:
 None yet.
 
 ### Blockers/Concerns
+
+- RESOLVED 2026-09-28: Phase 05 SC1/D-01 - PR #2 is MERGED (f54ccc2). `git diff --stat origin/main HEAD -- src scripts config tests docs` is EMPTY, so the verified tree is byte-identical to origin/main for all code paths.
+- OPEN (cycle-2 code review, 05-REVIEW-2.md, 1 critical + 4 warnings): CR-01 `.mask_inside_lut()` at src/implement_spatial_interventions.R:327 decides membership with `v == 1` and has NO value-domain guard. The offline validator DOES assert values in {0,1,NA} (validate_intervention_masks.r:267) - 05-09 mirrored only nlyr + compareGeom, so validator/runtime parity is incomplete. A mask burned with 255 (gdal_rasterize/QGIS 8-bit default) reads as all-outside; for Prob_adjust_zone: Outside that makes the ENTIRE target class the target area, zeroing all *->mining probability for NAT Mining_freeze_post_2030 (Absolute/0/Outside, 2032-2060) and the SOC twin. The smoke verifier CANNOT catch it - it builds `sel` from the same coding, so n_zone only proves the complement is non-empty, never that the mask has any 1 cells. NOT currently firing: shipped masks are {1, NA} (spatial_masks.md:11) and sha256 + validator pass, so job 841577 is valid. Latent, free to fix (`v` is already in memory).
+- OPEN (cycle-2 review WR-04): the new WR-07 non-vacuity guard in verify_intervention_smoke.r:347-354 turns a legitimate 'mask does not intersect this transition's from-class in this region' into a FAIL. Did not fire for NAT x costa_peruana x 2032 but is live for other regions - expect a confusing false failure on the next region's smoke.
+- OPEN (verifier observation, pre-dates Phase 5): config/local_config.yaml:5 is `data_basepath: "E:/nascent-lulcc-agg"` but the data is on `D:/C.3_Modelling/nascent-lulcc-agg`; drive E: does not exist on this workstation. A bare `Rscript scripts/validate_intervention_masks.r` exits 1 with 'mask directory does not exist'; --mask-dir/--ref-grid overrides are needed. Value last set 2026-01-27 by blenback, so not a Phase 5 regression. One-line fix.
+- STALE ROADMAP CHECKBOXES to confirm: Phase 1.1 (line 16) and Phase 3 (line 18) are still `- [ ]` although STATE records 1.1 as closed (INFRA-01 live smoke exits 0) and all of 3.1-3.6 are complete. Not changed unilaterally - needs the owner's call.
+
 
 - `MultisessionFuture interrupted` (OOM SIGKILL) at ~3 minutes locally — the project's defining failure mode; addressed structurally across Phases 2–3.
 - Phase 1 HPC-only verification gates (live Euler smoke test, live env solve, live SIGKILL test) pending operator confirmation — tracked in 01-HUMAN-UAT.md. **Phase 1.1 now closed** — the INFRA-01 live smoke gate is satisfied (exit 0).

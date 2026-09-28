@@ -113,3 +113,7 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 *Last updated: 2026-05-05 after initialization*
+
+## Current State
+
+Phase 05 complete and verified 2026-09-28 (24/24 must-haves). Spatial interventions are integrated into allocation on `main` (PR #2, merge `f54ccc2`): resolver-owned intervention identity and `Prob_adjust_*` schema, runtime mask geometry validation, a fail-closed Stage 7 pre-flight, corrected adjustment semantics (`>=` percentile alignment and the `Perc_diff == 0` threshold path), per-intervention probability-change telemetry in both the AUDIT lines and a 25-column CSV, and a smoke verifier that can no longer pass vacuously. Proven on HPC: job 841577, NAT x costa_peruana x 2032, `PASS ... maps_checked=16 telemetry_rows=9`.

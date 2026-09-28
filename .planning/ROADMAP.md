@@ -24,7 +24,8 @@ Decimal phases appear between their surrounding integers in numeric order.
  (completed 2026-06-24)
 - [x] **Phase 3.6: Complete Single-Scenario End-to-End Run** *(INSERTED 2026-06-24)* (completed 2026-06-28) - A single scenario (NAT) runs to completion across all regions and all timesteps, producing posterior rasters for every region/timestep — capstone proof of the Phase 3 machinery at scale.
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port; parallelise the full scenario sweep across Rundeck nodes (S2 multi-scenario packing)
-- [ ] **Phase 5: Integrate spatial_interventions branch and stage intervention masks** - Port the colleague's `spatial_interventions` branch onto the much-advanced `main`; check the `spat_prob_perturb` masks against the intervention configs and plan where they go on HPC (mainline 6/6 complete 2026-09-23; reopened for gap closure 2026-09-23 - 21 review findings + new delta telemetry + 2 operator actions)
+- [x] **Phase 5: Integrate spatial_interventions branch and stage intervention masks** *(completed 2026-09-28)* - Port the colleague's `spatial_interventions` branch onto the much-advanced `main`; check the `spat_prob_perturb` masks against the intervention configs and plan where they go on HPC | GAP CLOSURE COMPLETE 2026-09-28: all 21 review findings closed, delta telemetry added, both operator actions done. PR #2 merged as f54ccc2; verification 24/24 must-haves passed; HPC job 841577 PASS maps_checked=16 telemetry_rows=9.
+ (mainline 6/6 complete 2026-09-23; reopened for gap closure 2026-09-23 - 21 review findings + new delta telemetry + 2 operator actions)
 
 ## Phase Details
 
@@ -295,7 +296,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 **Requirements**: TBD
 **Depends on:** Phase 3.6 (allocation runs end-to-end on `main`)
-**Plans:** 9/16 plans executed
+**Plans:** 16/16 plans executed
 
 Plans:
 
