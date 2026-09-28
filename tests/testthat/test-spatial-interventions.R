@@ -507,6 +507,27 @@ test_that("IN-07: a mask removed after resolution reports the forbidden marker",
   )
 }
 
+# The intervention AUDIT line is written through log_msg(), so every log line
+# carries a "<timestamp> | " prefix. Telemetry assertions are made over the
+# AUDIT body only, so the frozen field order can be pinned with one regex and
+# the field count is comparable across runs. These three live here rather than
+# in the plan 05-12 section below because test bodies execute in file order and
+# blocks above that section read AUDIT fields too.
+.audit_body <- function(line) {
+  at <- regexpr("AUDIT stage=intervention ", line, fixed = TRUE)
+  substring(line, at)
+}
+
+.audit_nfields <- function(line) {
+  length(strsplit(.audit_body(line), " ", fixed = TRUE)[[1L]])
+}
+
+.audit_field <- function(line, name) {
+  m <- regmatches(line, regexpr(paste0("(^| )", name, "=[^ ]+"), line))
+  if (length(m) == 0L) return(NA_character_)
+  sub(paste0("^ ?", name, "="), "", m)
+}
+
 test_that("engine: Absolute=0 Inside with From filter edits only inside from-class rows", {
   fx <- .engine_fixture(list(.abs_entry(from = list("forested_areas"))))
   dt <- .norm()
@@ -575,14 +596,64 @@ test_that("engine: Relative Decrease lowers inside values and never raises any",
   expect_true(all(out$prob <= before$prob + 1e-12))
 })
 
-test_that("engine: zeros from Absolute=0 stay zero after a Relative Increase", {
+test_that("WR-09: zeros from Absolute=0 survive a Relative Increase that actually runs", {
+  # This block used to pass for the wrong reason (05-REVIEW.md WR-09). Its
+  # rank-1 entry was an unfiltered .abs_entry(), which zeroes EVERY inside row
+  # of the target class, so the rank-2 Relative Increase found no positive
+  # probabilities in its intervention zone, the NaN guard fired, and the
+  # adjuster returned via `next` without touching anything. What the block
+  # actually proved was "a skipped intervention changes nothing" - the zeros
+  # were never at risk.
+  #
+  # The fix is to zero only PART of one zone, so both zones still hold
+  # positives and the guard cannot fire. `from = "forested_areas"` restricts
+  # rank 1 to from_val 101, and inside cell 5 carries from_val 102, so after
+  # rank 1 the inside rows of class 105 are (cell 1) 0, (cell 3) 0,
+  # (cell 5) 0.6 while the outside rows keep 0.3, 0.5, 0.1.
+  #
+  # Rank 2 then computes, by hand:
+  #   Intervention_ptile_val  = quantile(0.6, .5)         = 0.6
+  #     (the percentile is taken over the POSITIVE intervention values only,
+  #      which is the first reason a zeroed row can never be selected)
+  #   Intervention_ptile_mean = mean(0.6)                 = 0.60
+  #   Non_int_ptile_val       = quantile(c(.3,.5,.1), .5) = 0.3
+  #   Non_int_ptile_mean      = mean(.3, .5)              = 0.40
+  #   Perc_diff = (0.60 - 0.40) / 0.50 * 100 = 40 -> Increase / Perc_diff >= 0
+  # so cell 5 rises to 0.84 and the zeros at cells 1 and 3 stay zero.
   fx <- .engine_fixture(list(
-    .abs_entry(id = "iv_zero", rank = 1L),
+    .abs_entry(id = "iv_zero", rank = 1L, from = list("forested_areas")),
     .rel_entry(id = "iv_inc", valency = "Increase", rank = 2L)
-  ))
-  out <- .run_engine(fx, .norm())
-  inside <- out$to_val == 105L & out$cell_id %in% c(1L, 3L, 5L)
-  expect_true(all(out$prob[inside] == 0))
+  ), scenario = "ZEROSURVIVE")
+  dt <- .norm()
+  before <- copy(dt)
+  out <- .run_engine(fx, dt)
+
+  # 1. Zero preservation: the rows rank 1 zeroed are still exactly 0 after the
+  #    Relative pass wrote to the same target class and zone.
+  zeroed <- out$to_val == 105L & out$cell_id %in% c(1L, 3L)
+  expect_true(all(out$prob[zeroed] == 0))
+
+  # 2. The table changed at all.
+  expect_false(identical(out$prob, before$prob))
+
+  # 3. The RANK-2 pass specifically ran and moved rows. This is the assertion
+  #    the old block lacked: the engine writes an AUDIT line even for an
+  #    adjuster that skipped every target class, so the line count alone is
+  #    necessary but NOT sufficient. rows_changed / sum_abs_delta are read off
+  #    the rank-2 line only.
+  a <- .audit_lines(fx$log_file)
+  expect_length(a$iv, 2L)
+  expect_match(a$iv[1], "id=iv_zero", fixed = TRUE)
+  expect_match(a$iv[2], "id=iv_inc", fixed = TRUE)
+  expect_identical(.audit_field(a$iv[2], "rows_changed"), "1")
+  expect_identical(.audit_field(a$iv[2], "n_inc"), "1")
+  expect_gt(as.numeric(.audit_field(a$iv[2], "sum_abs_delta")), 0)
+  expect_equal(
+    out$prob[out$to_val == 105L & out$cell_id == 5L], 0.84, tolerance = 1e-9
+  )
+
+  # 4. No intervention was skipped, for either rank.
+  expect_false(any(grepl("intervention skip:", a$all, fixed = TRUE)))
 })
 
 test_that("engine: interventions are applied in rank order with one AUDIT line each", {
@@ -953,24 +1024,9 @@ test_that("IN-04: the valency explanation line is not an orphan fragment", {
 # Phase 5 Plan 12 gap closure: probability-change telemetry (D-18, D-19, D-20)
 # with regression tests that fail against the pre-plan engine (D-23).
 
-# The intervention AUDIT line is written through log_msg(), so every log line
-# carries a "<timestamp> | " prefix. Telemetry assertions are made over the
-# AUDIT body only, so the frozen field order can be pinned with one regex and
-# the field count is comparable across runs.
-.audit_body <- function(line) {
-  at <- regexpr("AUDIT stage=intervention ", line, fixed = TRUE)
-  substring(line, at)
-}
-
-.audit_nfields <- function(line) {
-  length(strsplit(.audit_body(line), " ", fixed = TRUE)[[1L]])
-}
-
-.audit_field <- function(line, name) {
-  m <- regmatches(line, regexpr(paste0("(^| )", name, "=[^ ]+"), line))
-  if (length(m) == 0L) return(NA_character_)
-  sub(paste0("^ ?", name, "="), "", m)
-}
+# .audit_body(), .audit_nfields() and .audit_field() are defined next to
+# .audit_lines() above, because test bodies run in file order and the WR-09
+# block earlier in this file reads AUDIT fields too.
 
 # Field count of the AUDIT body BEFORE plan 05-12 appended the delta fields:
 #   AUDIT stage=intervention region= scenario= year= id= rank= type= zone=
