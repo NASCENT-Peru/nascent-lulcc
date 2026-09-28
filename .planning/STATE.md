@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 05-15-PLAN.md (waves 1-6 done; 05-16 is the OPERATOR GATE, autonomous: false)"
+stopped_at: "Completed 05-16-PLAN.md (operator gate closed; all 16 plans done, awaiting phase verification)"
 last_updated: "2026-09-28T09:40:00.000Z"
-last_activity: 2026-09-28 -- Phase 05 wave 6 complete (05-14, 05-15); 15/16 plans done
+last_activity: 2026-09-28 -- Phase 05 all 16 plans complete; operator gate closed
 progress:
   total_phases: 12
   completed_phases: 9
   total_plans: 52
-  completed_plans: 47
+  completed_plans: 48
   percent: 75
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 ## Current Position
 
 Phase: 05 (integrate-spatial-interventions-branch-and-stage-interventio) — EXECUTING
-Plan: 15 of 16 (05-16 pending - operator gate)
+Plan: 16 of 16
 Status: Executing Phase 05
-Last activity: 2026-09-28 -- Phase 05 wave 6 complete (05-14, 05-15); 15/16 plans done
+Last activity: 2026-09-28 -- Phase 05 all 16 plans complete; operator gate closed
 
 ### Roadmap Evolution
 
@@ -145,6 +145,11 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-14: AUDIT-vs-CSV cross-check scoped to Absolute only for rows_target vs sum(n_target); rows_changed and sum_abs_delta carry the unconditional checks (rel tol 1e-5). CSV region slug and AUDIT region label deliberately NOT compared.
 - [Phase 05]: 05-15: verified independently from config/*.yml - 14 Allocation entries, 6 distinct valency/zone combos. Confirms 05-REVIEW.md WR-11 is WRONG: the Outside+value:0 pairing is NAT Mining_freeze_post_2030 and SOC Mining_in_low_ES_areas, NOT CUL Mining_outside_restraint (which is Relative/Decrease/Outside with no Prob_adjust_value).
 - [Phase 05]: DEFERRED (out of phase scope): tests/testthat/test-prep-paths.R carries the same sys.frame(1)$ofile defect 05-15 removed and is the sole source of all 4 standing suite errors. It is now a one-line fix - delete its bootstrap and consume helper-spatial-interventions.R's .repo_root.
+
+- [Phase 05]: 05-16 CLOSED. PR #2 MERGED as f54ccc2 (2026-09-28T12:06:30Z); merge-base --is-ancestor a917ba1 origin/main exits 0; 3f06dc3 (all six gap-closure plans) is an ancestor of origin/main, so the merge carried the fixes. sha256sum -c: 14 OK / 0 FAILED (operator-attested). Job 841577 COMPLETED 0:0, MaxRSS 88.5GB on highmem, 2h11m. PASS verify_intervention_smoke ... maps_checked=16 telemetry_rows=9.
+- [Phase 05]: A `Decrease` valency CAN legitimately produce positive deltas: relative_prob_adjust() lowers inside pixels when Perc_diff >= 0 but raises OUTSIDE pixels when Perc_diff < 0. Job 841577 rank 3 (all-negative) and rank 4 (all-positive) are both declared Decrease on the same mask and zone - not a defect. The Perc_diff < 0 branch is the one 05-11 WR-01(b) touched.
+- [Phase 05]: OUT OF SCOPE, logged 2026-09-28: the verifier's 'Info (not assessed)' block shows `placed` exactly 1 below `demanded` for ~20 of 25 transitions in job 841577 (47481/47480, 86338/86337, 100256/100255...), a few equal. A systematic one-cell shortfall looks like an allocator off-by-one or floor artifact rather than intervention-driven scarcity. Unrelated to intervention telemetry. Belongs to whichever phase owns allocation demand satisfaction.
+- [Phase 05]: Rundeck node reservation is NOT needed for sbatch submissions - confirmed 2026-06-25 (job 574125 submitted from reserved node102 ran on node103). Rundeck salloc is for INTERACTIVE work only. The 05-16 plan text and scripts/submit_allocation_smoke.sh line 7 both say otherwise and are OUTDATED; --partition=highmem passed at submit time is what places the job.
 
 ### Pending Todos
 

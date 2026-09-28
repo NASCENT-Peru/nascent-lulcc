@@ -337,4 +337,4 @@ Plans:
 - [x] 05-15-PLAN.md - Test coverage: Increase_inside_decrease_outside and Relative zone=Outside, corrected zero-preservation test, helper hoist (WR-08, WR-09, IN-06).
 
 **Wave 11** *(operator-gated)*
-- [ ] 05-16-PLAN.md - Operator merges PR #2 and runs the HPC sha256sum -c plus the post-fix intervention smoke (D-17).
+- [x] 05-16-PLAN.md - Operator merges PR #2 and runs the HPC sha256sum -c plus the post-fix intervention smoke (D-17).
