@@ -437,10 +437,15 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
 # Render one numeric AUDIT field. Every appended field must stay a single
 # whitespace-delimited token or the shipped log parsers break, so a non-finite
 # statistic is written as the literal NA and formatC()'s "g" format is used
-# (it emits no spaces and no thousands separator).
+# (no thousands separator, no embedded space).
+#
+# `width = 1L` is NOT cosmetic: formatC() defaults `width` to `digits` for the
+# "g" format, so the default would render -0.4 as "   -0.4" and split one field
+# into four tokens. trimws() is kept as a second guard so the invariant holds
+# whatever a future formatC()/locale does.
 .fmt_num <- function(v) {
   if (length(v) != 1L || !is.finite(v)) return("NA")
-  formatC(v, format = "g", digits = 6)
+  trimws(formatC(v, format = "g", digits = 6, width = 1L))
 }
 
 #' @title Implement Spatial Interventions on per-transition Probabilities
@@ -461,6 +466,33 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
 #' AUDIT line to `log_file` (D-15). Probabilities
 #' are NOT renormalised; the number of cells whose summed probability exceeds 1
 #' is only logged (`cells_sum_gt1`).
+#'
+#' @section Intervention AUDIT line contract:
+#' The per-intervention line is
+#' \preformatted{
+#' AUDIT stage=intervention region=<r> scenario=<s> year=<y> id=<id> rank=<n>
+#'   type=<t> zone=<z> to_vals=<v,..> mask=<f> rows_target=<n> rows_changed=<n>
+#'   delta_mean=<x> delta_med=<x> delta_sd=<x> delta_min=<x> delta_max=<x>
+#'   n_inc=<n> n_dec=<n> sum_abs_delta=<x>
+#' }
+#' written on one physical line. The fields up to and including `rows_changed`
+#' are FROZEN: `scripts/verify_intervention_smoke.r` parses them by fixed
+#' string and by `sub("^.* id=([^ ]+) .*$", ...)`, so they must never be
+#' reordered, renamed or removed. The eight `delta_*` / `n_inc` / `n_dec` /
+#' `sum_abs_delta` fields (D-18) are ADDITIVE and are appended at the end;
+#' any future telemetry is appended the same way.
+#'
+#' The eight appended fields describe the distribution of the probability
+#' change THIS intervention made, pooled across its target classes, over the
+#' rows it targeted (`Target_area_idx` for Absolute, `sub_idx` for Relative —
+#' the same index sets `rows_target` counts) against the values immediately
+#' before it ran. Interventions are applied in rank order, so a later
+#' intervention's "before" is the earlier one's output (D-19). Every numeric
+#' field is rendered by [.fmt_num()], which emits the literal `NA` for a
+#' non-finite value and never emits a space, so each field stays a single
+#' whitespace-delimited token. When every target class was skipped the five
+#' `delta_*` fields are `NA` and `n_inc`, `n_dec` and `sum_abs_delta` are `0`.
+#' `AUDIT stage=intervention_summary` remains the unchanged whole-call roll-up.
 #' @param normalized data.table with columns row_idx, from_val, to_val,
 #'   cell_id (region), prob. Modified in place by reference. The engine never
 #'   reads `x`/`y`: mask membership is looked up by national cell number
@@ -708,9 +740,36 @@ implement_spatial_interventions <- function(
     normalized <- res$normalized
     n_applied <- n_applied + 1L
 
+    # D-18: roll the per-target-class statistics up to one intervention-level
+    # record. The pooled delta vector rides on attr(res$stats, "delta") — it is
+    # the concatenation of the per-class deltas the adjuster already computed,
+    # so nothing is recomputed and nothing beyond O(rows_target) doubles is
+    # held; it is dropped as soon as the line is written (D-20).
+    iv_stats <- res$stats
+    d_pool <- attr(iv_stats, "delta")
+    if (is.null(d_pool)) d_pool <- numeric(0)
+    if (length(d_pool) == 0L) {
+      # Every target class was skipped: there is no distribution to describe.
+      d_mean <- NA_real_
+      d_med <- NA_real_
+      d_sd <- NA_real_
+      d_min <- NA_real_
+      d_max <- NA_real_
+    } else {
+      d_mean <- mean(d_pool)
+      d_med <- stats::median(d_pool)
+      d_sd <- stats::sd(d_pool)
+      d_min <- min(d_pool)
+      d_max <- max(d_pool)
+    }
+    n_inc_k <- as.integer(sum(iv_stats$n_inc))
+    n_dec_k <- as.integer(sum(iv_stats$n_dec))
+    sum_abs_k <- sum(iv_stats$sum_abs_delta)
+    rm(d_pool)
+
     log_msg(
       sprintf(
-        "AUDIT stage=intervention region=%s scenario=%s year=%d id=%s rank=%s type=%s zone=%s to_vals=%s mask=%s rows_target=%d rows_changed=%d",
+        "AUDIT stage=intervention region=%s scenario=%s year=%d id=%s rank=%s type=%s zone=%s to_vals=%s mask=%s rows_target=%d rows_changed=%d delta_mean=%s delta_med=%s delta_sd=%s delta_min=%s delta_max=%s n_inc=%d n_dec=%d sum_abs_delta=%s",
         region_label,
         scenario,
         year,
@@ -721,10 +780,22 @@ implement_spatial_interventions <- function(
         paste(Target_classes, collapse = ","),
         mask_name,
         as.integer(res$rows_target),
-        as.integer(res$rows_changed)
+        as.integer(res$rows_changed),
+        .fmt_num(d_mean),
+        .fmt_num(d_med),
+        .fmt_num(d_sd),
+        .fmt_num(d_min),
+        .fmt_num(d_max),
+        n_inc_k,
+        n_dec_k,
+        .fmt_num(sum_abs_k)
       ),
       log_file
     )
+    # The per-class table is the only telemetry that outlives the line, and it
+    # is one small row per target class. Drop the pooled delta with it.
+    attr(iv_stats, "delta") <- NULL
+    rm(iv_stats)
   } # end of intervention loop
 
   write_summary(n_applied)
