@@ -14,11 +14,20 @@
 #'       per-transition probability map whose To class is a target (and whose
 #'       From class passes From_lulc_filter when present) is 0 inside the mask
 #'       (zone Inside) or outside the mask (zone Outside). The national mask is
-#'       cropped to the region map (same grid, no resampling). The selected zone
-#'       must contain at least one non-NA probability cell: a zone with none is
-#'       a FAIL and is NOT counted in maps_checked, because `r * sel` is 0
-#'       wherever `sel` is FALSE and would otherwise report a vacuous [ok] for a
-#'       mask that lands entirely outside the region (WR-07).
+#'       cropped to the region map (same grid, no resampling). Because
+#'       `r * sel` is 0 wherever `sel` is FALSE, an empty zone would report a
+#'       vacuous [ok]; non-vacuity is therefore asserted at three levels:
+#'         - per map: a zone holding no non-NA probability cell is INFO and is
+#'           NOT counted in maps_checked. `r` is a PER-TRANSITION map, non-NA
+#'           only on that transition's from-class cells, so a mask that does
+#'           not intersect that from-class in this region is an ordinary,
+#'           correct-engine outcome, not a defect (WR-04);
+#'         - per intervention: zero checked maps is a FAIL. That is the real
+#'           WR-07 condition -- a mask that does not intersect this region at
+#'           all;
+#'         - per run: maps_checked == 0 while at least one active Absolute-0
+#'           intervention is configured is a FAIL, because the run then
+#'           asserted nothing at all.
 #'   (d) No forbidden marker appears in any log under the region dir (or in
 #'       --extra-log, e.g. the SLURM stdout file).
 #'   (e) The plan 05-13 telemetry CSV
@@ -323,6 +332,9 @@ if (length(abs0) > 0L) {
           cat(sprintf("Info: %s has no target rows in trans_rates.csv for this region\n", id))
           next
         }
+        # D-06a: count the maps this intervention actually asserted on, so the
+        # per-map INFO downgrade above cannot become a blanket escape hatch.
+        n_checked_id <- 0L
         for (k in rows) {
           id_trans <- tr[["id_trans"]][k]
           tif <- file.path(prob_map_dir, sprintf("%03d_id_trans_%d.tif", k, id_trans))
@@ -339,16 +351,23 @@ if (length(abs0) > 0L) {
           }
           m0 <- terra::ifel(is.na(m), 0, m)
           sel <- if (identical(zone, "Inside")) (m0 == 1) else (m0 != 1)
-          # WR-07: `r * sel` is 0 everywhere `sel` is FALSE, so the max over an
-          # EMPTY zone is 0 and would be reported [ok] — a mask that lands
-          # entirely outside the region would pass with nothing asserted on.
-          # Prove the zone is non-empty first, and do not let a vacuous check
-          # contribute to maps_checked.
+          # WR-04: `r` is a PER-TRANSITION probability map — allocation builds
+          # it as setValues(anterior, NA_real_) and then writes dt_j$prob at
+          # dt_j$cell_id (src/allocation.r:3196-3200), so it is non-NA only on
+          # the cells holding THIS transition's from-class. `n_zone` therefore
+          # counts "cells in the selected zone that also hold this transition's
+          # from-class", and zero is an ordinary correct-engine outcome: a mask
+          # that holds none of a rare from-class in this region simply has
+          # nothing to adjust for that transition. Report it as INFO, do not
+          # count it in maps_checked (there is nothing to assert on), and do
+          # NOT fail here — the meaningful non-vacuity assertions are one and
+          # two levels up (D-06a / D-06b). A non-finite global() result on an
+          # empty selection is the same "nothing to assert on" state.
           n_zone <- terra::global(sel & !is.na(r), "sum", na.rm = TRUE)[[1]][1]
           if (!is.finite(n_zone) || n_zone == 0) {
-            fail(sprintf(
-              "%s: %s has 0 non-NA cells in zone=%s for mask %s (assertion would be vacuous)",
-              id, basename(tif), zone, basename(mask_path)
+            cat(sprintf(
+              "  Info: %s %s has no non-NA cells in zone=%s (mask does not intersect this transition's from-class); not counted\n",
+              id, basename(tif), zone
             ))
             next
           }
@@ -363,6 +382,7 @@ if (length(abs0) > 0L) {
             next
           }
           maps_checked <- maps_checked + 1L
+          n_checked_id <- n_checked_id + 1L
           status <- if (mx == 0) "ok" else "FAIL"
           cat(sprintf("  %s zone=%s %s: n_zone=%d max prob in zone = %g [%s]\n",
                       id, zone, basename(tif), as.integer(n_zone), mx, status))
@@ -371,9 +391,33 @@ if (length(abs0) > 0L) {
                          id, basename(tif), mx, tolower(zone), basename(mask_path)))
           }
         }
+        # D-06a: this is the real WR-07 condition. Individual transitions may
+        # legitimately miss the zone (INFO above), but an intervention NONE of
+        # whose target maps could be asserted on means the mask does not
+        # intersect this region at all — nothing about that intervention was
+        # proved, and the run must not report PASS on it. The
+        # `length(rows) == 0L` branch above `next`s before the map loop, so
+        # this check is correctly unreachable for "this region has no target
+        # rows in trans_rates.csv" (that case is caught run-level by D-06b).
+        if (n_checked_id == 0L) {
+          fail(sprintf(
+            "%s: no probability map could be asserted on (0 of %d target map(s) had a non-NA probability cell in zone=%s for mask %s)",
+            id, length(rows), zone, basename(mask_path)
+          ))
+        }
       }
+      # D-06b: run-level floor. This block is already inside
+      # `if (length(abs0) > 0L)`, so reaching it with maps_checked == 0 means
+      # active Absolute-0 interventions are configured and yet not a single
+      # probability map was asserted on. This deliberately also fires when
+      # every active Absolute-0 intervention had no target rows in
+      # trans_rates.csv: the run then asserted nothing at all, and a PASS
+      # banner reporting maps_checked=0 would be evidence of nothing.
       if (maps_checked == 0L) {
-        cat("Info: no Absolute-0 target maps present for this region\n")
+        fail(sprintf(
+          "maps_checked=0: no Absolute-0 probability map could be asserted on in this region, but %d active Absolute-0 intervention(s) are configured",
+          length(abs0)
+        ))
       }
     }
   }
