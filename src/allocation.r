@@ -584,8 +584,13 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
         # condition here, while it is a header read, so a mis-staged mask is
         # rejected before any region work starts.
         #
-        # D-13: terra::rast() reads the header only — no values, no resample,
-        # no reproject. A grid mismatch is a hard failure, never a repair.
+        # D-13: terra::rast() reads the header only, and the value-domain check
+        # added below (CR-01) adds exactly one streaming min/max scan per UNIQUE
+        # mask — once per run, not once per region (~20M cells for the national
+        # masks, sub-second each against multi-hour region work). D-13 still
+        # holds in the sense that matters: nothing is ever resampled or
+        # reprojected, and no mask is ever repaired. A grid mismatch, a bad
+        # layer count and a bad value domain are all hard failures.
         existing_masks <- unique(existing_masks)
         if (length(existing_masks) > 0L) {
           ref_grid_path <- config[["ref_grid_path"]]
@@ -635,6 +640,54 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
                   sprintf(
                     "intervention mask: %s has %d layers (expected 1)",
                     mask_path, n_layers
+                  )
+                )
+                next
+              }
+              # CR-01 (pre-flight half). D-02b: a categorical GeoTIFF's minmax
+              # reads 0..1, so the range test below cannot see it; without this
+              # branch the categorical case is only caught by .mask_inside_lut()
+              # at the first intervention of the first region. terra::is.factor()
+              # returns a length-nlyr logical, and the nlyr == 1 branch above has
+              # already guaranteed length 1.
+              is_cat <- suppressWarnings(tryCatch(
+                isTRUE(terra::is.factor(m)), error = function(e) FALSE
+              ))
+              if (is_cat) {
+                intervention_errors <- c(
+                  intervention_errors,
+                  sprintf(
+                    "intervention mask: %s is categorical/non-numeric; expected numeric {0,1,NA}",
+                    mask_path
+                  )
+                )
+                next
+              }
+              # D-02: reject a mask whose observed value range escapes [0, 1]
+              # (255 from an 8-bit gdal_rasterize/QGIS burn, a 0/100 scaled
+              # mask, ...). Reading such a mask as "outside" inverts every
+              # Prob_adjust_zone: Outside intervention onto the whole region.
+              #
+              # all(is.finite(mm)) is MANDATORY, not defensive decoration:
+              # terra::minmax(compute = TRUE) returns NaN NaN for an all-NA
+              # raster, and a bare mm[1] >= 0 && mm[2] <= 1 on NaN throws
+              # "missing value where TRUE/FALSE needed" — itself a forbidden
+              # marker in the smoke verifier, i.e. the guard would manufacture
+              # the crash it exists to prevent. An all-NA mask is therefore
+              # deliberately NOT rejected here: its value-domain claim is
+              # vacuously true, and its degeneracy is caught by the verifier's
+              # D-04 assertion instead.
+              mm <- suppressWarnings(tryCatch(
+                as.vector(terra::minmax(m, compute = TRUE)),
+                error = function(e) c(NaN, NaN)
+              ))
+              if (length(mm) == 2L && all(is.finite(mm)) &&
+                  !(mm[1] >= 0 && mm[2] <= 1)) {
+                intervention_errors <- c(
+                  intervention_errors,
+                  sprintf(
+                    "intervention mask: %s has value(s) outside {0,1,NA} (observed min %s, max %s)",
+                    mask_path, format(mm[1]), format(mm[2])
                   )
                 )
                 next
