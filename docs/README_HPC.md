@@ -281,7 +281,18 @@ Allocation applies the Allocation-stage interventions from
 `config/<SCENARIO>_interventions.yml` to the per-transition probabilities, so
 the mask rasters must be on scratch before any Stage 7 job. The Stage 7
 pre-flight stops with `intervention mask: missing ...` if a referenced mask is
-absent.
+absent. Since phase 05.1 (CR-01) it also stops on a mask that is present but
+mis-coded, with one of:
+
+```text
+intervention mask: <path> has value(s) outside {0,1,NA} (observed min ..., max ...)
+intervention mask: <path> is categorical/non-numeric; expected numeric {0,1,NA}
+```
+
+Both run once per unique mask, before any region work, so a mis-staged mask
+costs seconds instead of surfacing hours into a job — or not at all. The fix is
+always an offline re-export of the mask with burn value 1 on the workstation,
+never a conversion or rescale on HPC.
 
 **Placement.** Masks live in `${HPC_SCRATCH_ROOT}/inputs/spat_prob_perturb/`
 (currently `/beegfs/black/nascent-lulcc/inputs/spat_prob_perturb/`). The path is
@@ -346,6 +357,18 @@ exits 1. It checks that `posterior.tif` exists, that the worker log has one
 `AUDIT stage=intervention region=` line per active intervention (5 for NAT
 2032) plus one summary line, that every Absolute-0 target probability map is 0
 inside (or outside) its mask, and that no forbidden error marker appears.
+
+Since phase 05.1 (WR-04), a per-transition probability map whose from-class does
+not intersect the mask in this region prints an `Info: ... not counted` line and
+is skipped instead of failing the run — this is normal and is expected to be
+common outside `costa_peruana`, because the mask was drawn for a specific extent
+and a given transition's from-class may simply be absent underneath it.
+Consequently `maps_checked` counts only the assertions that actually had cells
+to assert on, so it may be **lower** than the number of matching `trans_rates.csv`
+rows and lower than a previous region's figure without anything being wrong; but
+a run in which some active Absolute-0 intervention contributes zero checked maps,
+or in which `maps_checked` reaches 0 overall, is a hard FAIL — the verifier then
+proved nothing and must not be read as a pass.
 
 Notes:
 
