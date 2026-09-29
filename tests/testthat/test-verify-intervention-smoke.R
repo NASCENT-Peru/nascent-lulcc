@@ -5,11 +5,21 @@
 # region, so the thing it must never do is say PASS about nothing (WR-07). These
 # blocks drive the real script as a subprocess against a synthetic run output
 # tree and pin:
-#   - WR-07  a mask whose zone contains no cells is a FAIL, not a vacuous PASS;
+#   - D-06a  an intervention NONE of whose target maps could be asserted on is
+#            a FAIL, not a vacuous PASS (the real WR-07 condition);
 #   - WR-07b maps_checked counts only assertions that had cells to assert on;
+#   - WR-04  a single transition whose from-class misses the mask is INFO and
+#            is not counted, NOT a FAIL — the guard that over-fired on correct
+#            runs in every region but the one the phase gated on;
+#   - D-06b  an active Absolute-0 intervention with no target rows leaves the
+#            run asserting nothing, so maps_checked == 0 is a FAIL;
+#   - D-04   an Outside-zone mask with no cell equal to 1 is a FAIL: the
+#            complement assertion is otherwise satisfied trivially (CR-01);
 #   - CR-03  "argument is of length zero" / "subscript out of bounds" are fatal
 #            forbidden markers (the exact crash signature of the missing
 #            Prob_adjust_* defect);
+#   - CR-01  the mask value-domain stops ("outside {0,1,NA}",
+#            "is categorical/non-numeric") are fatal forbidden markers;
 #   - D-22   the 05-13 telemetry CSV exists, matches the AUDIT lines and shows
 #            mean_after = 0 for Absolute-to-0 target rows.
 #
@@ -80,24 +90,28 @@ library(testthat)
   .smoke_write_raster(path, v)
 }
 
-# A probability map that is exactly 0 on the masked cells and positive
-# elsewhere: what an Absolute-to-0 Inside intervention is supposed to produce.
-.smoke_write_prob <- function(path, zero_cells = .smoke_mask_cells, fill = 0.5) {
+# A probability map that is exactly 0 on the cells of the adjusted zone and
+# positive elsewhere: what an Absolute-to-0 intervention is supposed to
+# produce. `na_cells` makes the map non-NA-free on those cells, which is how a
+# per-transition map whose from-class does not intersect the mask looks (WR-04).
+.smoke_write_prob <- function(path, zero_cells = .smoke_mask_cells, fill = 0.5,
+                              na_cells = integer(0)) {
   v <- rep(fill, 20L)
   if (length(zero_cells) > 0L) v[zero_cells] <- 0
+  if (length(na_cells) > 0L) v[na_cells] <- NA_real_
   .smoke_write_raster(path, v)
 }
 
-.smoke_audit_iv <- function(region_label, scenario, year) {
+.smoke_audit_iv <- function(region_label, scenario, year, zone = "Inside") {
   sprintf(
     paste0(
       "2026-01-01 00:00:00 AUDIT stage=intervention region=%s scenario=%s ",
-      "year=%d id=iv_abs rank=1 type=Absolute zone=Inside to_vals=105,104 ",
+      "year=%d id=iv_abs rank=1 type=Absolute zone=%s to_vals=105,104 ",
       "mask=mask_a.tif rows_target=6 rows_changed=6 delta_mean=-0.27 ",
       "delta_med=-0.19 delta_sd=0.192146 delta_min=-0.6 delta_max=-0.1 ",
       "n_inc=0 n_dec=6 sum_abs_delta=1.62"
     ),
-    region_label, scenario, as.integer(year)
+    region_label, scenario, as.integer(year), zone
   )
 }
 
@@ -111,7 +125,7 @@ library(testthat)
   )
 }
 
-.smoke_telemetry <- function(scenario, region, year) {
+.smoke_telemetry <- function(scenario, region, year, zone = "Inside") {
   data.frame(
     scenario = rep(scenario, 2L),
     region = rep(region, 2L),
@@ -119,7 +133,7 @@ library(testthat)
     intervention_id = rep("iv_abs", 2L),
     rank = c(1L, 1L),
     type = rep("Absolute", 2L),
-    zone = rep("Inside", 2L),
+    zone = rep(zone, 2L),
     mask = rep("mask_a.tif", 2L),
     target_class = c(105L, 104L),
     n_target = c(3L, 3L),
@@ -150,8 +164,21 @@ library(testthat)
 # --------------------------------------------------------------------------
 # The full run-output fixture.
 
+#   zone             Prob_adjust_zone, threaded into the YAML entry, the AUDIT
+#                    line and the telemetry `zone` column so the three sources
+#                    stay mutually consistent. The probability maps follow: the
+#                    cells written as 0 are the mask cells for "Inside" and
+#                    their complement for "Outside", so the fixture is a
+#                    correct Absolute-to-0 run under either zone.
+#   na_in_zone_maps  subset of c(1L, 2L) naming which probability maps also get
+#                    NA_real_ at mask_cells. Such a map has no non-NA cell in an
+#                    Inside zone: the WR-04 shape.
+#   trans_to         the To_lulc column of trans_rates.csv, so a fixture can
+#                    present an intervention with no matching target rows.
 .smoke_fixture <- function(root, scenario = "BAU", region = "r1", year = 2028L,
-                           region_label = "R1", mask_cells = .smoke_mask_cells) {
+                           region_label = "R1", mask_cells = .smoke_mask_cells,
+                           zone = "Inside", na_in_zone_maps = integer(0),
+                           trans_to = c(105L, 104L)) {
   output_root <- file.path(root, "out")
   region_dir <- file.path(
     output_root, scenario, as.character(year), paste0("region_", region)
@@ -170,20 +197,31 @@ library(testthat)
   # the 1-based row index and id_trans, so row order is load-bearing.
   tr <- data.frame(
     From_lulc = c(101L, 101L),
-    To_lulc = c(105L, 104L),
+    To_lulc = as.integer(trans_to),
     Rate = c(0.1, 0.2),
     id_trans = c(11L, 12L),
     stringsAsFactors = FALSE
   )
   utils::write.csv(tr, file.path(region_dir, "trans_rates.csv"), row.names = FALSE)
-  .smoke_write_prob(file.path(prob_dir, "001_id_trans_11.tif"), mask_cells)
-  .smoke_write_prob(file.path(prob_dir, "002_id_trans_12.tif"), mask_cells)
+  zero_cells <- if (identical(zone, "Inside")) {
+    mask_cells
+  } else {
+    setdiff(seq_len(20L), mask_cells)
+  }
+  .smoke_write_prob(
+    file.path(prob_dir, "001_id_trans_11.tif"), zero_cells,
+    na_cells = if (1L %in% na_in_zone_maps) mask_cells else integer(0)
+  )
+  .smoke_write_prob(
+    file.path(prob_dir, "002_id_trans_12.tif"), zero_cells,
+    na_cells = if (2L %in% na_in_zone_maps) mask_cells else integer(0)
+  )
 
   log_path <- file.path(region_dir, "worker_1.log")
   writeLines(
     c(
       "2026-01-01 00:00:00 Applying intervention: iv_abs",
-      .smoke_audit_iv(region_label, scenario, year),
+      .smoke_audit_iv(region_label, scenario, year, zone = zone),
       .smoke_audit_summary(region_label, scenario, year)
     ),
     log_path
@@ -198,7 +236,7 @@ library(testthat)
     Time_steps_implemented = list(as.integer(year)),
     Prob_adjust_type = "Absolute",
     Prob_adjust_value = 0,
-    Prob_adjust_zone = "Inside",
+    Prob_adjust_zone = zone,
     Transition_target_classes = list(
       "built_up_and_barren_lands", "high_intensity_agricultural_areas"
     )
@@ -210,7 +248,7 @@ library(testthat)
     region_dir,
     sprintf("intervention_prob_deltas_%s_%s_%d.csv", scenario, region, as.integer(year))
   )
-  .smoke_write_telemetry(csv_path, .smoke_telemetry(scenario, region, year))
+  .smoke_write_telemetry(csv_path, .smoke_telemetry(scenario, region, year, zone = zone))
 
   list(
     scenario = scenario, region = region, year = as.integer(year),
@@ -272,13 +310,15 @@ test_that("CR-03s: the forbidden marker list carries both length-zero messages",
   expect_true(grepl("subscript out of bounds", src, fixed = TRUE))
 })
 
-test_that("WR-07: a mask with no cells in the zone fails instead of passing vacuously", {
+test_that("D-06a: an intervention whose maps all miss the zone fails at intervention level", {
   root <- withr::local_tempdir()
   fx <- .smoke_fixture(root, mask_cells = integer(0))
   res <- .run_verifier(fx)
   .skip_if_config_unavailable(res)
   expect_identical(res$status, 1L)
-  expect_match(res$out, "0 non-NA cells in zone", fixed = TRUE)
+  expect_match(res$out, "no probability map could be asserted on", fixed = TRUE)
+  # The per-map path is now INFO; the FAIL comes from the level above it.
+  expect_match(res$out, "not counted", fixed = TRUE)
 })
 
 test_that("WR-07b: maps_checked counts only non-vacuous assertions", {
@@ -289,6 +329,74 @@ test_that("WR-07b: maps_checked counts only non-vacuous assertions", {
   expect_identical(res$status, 1L)
   expect_false(grepl("maps_checked=1", res$out, fixed = TRUE))
   expect_false(grepl("maps_checked=2", res$out, fixed = TRUE))
+})
+
+test_that("WR-04: a transition whose from-class misses the mask is INFO, not FAIL", {
+  # `r` is a per-transition map, so a mask holding none of that transition's
+  # from-class is an ordinary correct-engine outcome. Under the HEAD guard this
+  # exited 1 — it is the regression that would have failed the andes run.
+  root <- withr::local_tempdir()
+  fx <- .smoke_fixture(root, na_in_zone_maps = 1L)
+  res <- .run_verifier(fx)
+  .skip_if_config_unavailable(res)
+  expect_identical(res$status, 0L)
+  expect_match(res$out, "not counted", fixed = TRUE)
+  expect_match(res$out, "maps_checked=1", fixed = TRUE)
+  expect_match(res$out, "PASS verify_intervention_smoke", fixed = TRUE)
+})
+
+test_that("D-06b: an active Absolute-0 intervention with no target rows fails the run", {
+  # No trans_rates row matches the target classes, so the intervention is
+  # skipped before the map loop and the run asserts nothing at all.
+  root <- withr::local_tempdir()
+  fx <- .smoke_fixture(root, trans_to = c(101L, 102L))
+  res <- .run_verifier(fx)
+  .skip_if_config_unavailable(res)
+  expect_identical(res$status, 1L)
+  expect_match(res$out, "maps_checked=0", fixed = TRUE)
+})
+
+test_that("D-04: a degenerate Outside mask fails instead of passing trivially", {
+  # The Outside zone is the complement of the mask, so an empty mask satisfies
+  # "prob is 0 over the complement" across the whole region with a large,
+  # non-vacuous n_zone (CR-01).
+  root <- withr::local_tempdir()
+  fx <- .smoke_fixture(root, zone = "Outside", mask_cells = integer(0))
+  res <- .run_verifier(fx)
+  .skip_if_config_unavailable(res)
+  expect_identical(res$status, 1L)
+  expect_match(res$out, "degenerate mask", fixed = TRUE)
+})
+
+test_that("D-04: a 1-coded Outside mask still passes", {
+  # No-regression control for the shipped Absolute/0/Outside entries.
+  root <- withr::local_tempdir()
+  fx <- .smoke_fixture(root, zone = "Outside")
+  res <- .run_verifier(fx)
+  .skip_if_config_unavailable(res)
+  expect_identical(res$status, 0L)
+  expect_match(res$out, "maps_checked=2", fixed = TRUE)
+})
+
+test_that("CR-01s: the forbidden list carries both value-domain substrings", {
+  # Static: runs even when the subprocess blocks skip. Frozen contract with
+  # plan 05.1-01 — the engine emits these exact substrings.
+  src <- paste(readLines(.smoke_script, warn = FALSE), collapse = "\n")
+  expect_true(grepl("outside {0,1,NA}", src, fixed = TRUE))
+  expect_true(grepl("is categorical/non-numeric", src, fixed = TRUE))
+})
+
+test_that("CR-01: a mask value-domain stop in the worker log is fatal", {
+  root <- withr::local_tempdir()
+  fx <- .smoke_fixture(root)
+  cat(paste0(
+    "2026-01-01 00:00:02 ERROR: intervention mask ",
+    "/inputs/mining_concessions_mask.tif has value(s) outside {0,1,NA}: 255\n"
+  ), file = fx$log_path, append = TRUE)
+  res <- .run_verifier(fx)
+  .skip_if_config_unavailable(res)
+  expect_identical(res$status, 1L)
+  expect_match(res$out, "forbidden marker", fixed = TRUE)
 })
 
 test_that("CR-03: 'argument is of length zero' is a forbidden marker", {
