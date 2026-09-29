@@ -347,13 +347,13 @@ Plans:
 **Requirements**: none mapped in REQUIREMENTS.md. Traceability is via the source findings CR-01 and WR-04 in `05-REVIEW-2.md` and the locked decisions D-01..D-07 recorded in each plan's `requirements` / `must_haves`.
 **Depends on:** Phase 5
 **Scope guard (D-07):** only CR-01 and WR-04. WR-01, WR-02, WR-03 and IN-01..IN-08 from `05-REVIEW-2.md` are explicitly out of scope.
-**Plans:** 3 plans
+**Plans:** 2/3 plans executed
 
 Plans:
 
 **Wave 1** *(parallel - no files_modified overlap; the two D-01 error substrings are pinned verbatim in both plans so they can run concurrently)*
-- [ ] 05.1-01-PLAN.md - Engine + pre-flight mask value-domain guards: fatal `{0,1,NA}` and non-numeric stops in `.mask_inside_lut()`, `terra::minmax` + categorical rejection in the Stage 7 pre-flight, and fixtures for 255-valued / categorical / all-NA / 1-coded masks (CR-01, D-01, D-02).
-- [ ] 05.1-02-PLAN.md - Smoke verifier: per-map non-intersection becomes INFO that does not count, the non-vacuity assertion moves to per-intervention and per-run level, `Outside`-zone masks must have a 1-cell, and the two CR-01 stops join the forbidden marker list (WR-04, D-03, D-04, D-05, D-06).
+- [x] 05.1-01-PLAN.md - Engine + pre-flight mask value-domain guards: fatal `{0,1,NA}` and non-numeric stops in `.mask_inside_lut()`, `terra::minmax` + categorical rejection in the Stage 7 pre-flight, and fixtures for 255-valued / categorical / all-NA / 1-coded masks (CR-01, D-01, D-02).
+- [x] 05.1-02-PLAN.md - Smoke verifier: per-map non-intersection becomes INFO that does not count, the non-vacuity assertion moves to per-intervention and per-run level, `Outside`-zone masks must have a 1-cell, and the two CR-01 stops join the forbidden marker list (WR-04, D-03, D-04, D-05, D-06).
 
 **Wave 2** *(blocked on Wave 1; operator-gated)*
 - [ ] 05.1-03-PLAN.md - Cross-file wording gate + five-file regression run, docs (`spatial_masks.md`, `README_HPC.md`), and the ZALF HPC operator gate proving the guards stay silent on the 14 real masks and that a second region no longer false-FAILs.

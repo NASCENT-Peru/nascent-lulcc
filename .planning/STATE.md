@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: "Phase 05.1 inserted (URGENT) — awaiting /gsd:plan-phase 05.1"
+status: executing
 stopped_at: "Completed 05-06-PLAN.md (main merge pending: PR #2)"
-last_updated: "2026-09-29T09:08:12.408Z"
-last_activity: 2026-09-28 -- Phase 05 all 16 plans complete; operator gate closed
+last_updated: "2026-09-29T09:28:26.668Z"
+last_activity: 2026-09-29 -- Phase 05.1 execution started
 progress:
   total_phases: 13
   completed_phases: 10
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** allocation.r completes reliably for all scenarios × regions × timesteps, producing simulated LULC maps without crashing.
-**Current focus:** Phase 05 COMPLETE. Next open phases: 4 (End-to-End Correctness & Performance), plus stale-looking checkboxes on 1.1 and 3 — see Blockers.
+**Current focus:** Phase 05.1 — fix-mask-value-domain-guard-cr-01-and-the-over-firing-non-va
 
 ## Current Position
 
-Phase: 05.1 (fix-mask-value-domain-guard-cr-01-and-the-over-firing-non-va) — NOT PLANNED
-Plan: 0 of 0
-Status: Phase 05.1 inserted (URGENT) — awaiting /gsd:plan-phase 05.1
-Last activity: 2026-09-28 -- Phase 05 all 16 plans complete; operator gate closed
+Phase: 05.1 (fix-mask-value-domain-guard-cr-01-and-the-over-firing-non-va) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 05.1
+Last activity: 2026-09-29 -- Phase 05.1 execution started
 
 ### Roadmap Evolution
 
