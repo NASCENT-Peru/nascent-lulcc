@@ -243,6 +243,9 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
 #' (CR-02, D-13). Nothing is ever resampled or reprojected at runtime. The
 #' caller's `cell_index` is validated too, because `max(cell_id)` drives a vector
 #' allocation and a `cell_id` of 0 silently mis-selects rows downstream (WR-10).
+#' The mask's value domain `{0, 1, NA}` is enforced as well: a categorical or
+#' otherwise non-1-coded mask is a hard stop rather than a vector that reads as
+#' entirely "outside" (CR-01).
 #'
 #' The cache is keyed on the normalised path, the mask's modification time
 #' (sub-second), its size in bytes and `length(cell_index$cell_id)` — not on the
@@ -322,6 +325,29 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
   }
 
   v <- terra::extract(m, rcid)[[1L]]
+  # CR-01: the THIRD assertion scripts/validate_intervention_masks.r makes
+  # offline (`bad <- vals[!vals %in% c(0, 1)]`). The comment at the compareGeom
+  # guard above claims parity with that validator, but plan 05-09 mirrored only
+  # two of its three assertions. A value that is not 0/1/NA — 255 from an 8-bit
+  # gdal_rasterize/QGIS burn, or the factor a categorical GeoTIFF returns — reads
+  # as "outside" here, and for `Prob_adjust_zone: Outside` the zone is the
+  # complement of the mask, so an all-FALSE LUT inverts the policy onto the whole
+  # region. `v` is already materialised, so the check costs nothing.
+  # Order matters: the `!=` comparisons below are meaningless on a factor, so the
+  # non-numeric guard must come first.
+  if (!is.numeric(v)) {
+    stop(sprintf(
+      "intervention mask %s is categorical/non-numeric; expected numeric {0,1,NA}",
+      mask_path
+    ), call. = FALSE)
+  }
+  bad <- unique(v[!is.na(v) & v != 0 & v != 1])
+  if (length(bad) > 0L) {
+    stop(sprintf(
+      "intervention mask %s has value(s) outside {0,1,NA}: %s",
+      mask_path, paste(utils::head(bad, 5L), collapse = ", ")
+    ), call. = FALSE)
+  }
   lut <- logical(max(cid))
   lut[cid[!is.na(v) & v == 1]] <- TRUE
   assign(key, lut, envir = cache)
