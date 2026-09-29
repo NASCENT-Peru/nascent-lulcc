@@ -28,6 +28,10 @@
 #'         - per run: maps_checked == 0 while at least one active Absolute-0
 #'           intervention is configured is a FAIL, because the run then
 #'           asserted nothing at all.
+#'       For zone Outside the mask itself must additionally hold at least one
+#'       cell equal to 1 over this region: the Outside zone is the complement
+#'       of the mask, so an empty or wrongly-coded mask would satisfy the
+#'       assertion trivially across the whole region (CR-01).
 #'   (d) No forbidden marker appears in any log under the region dir (or in
 #'       --extra-log, e.g. the SLURM stdout file).
 #'   (e) The plan 05-13 telemetry CSV
@@ -335,6 +339,11 @@ if (length(abs0) > 0L) {
         # D-06a: count the maps this intervention actually asserted on, so the
         # per-map INFO downgrade above cannot become a blanket escape hatch.
         n_checked_id <- 0L
+        # D-04 (CR-01): the Outside non-degeneracy check runs once per
+        # intervention, not once per map — every probability map in a region is
+        # built from the same `anterior` raster, so the cropped `m0` is
+        # identical for every k.
+        degeneracy_checked <- FALSE
         for (k in rows) {
           id_trans <- tr[["id_trans"]][k]
           tif <- file.path(prob_map_dir, sprintf("%03d_id_trans_%d.tif", k, id_trans))
@@ -351,6 +360,26 @@ if (length(abs0) > 0L) {
           }
           m0 <- terra::ifel(is.na(m), 0, m)
           sel <- if (identical(zone, "Inside")) (m0 == 1) else (m0 != 1)
+          # D-04 (CR-01): for zone Outside the asserted zone is the COMPLEMENT
+          # of the mask, so "prob is 0 over the complement" is satisfied
+          # trivially across the whole region by an all-zero or wrongly-coded
+          # mask — with a large, non-vacuous n_zone. The n_zone guard below
+          # only ever proved the complement is non-empty; it never proved the
+          # mask holds a single cell equal to 1. Prove that separately, or the
+          # evidence cannot distinguish a correctly 1-coded mask from an empty
+          # one. Only the Outside branch needs this: for zone Inside `sel` IS
+          # (m0 == 1), so a degenerate mask already yields n_zone == 0 on every
+          # map and is reported by the per-intervention D-06a check.
+          if (identical(zone, "Outside") && !degeneracy_checked) {
+            degeneracy_checked <- TRUE
+            n_ones <- terra::global(m0 == 1, "sum", na.rm = TRUE)[[1]][1]
+            if (!is.finite(n_ones) || n_ones == 0) {
+              fail(sprintf(
+                "%s: mask %s has 0 cells equal to 1 over this region but Prob_adjust_zone=Outside (degenerate mask: the Outside zone is then the whole region, so the assertion cannot distinguish a correct mask from an empty one)",
+                id, basename(mask_path)
+              ))
+            }
+          }
           # WR-04: `r` is a PER-TRANSITION probability map — allocation builds
           # it as setValues(anterior, NA_real_) and then writes dt_j$prob at
           # dt_j$cell_id (src/allocation.r:3196-3200), so it is non-NA only on
@@ -587,6 +616,16 @@ forbidden <- c(
   # these two prefixes is an error; no success line uses them.
   "intervention mask: ",
   "intervention config: ",
+  # Mask value-domain rejections (plan 05.1-01, CR-01). The D-01 runtime stop
+  # in .mask_inside_lut() reads "intervention mask <path> has value(s) outside
+  # {0,1,NA}: ..." (no colon after "mask"), while the D-02 Stage 7 pre-flight
+  # variants carry the existing "intervention mask: " prefix above. These two
+  # substrings are deliberately prefix-free so they catch BOTH wordings; they
+  # are a frozen contract with plan 05.1-01 and must not be paraphrased.
+  # Matching is grep(f, lines_p, fixed = TRUE), so the braces are literal.
+  # No success line anywhere in the engine emits either substring.
+  "outside {0,1,NA}",
+  "is categorical/non-numeric",
   # Telemetry degradation (plan 05-13). The success line is
   # "intervention telemetry: wrote N rows to ...", so only the WARN form and
   # the pre-flight form are forbidden.
