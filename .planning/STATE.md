@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 05-06-PLAN.md (main merge pending: PR #2)"
-last_updated: "2026-09-29T09:28:26.668Z"
+stopped_at: "05.1-03 tasks 1-2 complete; BLOCKED at task 3 operator gate (ZALF HPC login02)"
+last_updated: "2026-09-29T09:59:17.347Z"
 last_activity: 2026-09-29 -- Phase 05.1 execution started
 progress:
   total_phases: 13
@@ -167,6 +167,7 @@ None yet.
 - `MultisessionFuture interrupted` (OOM SIGKILL) at ~3 minutes locally — the project's defining failure mode; addressed structurally across Phases 2–3.
 - Phase 1 HPC-only verification gates (live Euler smoke test, live env solve, live SIGKILL test) pending operator confirmation — tracked in 01-HUMAN-UAT.md. **Phase 1.1 now closed** — the INFRA-01 live smoke gate is satisfied (exit 0).
 - Phase 05 SC1/D-01 PENDING: PR #2 (spatial-interventions-integration -> main) is open but NOT merged; main still has no intervention support
+- OPEN (05.1-03 task 3, BLOCKING): operator gate on ZALF HPC not yet run. CR-01 stays formally open until an operator pastes: validate_intervention_masks.r VERDICT line over the 14 real masks; PASS verify_intervention_smoke banners for NAT x costa_peruana x 2032 and NAT x andes x 2032 with their maps_checked; per-region count of 'Info: ... not counted' lines; the andes SLURM job id and its sacct Partition=fat line. Local tests only prove the guards fire on synthetic rasters.
 
 ## Deferred Items
 
@@ -177,6 +178,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-23T08:42:13.549Z
-Stopped at: Completed 05-06-PLAN.md (main merge pending: PR #2)
-Resume file: None
+Last session: 2026-09-29T09:59:09.591Z
+Stopped at: 05.1-03 tasks 1-2 complete; BLOCKED at task 3 operator gate (ZALF HPC login02)
+Resume file: .planning/phases/05.1-fix-mask-value-domain-guard-cr-01-and-the-over-firing-non-va/05.1-03-SUMMARY.md
