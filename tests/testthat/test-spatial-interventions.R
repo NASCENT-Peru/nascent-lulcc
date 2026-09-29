@@ -47,19 +47,40 @@ source(file.path(.repo_root, "src", "implement_spatial_interventions.R"))
 # Write a single-layer mask onto a caller-supplied template raster. Passing a
 # template that is NOT .ref_grid() is how the CR-02 mis-gridded fixtures are
 # built (shifted extent, smaller extent).
-.write_mask_on <- function(dir, template, name = "mask_a.tif", cells = .mask_cells) {
+#
+# `value` is the burn value written at `cells`; it defaults to 1 so every
+# pre-existing call site is byte-identical. Passing value = 255 is how the CR-01
+# out-of-domain fixture is built (the gdal_rasterize / QGIS 8-bit default).
+.write_mask_on <- function(dir, template, name = "mask_a.tif", cells = .mask_cells,
+                           value = 1) {
   r <- terra::rast(template)
   v <- rep(NA_real_, terra::ncell(r))
   keep <- cells[cells >= 1L & cells <= terra::ncell(r)]
-  v[keep] <- 1
+  v[keep] <- value
   terra::values(r) <- v
   path <- file.path(dir, name)
   terra::writeRaster(r, path, overwrite = TRUE)
   path
 }
 
-.write_mask <- function(dir, name = "mask_a.tif", cells = .mask_cells) {
-  .write_mask_on(dir, .ref_grid(), name = name, cells = cells)
+.write_mask <- function(dir, name = "mask_a.tif", cells = .mask_cells, value = 1) {
+  .write_mask_on(dir, .ref_grid(), name = name, cells = cells, value = value)
+}
+
+# A true categorical GeoTIFF ON the reference grid: integer 1 at `cells`, 0
+# elsewhere, plus a category table, so terra::extract() round-trips a FACTOR.
+# compareGeom() and nlyr() both pass, and terra::minmax() reads 0..1, so only an
+# explicit is.numeric()/is.factor() check catches it (CR-01).
+.write_categorical_mask <- function(dir, name = "mask_cat.tif", cells = .mask_cells) {
+  r <- .ref_grid()
+  v <- rep(0L, terra::ncell(r))
+  keep <- cells[cells >= 1L & cells <= terra::ncell(r)]
+  v[keep] <- 1L
+  terra::values(r) <- v
+  levels(r) <- data.frame(value = c(0L, 1L), label = c("outside", "inside"))
+  path <- file.path(dir, name)
+  terra::writeRaster(r, path, overwrite = TRUE)
+  path
 }
 
 # A multi-band raster ON the reference grid: compareGeom() passes (it ignores
@@ -393,6 +414,58 @@ test_that("IN-07: a mask removed after resolution reports the forbidden marker",
   )
   # verify_intervention_smoke.r treats this literal as fatal.
   expect_true(grepl("intervention mask missing", err, fixed = TRUE))
+})
+
+test_that("CR-01: a mask burned with 255 is rejected, not read as empty", {
+  # 255 is the default burn value of gdal_rasterize and of QGIS "Rasterize" on
+  # an 8-bit output. Pre-fix, `v == 1` was FALSE everywhere, so the LUT was all
+  # FALSE and `Prob_adjust_zone: Outside` inverted onto the whole region with no
+  # error and no log line.
+  scratch <- withr::local_tempdir()
+  path <- .write_mask(scratch, name = "mask_255.tif", value = 255)
+  ref <- terra::rast(.write_ref_grid(scratch))
+  expect_error(
+    .mask_inside_lut(
+      path, .cell_index(), new.env(parent = emptyenv()), ref_grid = ref
+    ),
+    "outside {0,1,NA}",
+    fixed = TRUE
+  )
+  # The offending value must be reported, not just its existence.
+  expect_error(
+    .mask_inside_lut(
+      path, .cell_index(), new.env(parent = emptyenv()), ref_grid = ref
+    ),
+    "255",
+    fixed = TRUE
+  )
+})
+
+test_that("CR-01: a categorical mask is rejected before the 0/1 comparison", {
+  # terra::extract() returns a factor for a categorical GeoTIFF, so `v != 0` and
+  # `v != 1` are meaningless there; the non-numeric guard has to fire first.
+  scratch <- withr::local_tempdir()
+  path <- .write_categorical_mask(scratch)
+  ref <- terra::rast(.write_ref_grid(scratch))
+  expect_error(
+    .mask_inside_lut(
+      path, .cell_index(), new.env(parent = emptyenv()), ref_grid = ref
+    ),
+    "is categorical/non-numeric",
+    fixed = TRUE
+  )
+})
+
+test_that("CR-01: a correctly 1-coded mask still yields the same LUT", {
+  # No-regression control for the two guards above: .mask_cells are national
+  # cells 2, 7, 13 -> region cell_ids 1, 3, 5.
+  scratch <- withr::local_tempdir()
+  path <- .write_mask(scratch)
+  ref <- terra::rast(.write_ref_grid(scratch))
+  lut <- .mask_inside_lut(
+    path, .cell_index(), new.env(parent = emptyenv()), ref_grid = ref
+  )
+  expect_identical(lut, c(TRUE, FALSE, TRUE, FALSE, TRUE, FALSE))
 })
 
 # --------------------------------------------------------------------------

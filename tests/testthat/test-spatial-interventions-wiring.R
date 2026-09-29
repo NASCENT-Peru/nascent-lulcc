@@ -200,6 +200,42 @@ sys.source(file.path(.repo_root, "src", "allocation.r"), envir = .wenv_noengine)
   path
 }
 
+# CR-01 value-domain fixtures. All three sit ON the reference grid and are
+# single-layer, so they reach the new value-domain block with the nlyr and
+# compareGeom branches satisfied.
+
+# Every cell burned with `value` (255 = the gdal_rasterize / QGIS 8-bit default).
+.write_wiring_valued_mask <- function(dir, name, value) {
+  r <- .wiring_ref_grid()
+  terra::values(r) <- rep(value, terra::ncell(r))
+  path <- file.path(dir, name)
+  terra::writeRaster(r, path, overwrite = TRUE)
+  path
+}
+
+# A true categorical GeoTIFF: minmax() reads 0..1, so only terra::is.factor()
+# catches it at pre-flight.
+.write_wiring_categorical_mask <- function(dir, name) {
+  r <- .wiring_ref_grid()
+  v <- rep(0L, terra::ncell(r))
+  v[c(2L, 7L, 13L)] <- 1L
+  terra::values(r) <- v
+  levels(r) <- data.frame(value = c(0L, 1L), label = c("outside", "inside"))
+  path <- file.path(dir, name)
+  terra::writeRaster(r, path, overwrite = TRUE)
+  path
+}
+
+# All NA: terra::minmax(compute = TRUE) returns NaN NaN here, which is why the
+# pre-flight's finiteness guard is mandatory.
+.write_wiring_all_na_mask <- function(dir, name) {
+  r <- .wiring_ref_grid()
+  terra::values(r) <- rep(NA_real_, terra::ncell(r))
+  path <- file.path(dir, name)
+  terra::writeRaster(r, path, overwrite = TRUE)
+  path
+}
+
 .wiring_config <- function(dir,
                            ref_grid_path = .write_wiring_ref_grid(dir),
                            simulation_year_steps = c(2024L, 2028L, 2032L),
@@ -481,6 +517,68 @@ test_that("CR-02: each unique mask path is opened at most once per pre-flight", 
   lines <- .intervention_lines(res)
   expect_length(lines, 1L)
   expect_match(lines, "is not on the reference grid")
+})
+
+# --- CR-01 pre-flight value-domain fixtures ---------------------------------
+
+test_that("CR-01: pre-flight rejects a mask whose values are outside {0,1,NA}", {
+  withr::local_envvar(ALLOCATION_YEAR_POST_FILTER = NA)
+  dir <- withr::local_tempdir()
+  .write_nat_yaml(dir)
+  .write_wiring_masks(dir, c("nat_mask_2028.tif", "nat_mask_2032.tif"))
+  # Overwrite one of the resolved masks so the resolver still finds both.
+  .write_wiring_valued_mask(dir, "nat_mask_2032.tif", value = 255)
+  res <- .wenv$validate_allocation_runtime(config = .wiring_config(dir))
+  lines <- .intervention_lines(res)
+  expect_length(lines, 1L)
+  expect_true(grepl("outside {0,1,NA}", lines, fixed = TRUE))
+  expect_true(startsWith(lines, "intervention mask: "))
+  expect_match(lines, "nat_mask_2032.tif", fixed = TRUE)
+  # The conforming mask is silent.
+  expect_false(any(grepl("nat_mask_2028.tif", lines, fixed = TRUE)))
+})
+
+test_that("CR-01: pre-flight rejects a categorical mask", {
+  withr::local_envvar(ALLOCATION_YEAR_POST_FILTER = NA)
+  dir <- withr::local_tempdir()
+  .write_nat_yaml(dir)
+  .write_wiring_masks(dir, c("nat_mask_2028.tif", "nat_mask_2032.tif"))
+  .write_wiring_categorical_mask(dir, "nat_mask_2032.tif")
+  res <- .wenv$validate_allocation_runtime(config = .wiring_config(dir))
+  lines <- .intervention_lines(res)
+  expect_length(lines, 1L)
+  expect_true(grepl("is categorical/non-numeric", lines, fixed = TRUE))
+  expect_true(startsWith(lines, "intervention mask: "))
+  expect_match(lines, "nat_mask_2032.tif", fixed = TRUE)
+})
+
+test_that("CR-01: an all-NA mask does not crash the pre-flight", {
+  # terra::minmax(compute = TRUE) returns NaN NaN on an all-NA raster, so a bare
+  # `mm[1] >= 0 && mm[2] <= 1` throws "missing value where TRUE/FALSE needed" -
+  # itself a forbidden marker in the smoke verifier. An all-NA mask is degenerate
+  # but its value-domain claim is vacuously true, so it must pass this gate.
+  withr::local_envvar(ALLOCATION_YEAR_POST_FILTER = NA)
+  dir <- withr::local_tempdir()
+  .write_nat_yaml(dir)
+  .write_wiring_masks(dir, c("nat_mask_2028.tif", "nat_mask_2032.tif"))
+  .write_wiring_all_na_mask(dir, "nat_mask_2032.tif")
+  expect_no_error(
+    res <- .wenv$validate_allocation_runtime(config = .wiring_config(dir))
+  )
+  expect_false(any(grepl(
+    "missing value where TRUE/FALSE needed", res, fixed = TRUE
+  )))
+  expect_false(any(grepl("outside {0,1,NA}", res, fixed = TRUE)))
+})
+
+test_that("CR-01: a valid 1-coded mask adds no intervention line", {
+  # No-regression control for the three blocks above.
+  withr::local_envvar(ALLOCATION_YEAR_POST_FILTER = NA)
+  dir <- withr::local_tempdir()
+  .write_nat_yaml(dir)
+  .write_wiring_masks(dir, c("nat_mask_2028.tif", "nat_mask_2032.tif"))
+  res <- .wenv$validate_allocation_runtime(config = .wiring_config(dir))
+  expect_length(.intervention_lines(res), 0L)
 })
 
 # --- D-07: repo YAMLs agree with the posterior-year schedule ----------------
