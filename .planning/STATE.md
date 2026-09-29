@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: phase_complete
-stopped_at: "Phase 05 COMPLETE - verification passed 24/24 must-haves (2026-09-28)"
-last_updated: "2026-09-28T11:00:00.000Z"
-last_activity: 2026-09-28 -- Phase 05 COMPLETE and verified (24/24 must-haves)
+status: "Phase 05.1 inserted (URGENT) — awaiting /gsd:plan-phase 05.1"
+stopped_at: "Completed 05-06-PLAN.md (main merge pending: PR #2)"
+last_updated: "2026-09-29T09:08:12.408Z"
+last_activity: 2026-09-28 -- Phase 05 all 16 plans complete; operator gate closed
 progress:
-  total_phases: 12
+  total_phases: 13
   completed_phases: 10
-  total_plans: 52
-  completed_plans: 48
-  percent: 83
+  total_plans: 55
+  completed_plans: 51
+  percent: 77
 ---
 
 # Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 05 (integrate-spatial-interventions-branch-and-stage-interventio) — COMPLETE (verified 2026-09-28, 24/24)
-Plan: 16 of 16
-Status: Phase 05 complete and verified; awaiting next phase selection
+Phase: 05.1 (fix-mask-value-domain-guard-cr-01-and-the-over-firing-non-va) — NOT PLANNED
+Plan: 0 of 0
+Status: Phase 05.1 inserted (URGENT) — awaiting /gsd:plan-phase 05.1
 Last activity: 2026-09-28 -- Phase 05 all 16 plans complete; operator gate closed
 
 ### Roadmap Evolution
@@ -41,6 +41,7 @@ Progress: [██████████] 98%
 
 - Phase 03.6 inserted after Phase 3: Complete single-scenario end-to-end run (all regions x all timesteps) (URGENT)
 - Phase 5 added (2026-09-22): Integrate colleague's `spatial_interventions` branch into the much-advanced `main`; check spatial-intervention masks (`D:\C.3_Modelling\nascent-lulcc-agg\inputs\spat_prob_perturb`) against the intervention config files and plan their HPC file-system placement
+- Phase 05.1 inserted after Phase 5: Fix mask value-domain guard (CR-01) and the over-firing WR-07 non-vacuity guard (WR-04) from 05-REVIEW-2.md (URGENT)
 
 ## Performance Metrics
 
@@ -162,7 +163,6 @@ None yet.
 - OPEN (cycle-2 review WR-04): the new WR-07 non-vacuity guard in verify_intervention_smoke.r:347-354 turns a legitimate 'mask does not intersect this transition's from-class in this region' into a FAIL. Did not fire for NAT x costa_peruana x 2032 but is live for other regions - expect a confusing false failure on the next region's smoke.
 - OPEN (verifier observation, pre-dates Phase 5): config/local_config.yaml:5 is `data_basepath: "E:/nascent-lulcc-agg"` but the data is on `D:/C.3_Modelling/nascent-lulcc-agg`; drive E: does not exist on this workstation. A bare `Rscript scripts/validate_intervention_masks.r` exits 1 with 'mask directory does not exist'; --mask-dir/--ref-grid overrides are needed. Value last set 2026-01-27 by blenback, so not a Phase 5 regression. One-line fix.
 - STALE ROADMAP CHECKBOXES to confirm: Phase 1.1 (line 16) and Phase 3 (line 18) are still `- [ ]` although STATE records 1.1 as closed (INFRA-01 live smoke exits 0) and all of 3.1-3.6 are complete. Not changed unilaterally - needs the owner's call.
-
 
 - `MultisessionFuture interrupted` (OOM SIGKILL) at ~3 minutes locally — the project's defining failure mode; addressed structurally across Phases 2–3.
 - Phase 1 HPC-only verification gates (live Euler smoke test, live env solve, live SIGKILL test) pending operator confirmation — tracked in 01-HUMAN-UAT.md. **Phase 1.1 now closed** — the INFRA-01 live smoke gate is satisfied (exit 0).
