@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: 05.1 plans 3/3 complete, operator gate CLOSED; VERIFICATION gaps_found - GAP-1 blocker open (verify_intervention_smoke.r can PASS with an Absolute-0 intervention unasserted)
-last_updated: "2026-10-05T14:11:28.713Z"
-last_activity: 2026-10-05 -- Phase 05.1 plans complete, operator gate closed, verification found GAP-1 blocker
+status: "Awaiting gap closure — /gsd:plan-phase 05.1 --gaps"
+stopped_at: 05.1-03 tasks 1-2 complete; BLOCKED at task 3 operator gate (ZALF HPC login02)
+last_updated: "2026-10-05T15:49:33.080Z"
+last_activity: 2026-10-05 -- operator gate closed; GAP-1 blocker open (see 05.1-VERIFICATION.md)
 progress:
   total_phases: 13
   completed_phases: 10
-  total_plans: 55
-  completed_plans: 51
+  total_plans: 59
+  completed_plans: 54
   percent: 77
 ---
 
