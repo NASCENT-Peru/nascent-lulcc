@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "05.1-03 tasks 1-2 complete; BLOCKED at task 3 operator gate (ZALF HPC login02)"
-last_updated: "2026-09-29T09:59:17.347Z"
+stopped_at: 05.1-03 tasks 1-2 complete; BLOCKED at task 3 operator gate (ZALF HPC login02)
+last_updated: "2026-10-05T14:11:28.713Z"
 last_activity: 2026-09-29 -- Phase 05.1 execution started
 progress:
   total_phases: 13

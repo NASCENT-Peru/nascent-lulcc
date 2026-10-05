@@ -26,7 +26,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port; parallelise the full scenario sweep across Rundeck nodes (S2 multi-scenario packing)
 - [x] **Phase 5: Integrate spatial_interventions branch and stage intervention masks** *(completed 2026-09-28)* - Port the colleague's `spatial_interventions` branch onto the much-advanced `main`; check the `spat_prob_perturb` masks against the intervention configs and plan where they go on HPC | GAP CLOSURE COMPLETE 2026-09-28: all 21 review findings closed, delta telemetry added, both operator actions done. PR #2 merged as f54ccc2; verification 24/24 must-haves passed; HPC job 841577 PASS maps_checked=16 telemetry_rows=9.
  (mainline 6/6 complete 2026-09-23; reopened for gap closure 2026-09-23 - 21 review findings + new delta telemetry + 2 operator actions)
-- [ ] **Phase 05.1: Fix mask value-domain guard and over-firing non-vacuity guard** *(INSERTED 2026-09-29)* - Close CR-01 (`.mask_inside_lut()` has no mask value-domain guard, so a non-1-coded mask silently turns `Prob_adjust_zone: Outside` into the whole region while the smoke verifier still PASSes) and WR-04 (the WR-07 non-vacuity guard FAILs a correct run whenever a mask legitimately does not intersect a transition's from-class in a region). Source: 05-REVIEW-2.md.
+- [x] **Phase 05.1: Fix mask value-domain guard and over-firing non-vacuity guard** *(INSERTED 2026-09-29)* - Close CR-01 (`.mask_inside_lut()` has no mask value-domain guard, so a non-1-coded mask silently turns `Prob_adjust_zone: Outside` into the whole region while the smoke verifier still PASSes) and WR-04 (the WR-07 non-vacuity guard FAILs a correct run whenever a mask legitimately does not intersect a transition's from-class in a region). Source: 05-REVIEW-2.md. (completed 2026-10-05)
 
 ## Phase Details
 
@@ -347,7 +347,7 @@ Plans:
 **Requirements**: none mapped in REQUIREMENTS.md. Traceability is via the source findings CR-01 and WR-04 in `05-REVIEW-2.md` and the locked decisions D-01..D-07 recorded in each plan's `requirements` / `must_haves`.
 **Depends on:** Phase 5
 **Scope guard (D-07):** only CR-01 and WR-04. WR-01, WR-02, WR-03 and IN-01..IN-08 from `05-REVIEW-2.md` are explicitly out of scope.
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 
@@ -356,4 +356,4 @@ Plans:
 - [x] 05.1-02-PLAN.md - Smoke verifier: per-map non-intersection becomes INFO that does not count, the non-vacuity assertion moves to per-intervention and per-run level, `Outside`-zone masks must have a 1-cell, and the two CR-01 stops join the forbidden marker list (WR-04, D-03, D-04, D-05, D-06).
 
 **Wave 2** *(blocked on Wave 1; operator-gated)*
-- [ ] 05.1-03-PLAN.md - Cross-file wording gate + five-file regression run, docs (`spatial_masks.md`, `README_HPC.md`), and the ZALF HPC operator gate proving the guards stay silent on the 14 real masks and that a second region no longer false-FAILs.
+- [x] 05.1-03-PLAN.md - Cross-file wording gate + five-file regression run, docs (`spatial_masks.md`, `README_HPC.md`), and the ZALF HPC operator gate proving the guards stay silent on the 14 real masks and that a second region no longer false-FAILs.
