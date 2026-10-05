@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: 05.1-03 tasks 1-2 complete; BLOCKED at task 3 operator gate (ZALF HPC login02)
+stopped_at: 05.1 plans 3/3 complete, operator gate CLOSED; VERIFICATION gaps_found - GAP-1 blocker open (verify_intervention_smoke.r can PASS with an Absolute-0 intervention unasserted)
 last_updated: "2026-10-05T14:11:28.713Z"
-last_activity: 2026-09-29 -- Phase 05.1 execution started
+last_activity: 2026-10-05 -- Phase 05.1 plans complete, operator gate closed, verification found GAP-1 blocker
 progress:
   total_phases: 13
   completed_phases: 10
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 05.1 (fix-mask-value-domain-guard-cr-01-and-the-over-firing-non-va) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 05.1
-Last activity: 2026-09-29 -- Phase 05.1 execution started
+Phase: 05.1 (fix-mask-value-domain-guard-cr-01-and-the-over-firing-non-va) — PLANS COMPLETE, GAPS FOUND
+Plan: 3 of 3 complete
+Status: Awaiting gap closure — /gsd:plan-phase 05.1 --gaps
+Last activity: 2026-10-05 -- operator gate closed; GAP-1 blocker open (see 05.1-VERIFICATION.md)
 
 ### Roadmap Evolution
 
