@@ -243,3 +243,178 @@ test_that("D-03 contract: real engine stops for 255, categorical and all-zero ma
   expect_true(grepl(.STEM, msgs[["all_zero"]], fixed = TRUE))
   expect_false(grepl(.MARK, msgs[["all_zero"]], fixed = TRUE))
 })
+
+
+# --- the contract test is itself proven non-vacuous (R51-IN-05) ---
+#
+# A test of a guard is only worth having if it can fail. Every block below feeds
+# the SAME helper functions the real blocks above use (no reimplemented rule) a
+# source that violates the contract, and asserts the violation is reported. Five
+# classes are covered: a full-line comment, a trailing comment, a substring split
+# over two literals, a `forbidden` block that is not a literal expression, and
+# mutated copies of the three real files.
+
+# Mutate `from` into `to` on CODE lines only, leaving comment lines intact: the
+# shape of the R51-IN-05 defect, where the behaviour is paraphrased away while a
+# comment keeps quoting the frozen wording. `startsWith(trimws(.), "#")` is used
+# here for the MUTATION only - the assertions never decide "comment vs code" by
+# line shape, which is the whole reason the real rule goes through the parser.
+.mutate_code_lines <- function(lines, from, to) {
+  is_comment <- startsWith(trimws(lines), "#")
+  lines[!is_comment] <- gsub(from, to, lines[!is_comment], fixed = TRUE)
+  lines
+}
+
+# Write `lines` to a temp file whose lifetime is the calling test block.
+.write_source <- function(lines, env = parent.frame(), ext = ".R") {
+  path <- withr::local_tempfile(fileext = ext, .local_envir = env)
+  writeLines(lines, path)
+  path
+}
+
+test_that("non-vacuity: a comment-only occurrence of a frozen substring is reported missing", {
+  f <- .write_source(c(
+    "# has no cell equal to 1",
+    "x <- \"other\""
+  ))
+  lits <- .contract_string_literals(f)
+  # The parser discards the comment, so the only literal is "other".
+  expect_identical(lits, "other")
+  expect_identical(.contract_missing(lits, .S3), .S3)
+  # The retired whole-text grep would have called this file compliant.
+  expect_true(grepl(.S3, paste(readLines(f, warn = FALSE), collapse = "\n"), fixed = TRUE))
+})
+
+test_that("non-vacuity: a trailing comment after real code does not count", {
+  # A `^[[:space:]]*#` line filter - the obvious cheap repair - passes this file,
+  # because the line carries real code. The parser does not.
+  f <- .write_source("x <- \"other\" # has no cell equal to 1")
+  lits <- .contract_string_literals(f)
+  expect_identical(lits, "other")
+  expect_identical(.contract_missing(lits, .S3), .S3)
+  expect_true(grepl(.S3, paste(readLines(f, warn = FALSE), collapse = "\n"), fixed = TRUE))
+  # And the line-filter repair really would have been fooled:
+  kept <- readLines(f, warn = FALSE)
+  kept <- kept[!startsWith(trimws(kept), "#")]
+  expect_true(grepl(.S3, paste(kept, collapse = "\n"), fixed = TRUE))
+})
+
+test_that("non-vacuity: a substring split across two string literals does not count", {
+  # Two literals are two messages. Neither can ever reach a log line as the
+  # frozen substring, so the contract must not accept the pair.
+  split_file <- .write_source("x <- c(\"has no cell \", \"equal to 1\")")
+  expect_identical(.contract_missing(.contract_string_literals(split_file), .S3), .S3)
+  # A whole-text grep is not fooled here (the comma and quotes sit between the
+  # halves), but a check that pasted every literal together WOULD be: that
+  # concatenation does contain the frozen substring, and no log line ever can.
+  expect_true(grepl(
+    .S3, paste(.contract_string_literals(split_file), collapse = ""), fixed = TRUE
+  ))
+
+  # Control: the same text inside ONE literal is present.
+  whole_file <- .write_source("x <- \"intervention mask %s has no cell equal to 1\"")
+  expect_identical(.contract_missing(.contract_string_literals(whole_file), .S3), character(0))
+})
+
+test_that("non-vacuity: a forbidden block that is not a literal expression is rejected, and a commented-out element is absent", {
+  # A `forbidden` vector built with a call could not be lifted out and evaluated
+  # on its own, so the extraction refuses it loudly instead of guessing.
+  not_literal <- .write_source(c(
+    "suffix <- \"x\"",
+    "forbidden <- c(paste0(\"a\", suffix), \"b\")"
+  ))
+  expect_error(.contract_forbidden_vector(not_literal), "self-contained")
+
+  # An element demoted to a comment is simply not in the evaluated vector - which
+  # is exactly the deletion the retired source grep could not see.
+  commented_out <- .write_source(c(
+    "forbidden <- c(",
+    "  # \"has no cell equal to 1\" used to be an element and is now only this",
+    "  \"other\"",
+    ")"
+  ))
+  fb <- .contract_forbidden_vector(commented_out)
+  expect_identical(fb, "other")
+  expect_false(.S3 %in% fb)
+
+  # Two assignments mean the asserted vector is not the one the script runs with.
+  two_assigns <- .write_source(c(
+    "forbidden <- c(\"a\")",
+    "forbidden <- c(\"b\")"
+  ))
+  expect_error(.contract_forbidden_vector(two_assigns), "exactly one")
+})
+
+test_that("non-vacuity: a mutated copy of the real verifier that keeps S3 only in a comment fails the contract", {
+  # THIS IS THE R51-IN-05 DEFECT, DEMONSTRATED ON THE REAL FILE. The mutation is
+  # the commit a future plan could plausibly make: paraphrase the `forbidden`
+  # entry while the rationale comment above it keeps quoting the frozen wording.
+  # The verifier would stop treating an all-zero mask as fatal, and the retired
+  # whole-text grep would have stayed green through it.
+  src <- readLines(.verifier_path(), warn = FALSE)
+  mutated <- c(.mutate_code_lines(src, .S3, "has no 1-coded cell"), paste("#", .S3))
+  tmp <- .write_source(mutated, ext = ".r")
+
+  # (a) the retired test's behaviour: still GREEN on the mutated copy.
+  expect_true(grepl(.S3, paste(mutated, collapse = "\n"), fixed = TRUE))
+  # (b) the parse-based contract: the evaluated vector no longer carries it.
+  fb_mut <- .contract_forbidden_vector(tmp)
+  expect_false(.S3 %in% fb_mut)
+  expect_true("has no 1-coded cell" %in% fb_mut)
+  # (c) the unmutated file does carry it, so the mutation is the only difference.
+  expect_true(.S3 %in% .contract_forbidden_vector(.verifier_path()))
+})
+
+test_that("non-vacuity: mutated copies of the real engine and pre-flight that keep S3 only in a comment fail the contract", {
+  # Same demonstration on the two emitting files: a paraphrased message with the
+  # frozen wording left behind in a comment. Whole-text grep green, contract red.
+  for (real in c(.engine_path(), .preflight_path())) {
+    src <- readLines(real, warn = FALSE)
+    mutated <- c(.mutate_code_lines(src, .S3, "has no 1-coded cell"), paste("#", .S3))
+    tmp <- .write_source(mutated)
+    expect_true(
+      grepl(.S3, paste(mutated, collapse = "\n"), fixed = TRUE),
+      info = sprintf("whole-text grep must stay green on the mutated %s", basename(real))
+    )
+    expect_identical(
+      .contract_missing(.contract_string_literals(tmp), .S3), .S3
+    )
+    # Control: the real file passes the same check.
+    expect_identical(
+      .contract_missing(.contract_string_literals(real), .S3), character(0)
+    )
+  }
+
+  # The pre-flight is the only emitter of S4, so deleting its literal while a
+  # comment keeps the phrase must also be caught.
+  pre <- readLines(.preflight_path(), warn = FALSE)
+  mutated4 <- c(
+    .mutate_code_lines(pre, .S4, "values were unreadable"), paste("#", .S4)
+  )
+  tmp4 <- .write_source(mutated4)
+  expect_true(grepl(.S4, paste(mutated4, collapse = "\n"), fixed = TRUE))
+  expect_identical(.contract_missing(.contract_string_literals(tmp4), .S4), .S4)
+})
+
+test_that("non-vacuity: the colon-form rule rejects the wrong form in each file", {
+  # The two forms are not interchangeable: the verifier's single prefix-free
+  # entry catches both, but its "intervention mask: " marker is what catches the
+  # pre-flight-only "values could not be read", so the pre-flight must keep the
+  # colon and the engine must not grow one.
+  colon <- .contract_string_literals(
+    .write_source("stop(sprintf(\"intervention mask: %s has no cell equal to 1\", p))")
+  )
+  colon_free <- .contract_string_literals(
+    .write_source("stop(sprintf(\"intervention mask %s has no cell equal to 1\", p))")
+  )
+
+  expect_false(.engine_form_ok(colon, .S3, mark = .MARK, stem = .STEM))
+  expect_true(.engine_form_ok(colon_free, .S3, mark = .MARK, stem = .STEM))
+  expect_false(.preflight_form_ok(colon_free, .S3, mark = .MARK))
+  expect_true(.preflight_form_ok(colon, .S3, mark = .MARK))
+
+  # Absence is not compliance: a file that never emits the substring fails both.
+  absent <- .contract_string_literals(.write_source("x <- \"unrelated\""))
+  expect_false(.engine_form_ok(absent, .S3, mark = .MARK, stem = .STEM))
+  expect_false(.preflight_form_ok(absent, .S3, mark = .MARK))
+})

@@ -512,13 +512,9 @@ test_that("D-04: a 1-coded Outside mask still passes", {
   expect_match(res$out, "maps_checked=2", fixed = TRUE)
 })
 
-test_that("CR-01s: the forbidden list carries both value-domain substrings", {
-  # Static: runs even when the subprocess blocks skip. Frozen contract with
-  # plan 05.1-01 — the engine emits these exact substrings.
-  src <- paste(readLines(.smoke_script, warn = FALSE), collapse = "\n")
-  expect_true(grepl("outside {0,1,NA}", src, fixed = TRUE))
-  expect_true(grepl("is categorical/non-numeric", src, fixed = TRUE))
-})
+# The CR-01s source-text grep for "outside {0,1,NA}" / "is categorical/non-numeric"
+# is retired (R51-IN-05): it passed on the rationale comments above `forbidden`.
+# See test-intervention-wording-contract.R and the D-03 block near the end of this file.
 
 test_that("CR-01: a mask value-domain stop in the worker log is fatal", {
   root <- withr::local_tempdir()
