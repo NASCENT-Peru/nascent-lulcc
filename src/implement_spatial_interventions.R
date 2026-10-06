@@ -575,6 +575,13 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
 #' are NOT renormalised; the number of cells whose summed probability exceeds 1
 #' is only logged (`cells_sum_gt1`).
 #'
+#' Two non-fatal WARN lines can appear in `log_file`: a `WARN intervention
+#' zone:` line per intervention whose (validly 1-coded) mask does not intersect
+#' this region, naming the id, mask, region, zone and whether the zone therefore
+#' covers `none` or `all` of the region (GAP-2); and the `WARN intervention
+#' telemetry` line described under the telemetry CSV section below. Neither
+#' stops the call.
+#'
 #' @section Intervention AUDIT line contract:
 #' The per-intervention line is
 #' \preformatted{
@@ -805,6 +812,31 @@ implement_spatial_interventions <- function(
     inside_lut <- .mask_inside_lut(
       mask_path, cell_index, cache, ref_grid = ref_grid
     )
+
+    # GAP-2, non-fatal half. .mask_inside_lut() has already proven this mask is
+    # either validly 1-coded somewhere or entirely NA (a mask that carries
+    # values but has no 1 anywhere stopped inside it), so an LUT with no TRUE
+    # over this region's cells means the mask legitimately misses the region --
+    # a national mask applied region by region. That is not an error. It was,
+    # however, completely silent: an `Inside` intervention did nothing and an
+    # `Outside` intervention applied to the entire region, and the smoke
+    # verifier had no way to tell "this mask misses this region" from "this mask
+    # is broken". With this line the verifier's Outside proof can stay a FAIL
+    # for a degenerate mask while this stays a logged non-event. `all` is the
+    # honest statement for zone `Outside`: the complement of an empty zone is
+    # the whole region. `inside_lut` is indexed by region cell_id and has length
+    # max(cell_index$cell_id), so the index is in range.
+    zone <- intervention[["Prob_adjust_zone"]]
+    if (!any(inside_lut[cell_index$cell_id], na.rm = TRUE)) {
+      log_msg(
+        sprintf(
+          "WARN intervention zone: %s mask %s does not intersect region %s; Prob_adjust_zone=%s therefore applies to %s of the region",
+          iv_id, mask_name, region_label, zone,
+          if (identical(zone, "Inside")) "none" else "all"
+        ),
+        log_file
+      )
+    }
 
     # If the Intervention requires filtering by LULC classes then translate
     # the From_lulc_filter class names to integer from_val values, to be
