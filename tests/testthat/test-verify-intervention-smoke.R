@@ -21,7 +21,21 @@
 #   - CR-01  the mask value-domain stops ("outside {0,1,NA}",
 #            "is categorical/non-numeric") are fatal forbidden markers;
 #   - D-22   the 05-13 telemetry CSV exists, matches the AUDIT lines and shows
-#            mean_after = 0 for Absolute-to-0 target rows.
+#            mean_after = 0 for Absolute-to-0 target rows;
+#   - GAP-1  an active Absolute-0 intervention that this region's
+#            trans_rates.csv holds no target rows for FAILs the run by name,
+#            even when a sibling intervention keeps maps_checked above the
+#            run-level floor — and its Outside mask is still proved
+#            non-degenerate. A two-intervention run where both have rows is
+#            the control that the ledger does not false-FAIL;
+#   - R51-WR-04
+#            a probability map with no non-NA cell anywhere in the region is a
+#            FAIL unless the judged worker log carries the engine's own
+#            "has no predictions; wrote empty TIF" WARN for that row;
+#   - R51-IN-01
+#            one log line matching two forbidden markers yields errors=1;
+#   - D-03   the forbidden vector carries "has no cell equal to 1" and parses
+#            standalone (frozen contract with plans 05.1-05 and 05.1-06).
 #
 # IN-06: the repository root is resolved WITHOUT base R's null-coalescing
 # operator, which would be taken from base at file-source time, before
@@ -102,56 +116,73 @@ library(testthat)
   .smoke_write_raster(path, v)
 }
 
-.smoke_audit_iv <- function(region_label, scenario, year, zone = "Inside") {
+# The intervention-identifying tokens are formals so a fixture can emit a
+# SECOND AUDIT line. The defaults reproduce the single-intervention line
+# byte for byte.
+.smoke_audit_iv <- function(region_label, scenario, year, zone = "Inside",
+                            id = "iv_abs", rank = 1L, to_vals = "105,104",
+                            mask = "mask_a.tif", rows_target = 6,
+                            rows_changed = 6, sum_abs_delta = 1.62) {
   sprintf(
     paste0(
       "2026-01-01 00:00:00 AUDIT stage=intervention region=%s scenario=%s ",
-      "year=%d id=iv_abs rank=1 type=Absolute zone=%s to_vals=105,104 ",
-      "mask=mask_a.tif rows_target=6 rows_changed=6 delta_mean=-0.27 ",
+      "year=%d id=%s rank=%d type=Absolute zone=%s to_vals=%s ",
+      "mask=%s rows_target=%g rows_changed=%g delta_mean=-0.27 ",
       "delta_med=-0.19 delta_sd=0.192146 delta_min=-0.6 delta_max=-0.1 ",
-      "n_inc=0 n_dec=6 sum_abs_delta=1.62"
+      "n_inc=0 n_dec=6 sum_abs_delta=%g"
     ),
-    region_label, scenario, as.integer(year), zone
+    region_label, scenario, as.integer(year), id, as.integer(rank), zone,
+    to_vals, mask, rows_target, rows_changed, sum_abs_delta
   )
 }
 
-.smoke_audit_summary <- function(region_label, scenario, year) {
+.smoke_audit_summary <- function(region_label, scenario, year,
+                                 n_interventions = 1L) {
   sprintf(
     paste0(
       "2026-01-01 00:00:01 AUDIT stage=intervention_summary region=%s ",
-      "scenario=%s year=%d n_interventions=1 cells_sum_gt1=0"
+      "scenario=%s year=%d n_interventions=%d cells_sum_gt1=0"
     ),
-    region_label, scenario, as.integer(year)
+    region_label, scenario, as.integer(year), as.integer(n_interventions)
   )
 }
 
-.smoke_telemetry <- function(scenario, region, year, zone = "Inside") {
+# Emits one row per target class. The distribution columns are not asserted on
+# by the verifier, so they are recycled to the requested row count; the columns
+# section (e) reconciles against the AUDIT line are formals.
+.smoke_telemetry <- function(scenario, region, year, zone = "Inside",
+                             id = "iv_abs", rank = 1L, mask = "mask_a.tif",
+                             target_classes = c(105L, 104L),
+                             n_target = c(3L, 3L), n_changed = c(3L, 3L),
+                             sum_abs_delta = c(1.2, 0.42)) {
+  n <- length(target_classes)
+  sum_abs_delta <- rep_len(as.numeric(sum_abs_delta), n)
   data.frame(
-    scenario = rep(scenario, 2L),
-    region = rep(region, 2L),
-    year = rep(as.integer(year), 2L),
-    intervention_id = rep("iv_abs", 2L),
-    rank = c(1L, 1L),
-    type = rep("Absolute", 2L),
-    zone = rep(zone, 2L),
-    mask = rep("mask_a.tif", 2L),
-    target_class = c(105L, 104L),
-    n_target = c(3L, 3L),
-    n_changed = c(3L, 3L),
-    mean_before = c(0.4, 0.14),
-    mean_after = c(0, 0),
-    sd_before = c(0.2, 0.04),
-    sd_after = c(0, 0),
-    p05_delta = c(-0.58, -0.176),
-    p25_delta = c(-0.5, -0.16),
-    p50_delta = c(-0.4, -0.14),
-    p75_delta = c(-0.3, -0.12),
-    p95_delta = c(-0.22, -0.104),
-    min_delta = c(-0.6, -0.18),
-    max_delta = c(-0.2, -0.1),
-    sum_abs_delta = c(1.2, 0.42),
-    prob_mass_before = c(1.2, 0.42),
-    prob_mass_after = c(0, 0),
+    scenario = rep(scenario, n),
+    region = rep(region, n),
+    year = rep(as.integer(year), n),
+    intervention_id = rep(id, n),
+    rank = rep(as.integer(rank), n),
+    type = rep("Absolute", n),
+    zone = rep(zone, n),
+    mask = rep(mask, n),
+    target_class = as.integer(target_classes),
+    n_target = rep_len(as.integer(n_target), n),
+    n_changed = rep_len(as.integer(n_changed), n),
+    mean_before = rep_len(c(0.4, 0.14), n),
+    mean_after = rep(0, n),
+    sd_before = rep_len(c(0.2, 0.04), n),
+    sd_after = rep(0, n),
+    p05_delta = rep_len(c(-0.58, -0.176), n),
+    p25_delta = rep_len(c(-0.5, -0.16), n),
+    p50_delta = rep_len(c(-0.4, -0.14), n),
+    p75_delta = rep_len(c(-0.3, -0.12), n),
+    p95_delta = rep_len(c(-0.22, -0.104), n),
+    min_delta = rep_len(c(-0.6, -0.18), n),
+    max_delta = rep_len(c(-0.2, -0.1), n),
+    sum_abs_delta = sum_abs_delta,
+    prob_mass_before = abs(sum_abs_delta),
+    prob_mass_after = rep(0, n),
     stringsAsFactors = FALSE
   )
 }
@@ -175,10 +206,47 @@ library(testthat)
 #                    Inside zone: the WR-04 shape.
 #   trans_to         the To_lulc column of trans_rates.csv, so a fixture can
 #                    present an intervention with no matching target rows.
+#   all_na_maps      subset of c(1L, 2L) naming which probability maps are
+#                    written entirely NA. That is what allocation writes for an
+#                    active transition with no predictions, so the shape is
+#                    legitimate only when the worker log explains it.
+#   empty_tif_warn_maps
+#                    subset of c(1L, 2L) for which the engine's exact
+#                    "WARN id_trans=.. row=.. has no predictions; wrote empty
+#                    TIF" line is appended to the judged worker log.
+#   second           when a list, adds a SECOND active Allocation intervention.
+#                    This reproduces the shipped config/NAT_interventions.yml
+#                    shape — Conservation_expansion_and_preservation
+#                    (Absolute/0/Inside, three target classes, almost always
+#                    has rows) paired with Mining_freeze_post_2030
+#                    (Absolute/0/Outside, mining alone, often has none). No
+#                    fixture covered that shape, which is why an intervention
+#                    could go entirely unasserted behind a sibling's green
+#                    banner. Its sum_abs_delta field is the per-telemetry-row
+#                    vector; the second AUDIT line carries its sum, which is
+#                    the number section (e) reconciles against.
 .smoke_fixture <- function(root, scenario = "BAU", region = "r1", year = 2028L,
                            region_label = "R1", mask_cells = .smoke_mask_cells,
                            zone = "Inside", na_in_zone_maps = integer(0),
-                           trans_to = c(105L, 104L)) {
+                           trans_to = c(105L, 104L),
+                           all_na_maps = integer(0),
+                           empty_tif_warn_maps = integer(0),
+                           second = NULL) {
+  # Wholesale field replacement, not modifyList(): modifyList() recurses into
+  # list-valued fields and merges them BY NAME, so an unnamed override such as
+  # targets = list("a", "b") would silently leave the default list("mining") in
+  # place.
+  sec <- NULL
+  if (!is.null(second)) {
+    sec <- list(
+      id = "iv_mine", rank = 2L, mask_name = "mask_b.tif",
+      mask_cells = integer(0), zone = "Outside",
+      targets = list("mining"), to_vals = "106", target_classes = 106L,
+      rows_target = 0, rows_changed = 0, sum_abs_delta = 0,
+      n_target = 0L, n_changed = 0L
+    )
+    for (nm in names(second)) sec[[nm]] <- second[[nm]]
+  }
   output_root <- file.path(root, "out")
   region_dir <- file.path(
     output_root, scenario, as.character(year), paste0("region_", region)
@@ -192,6 +260,9 @@ library(testthat)
 
   .smoke_write_raster(file.path(region_dir, "posterior.tif"), rep(1, 20L))
   mask_path <- .smoke_write_mask(file.path(mask_dir, "mask_a.tif"), mask_cells)
+  if (!is.null(sec)) {
+    .smoke_write_mask(file.path(mask_dir, sec$mask_name), sec$mask_cells)
+  }
 
   # One row per target class. The verifier reconstructs the map filename from
   # the 1-based row index and id_trans, so row order is load-bearing.
@@ -208,13 +279,35 @@ library(testthat)
   } else {
     setdiff(seq_len(20L), mask_cells)
   }
+  na_cells_for <- function(j) {
+    if (j %in% all_na_maps) {
+      seq_len(20L)
+    } else if (j %in% na_in_zone_maps) {
+      mask_cells
+    } else {
+      integer(0)
+    }
+  }
   .smoke_write_prob(
     file.path(prob_dir, "001_id_trans_11.tif"), zero_cells,
-    na_cells = if (1L %in% na_in_zone_maps) mask_cells else integer(0)
+    na_cells = na_cells_for(1L)
   )
   .smoke_write_prob(
     file.path(prob_dir, "002_id_trans_12.tif"), zero_cells,
-    na_cells = if (2L %in% na_in_zone_maps) mask_cells else integer(0)
+    na_cells = na_cells_for(2L)
+  )
+
+  # Map j carries id_trans 10 + j and sits at trans_rates row j, which is the
+  # pair the engine prints and the verifier rebuilds the filename from.
+  warn_lines <- vapply(
+    sort(as.integer(empty_tif_warn_maps)),
+    function(j) {
+      sprintf(
+        "2026-01-01 00:00:00 WARN id_trans=%d row=%d has no predictions; wrote empty TIF",
+        10L + j, j
+      )
+    },
+    character(1)
   )
 
   log_path <- file.path(region_dir, "worker_1.log")
@@ -222,7 +315,24 @@ library(testthat)
     c(
       "2026-01-01 00:00:00 Applying intervention: iv_abs",
       .smoke_audit_iv(region_label, scenario, year, zone = zone),
-      .smoke_audit_summary(region_label, scenario, year)
+      if (is.null(sec)) {
+        character(0)
+      } else {
+        .smoke_audit_iv(
+          region_label, scenario, year, zone = sec$zone, id = sec$id,
+          rank = sec$rank, to_vals = sec$to_vals, mask = sec$mask_name,
+          rows_target = sec$rows_target, rows_changed = sec$rows_changed,
+          # sec$sum_abs_delta is the per-telemetry-row vector; the AUDIT line
+          # carries the intervention total, which is what section (e)
+          # reconciles against.
+          sum_abs_delta = sum(sec$sum_abs_delta)
+        )
+      },
+      .smoke_audit_summary(
+        region_label, scenario, year,
+        n_interventions = if (is.null(sec)) 1L else 2L
+      ),
+      warn_lines
     ),
     log_path
   )
@@ -241,14 +351,38 @@ library(testthat)
       "built_up_and_barren_lands", "high_intensity_agricultural_areas"
     )
   )
+  entries <- list(entry)
+  if (!is.null(sec)) {
+    entries[[2L]] <- list(
+      Intervention_stage = "Allocation",
+      Intervention_ID = sec$id,
+      Intervention_ranking = as.integer(sec$rank),
+      Mask_type = "Static",
+      Intervention_mask = sec$mask_name,
+      Time_steps_implemented = list(as.integer(year)),
+      Prob_adjust_type = "Absolute",
+      Prob_adjust_value = 0,
+      Prob_adjust_zone = sec$zone,
+      Transition_target_classes = sec$targets
+    )
+  }
   yaml_path <- file.path(iv_dir, paste0(scenario, "_interventions.yml"))
-  yaml::write_yaml(list(entry), yaml_path)
+  yaml::write_yaml(entries, yaml_path)
 
   csv_path <- file.path(
     region_dir,
     sprintf("intervention_prob_deltas_%s_%s_%d.csv", scenario, region, as.integer(year))
   )
-  .smoke_write_telemetry(csv_path, .smoke_telemetry(scenario, region, year, zone = zone))
+  tel <- .smoke_telemetry(scenario, region, year, zone = zone)
+  if (!is.null(sec)) {
+    tel <- rbind(tel, .smoke_telemetry(
+      scenario, region, year, zone = sec$zone, id = sec$id, rank = sec$rank,
+      mask = sec$mask_name, target_classes = sec$target_classes,
+      n_target = sec$n_target, n_changed = sec$n_changed,
+      sum_abs_delta = sec$sum_abs_delta
+    ))
+  }
+  .smoke_write_telemetry(csv_path, tel)
 
   list(
     scenario = scenario, region = region, year = as.integer(year),
@@ -465,6 +599,118 @@ test_that("D-22c: Absolute-to-0 rows must report mean_after = 0", {
   .skip_if_config_unavailable(res)
   expect_identical(res$status, 1L)
   expect_match(res$out, "mean_after", fixed = TRUE)
+})
+
+test_that("GAP-1: a sibling Absolute-0 intervention with a degenerate Outside mask and no target rows fails the run", {
+  # The shipped config shape: an Inside intervention that has rows paired with
+  # an Outside mining-only intervention that has none. Before the hoist and the
+  # ledger this exited 0 — the sibling kept maps_checked above the run-level
+  # floor, so the green banner was read as evidence for both.
+  root <- withr::local_tempdir()
+  fx <- .smoke_fixture(root, second = list())
+  res <- .run_verifier(fx)
+  .skip_if_config_unavailable(res)
+  expect_identical(res$status, 1L)
+  # The hoisted D-04 fired even though the intervention has zero target rows.
+  expect_match(res$out, "degenerate mask", fixed = TRUE)
+  expect_match(res$out, "iv_mine", fixed = TRUE)
+  expect_match(res$out, "this run is not evidence for them", fixed = TRUE)
+  expect_false(grepl("PASS verify_intervention_smoke", res$out, fixed = TRUE))
+})
+
+test_that("GAP-1: the unasserted ledger fires even when the skipped intervention's mask is fine", {
+  # A correctly 1-coded Inside mask, so D-04 does not apply and only the ledger
+  # can catch that nothing was asserted about this intervention.
+  root <- withr::local_tempdir()
+  fx <- .smoke_fixture(
+    root,
+    second = list(zone = "Inside", mask_cells = .smoke_mask_cells)
+  )
+  res <- .run_verifier(fx)
+  .skip_if_config_unavailable(res)
+  expect_identical(res$status, 1L)
+  expect_match(res$out, "this run is not evidence for them", fixed = TRUE)
+  expect_match(res$out, "iv_mine", fixed = TRUE)
+  expect_match(res$out, "Info: iv_mine has no target rows", fixed = TRUE)
+})
+
+test_that("GAP-1 control: two Absolute-0 interventions that both have rows still PASS", {
+  # Regression guard: the ledger must not false-FAIL a correct
+  # multi-intervention run.
+  root <- withr::local_tempdir()
+  fx <- .smoke_fixture(root, second = list(
+    zone = "Inside", mask_cells = .smoke_mask_cells, mask_name = "mask_b.tif",
+    targets = list("built_up_and_barren_lands",
+                   "high_intensity_agricultural_areas"),
+    to_vals = "105,104", target_classes = c(105L, 104L),
+    rows_target = 6, rows_changed = 6, sum_abs_delta = c(1.2, 0.42),
+    n_target = c(3L, 3L), n_changed = c(3L, 3L)
+  ))
+  res <- .run_verifier(fx)
+  .skip_if_config_unavailable(res)
+  expect_identical(res$status, 0L)
+  expect_match(res$out, "maps_checked=4", fixed = TRUE)
+  expect_match(res$out, "interventions=2", fixed = TRUE)
+  expect_false(grepl("this run is not evidence", res$out, fixed = TRUE))
+})
+
+test_that("R51-WR-04: an all-NA probability map explained by the engine's WARN is INFO, not FAIL", {
+  # src/allocation.r writes an all-NA TIF on purpose for an active transition
+  # with no predictions, to keep the %03d sequence Dinamica binds to gap-free.
+  # Failing on that shape would reject a correct run.
+  root <- withr::local_tempdir()
+  fx <- .smoke_fixture(root, all_na_maps = 1L, empty_tif_warn_maps = 1L)
+  res <- .run_verifier(fx)
+  .skip_if_config_unavailable(res)
+  expect_identical(res$status, 0L)
+  expect_match(res$out, "the engine logged no predictions for id_trans", fixed = TRUE)
+  expect_match(res$out, "maps_checked=1", fixed = TRUE)
+  expect_match(res$out, "PASS verify_intervention_smoke", fixed = TRUE)
+})
+
+test_that("R51-WR-04: an unexplained all-NA probability map FAILs", {
+  # Same raster, no engine WARN to explain it: nothing accounts for a map that
+  # holds no probability anywhere, so it must not be downgraded to INFO.
+  root <- withr::local_tempdir()
+  fx <- .smoke_fixture(root, all_na_maps = 1L)
+  res <- .run_verifier(fx)
+  .skip_if_config_unavailable(res)
+  expect_identical(res$status, 1L)
+  expect_match(
+    res$out, "has no non-NA probability cell anywhere in this region",
+    fixed = TRUE
+  )
+})
+
+test_that("R51-IN-01: a single mis-coded-mask log line produces one forbidden error, not two", {
+  # The Stage 7 pre-flight wording carries both "intervention mask: " and
+  # "outside {0,1,NA}", which used to be counted twice in the FAIL banner.
+  root <- withr::local_tempdir()
+  fx <- .smoke_fixture(root)
+  cat(paste0(
+    "2026-01-01 00:00:02 ERROR: intervention mask: /inputs/m.tif ",
+    "has value(s) outside {0,1,NA} (observed min 0, max 255)\n"
+  ), file = fx$log_path, append = TRUE)
+  res <- .run_verifier(fx)
+  .skip_if_config_unavailable(res)
+  expect_identical(res$status, 1L)
+  expect_match(res$out, "FAIL verify_intervention_smoke", fixed = TRUE)
+  expect_match(res$out, "errors=1", fixed = TRUE)
+})
+
+test_that("D-03: the forbidden vector carries the no-1-cell substring and parses standalone", {
+  # Static: runs even when the subprocess blocks skip. Asserts on the PARSED
+  # vector, not a source grep, so an occurrence in a comment cannot satisfy it.
+  # Frozen cross-file contract with plans 05.1-05 and 05.1-06.
+  src <- readLines(.smoke_script, warn = FALSE)
+  i <- grep("^forbidden <- c\\(", src)
+  expect_length(i, 1L)
+  j <- i + which(grepl("^\\)[[:space:]]*$", src[(i + 1):length(src)]))[1]
+  fb <- eval(parse(text = paste(src[i:j], collapse = "\n")))
+  expect_true(is.character(fb))
+  expect_true("has no cell equal to 1" %in% fb)
+  expect_true("outside {0,1,NA}" %in% fb)
+  expect_true("is categorical/non-numeric" %in% fb)
 })
 
 test_that("the intact fixture is a real PASS with a non-zero maps_checked", {

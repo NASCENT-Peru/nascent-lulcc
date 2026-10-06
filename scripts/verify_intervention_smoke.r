@@ -21,19 +21,33 @@
 #'           NOT counted in maps_checked. `r` is a PER-TRANSITION map, non-NA
 #'           only on that transition's from-class cells, so a mask that does
 #'           not intersect that from-class in this region is an ordinary,
-#'           correct-engine outcome, not a defect (WR-04);
+#'           correct-engine outcome, not a defect (WR-04). A map holding no
+#'           non-NA cell ANYWHERE in the region is a different shape and is
+#'           only excused when the judged worker log carries the engine's own
+#'           "has no predictions; wrote empty TIF" WARN for that id_trans and
+#'           row; otherwise it is a FAIL (R51-WR-04);
 #'         - per intervention: zero checked maps is a FAIL. That is the real
 #'           WR-07 condition -- a mask that does not intersect this region at
-#'           all;
+#'           all. An intervention that is skipped earlier, because this
+#'           region's trans_rates.csv holds none of its target rows, never
+#'           reaches that check; it is recorded in an unasserted-id ledger and
+#'           FAILs at run level instead, because the run asserted nothing about
+#'           it and is therefore not evidence for it (GAP-1);
 #'         - per run: maps_checked == 0 while at least one active Absolute-0
 #'           intervention is configured is a FAIL, because the run then
 #'           asserted nothing at all.
 #'       For zone Outside the mask itself must additionally hold at least one
 #'       cell equal to 1 over this region: the Outside zone is the complement
 #'       of the mask, so an empty or wrongly-coded mask would satisfy the
-#'       assertion trivially across the whole region (CR-01).
+#'       assertion trivially across the whole region (CR-01). That proof runs
+#'       once per intervention against the region grid and BEFORE the
+#'       target-row lookup, because it depends only on the mask and the grid --
+#'       never on what this region's trans_rates.csv happens to contain
+#'       (GAP-1).
 #'   (d) No forbidden marker appears in any log under the region dir (or in
-#'       --extra-log, e.g. the SLURM stdout file).
+#'       --extra-log, e.g. the SLURM stdout file). An offending line is
+#'       reported once, under the first marker it matches, so a wording that
+#'       carries two markers does not inflate errors=N (R51-IN-01).
 #'   (e) The plan 05-13 telemetry CSV
 #'       <region_dir>/intervention_prob_deltas_<scenario>_<region>_<year>.csv
 #'       exists, carries the 25-column contract in order, covers exactly the
@@ -236,8 +250,11 @@ is_iv <- function(l) {
     grepl(year_pat, l, fixed = TRUE) & grepl(scen_pat, l, fixed = TRUE)
 }
 # Declared before the branch so section (e) can consume the AUDIT lines rather
-# than re-parse the logs, even on the "no summary line" path.
+# than re-parse the logs, even on the "no summary line" path. Same rationale
+# for judged_log_lines: section (c) must judge the SAME log that section (b)
+# judged (R51-WR-04), not re-derive one of its own.
 iv_lines <- character(0)
+judged_log_lines <- character(0)
 with_summary <- log_files[vapply(log_lines, function(l) any(is_summary(l)), logical(1))]
 if (length(with_summary) == 0L) {
   fail(sprintf(
@@ -254,6 +271,7 @@ if (length(with_summary) == 0L) {
   }
   l <- log_lines[[newest]]
   iv_lines <- l[is_iv(l)]
+  judged_log_lines <- l
   sum_lines <- l[is_summary(l)]
   cat(sprintf("AUDIT lines from %s:\n", newest))
   for (x in c(iv_lines, sum_lines)) cat("  ", x, "\n", sep = "")
@@ -313,6 +331,31 @@ if (length(abs0) > 0L) {
       fail(sprintf("trans_rates.csv lacks From*/To*/id_trans columns: %s",
                    paste(names(tr), collapse = ", ")))
     } else {
+      # GAP-1: the Outside non-degeneracy proof (D-04) needs a reference grid
+      # for this region, and ANY probability map in the directory is a valid
+      # one: allocation builds every per-transition map as
+      # terra::setValues(anterior, ...), so all of them share one geometry. The
+      # previous code relied on exactly this already when it latched D-04 on
+      # the first map it happened to visit. Taking the reference from the
+      # directory instead decouples the proof from trans_rates.csv content.
+      region_ref_paths <- list.files(prob_map_dir, pattern = "[.]tif$", full.names = TRUE)
+      region_ref <- if (length(region_ref_paths) > 0L) {
+        terra::rast(region_ref_paths[[1]])
+      } else {
+        NULL
+      }
+      if (is.null(region_ref)) {
+        fail(sprintf(
+          "probability_map_dir %s holds no .tif, so the region grid for the Outside non-degeneracy proof cannot be established",
+          prob_map_dir
+        ))
+      }
+      # GAP-1 ledger: every active Absolute-0 intervention that this run could
+      # not assert anything about because the region's trans_rates.csv holds
+      # none of its target rows. Checked at run level below — a sibling
+      # intervention with rows keeps maps_checked > 0, so the D-06b floor alone
+      # would let the whole intervention pass unasserted.
+      unasserted_ids <- character(0)
       for (x in abs0) {
         id <- as.character(x[["Intervention_ID"]])
         zone <- as.character(x[["Prob_adjust_zone"]])
@@ -330,20 +373,54 @@ if (length(abs0) > 0L) {
           next
         }
         m_nat <- terra::rast(mask_path)
+        # D-04 (CR-01): for zone Outside the asserted zone is the COMPLEMENT of
+        # the mask, so "prob is 0 over the complement" is satisfied trivially
+        # across the whole region by an all-zero or wrongly-coded mask — with a
+        # large, non-vacuous n_zone. The per-map n_zone guard below only ever
+        # proved the complement is non-empty; it never proved the mask holds a
+        # single cell equal to 1. Prove that separately, or the evidence cannot
+        # distinguish a correctly 1-coded mask from an empty one. Only the
+        # Outside branch needs it: for zone Inside `sel` IS (m0 == 1), so a
+        # degenerate mask already yields n_zone == 0 on every map and is
+        # reported by the per-intervention D-06a check.
+        #
+        # GAP-1: this proof is a property of the mask and the region grid
+        # ALONE, so it runs here — once per intervention, before the target-row
+        # lookup. Sited below that lookup (as it was) it was skipped entirely
+        # whenever this region's trans_rates.csv held none of the
+        # intervention's target rows, which is the normal case for a
+        # mining-only Outside intervention.
+        if (identical(zone, "Outside") && !is.null(region_ref)) {
+          m_reg <- terra::crop(m_nat, region_ref)
+          if (!isTRUE(terra::compareGeom(region_ref, m_reg, stopOnError = FALSE))) {
+            fail(sprintf("mask %s does not align with %s after crop (no resampling allowed)",
+                         basename(mask_path), basename(region_ref_paths[[1]])))
+          } else {
+            m0r <- terra::ifel(is.na(m_reg), 0, m_reg)
+            n_ones <- terra::global(m0r == 1, "sum", na.rm = TRUE)[[1]][1]
+            if (!is.finite(n_ones) || n_ones == 0) {
+              fail(sprintf(
+                "%s: mask %s has 0 cells equal to 1 over this region but Prob_adjust_zone=Outside (degenerate mask: the Outside zone is then the whole region, so the assertion cannot distinguish a correct mask from an empty one)",
+                id, basename(mask_path)
+              ))
+            }
+          }
+        }
         rows <- which(tr[[to_col]] %in% targets &
                         (is.null(from_vals) | tr[[from_col]] %in% from_vals))
         if (length(rows) == 0L) {
+          # GAP-1: this intervention asserted nothing in this region, so the
+          # run is not evidence for it. Record it; the ledger is checked at run
+          # level after this loop. D-06a below is unreachable from here, and
+          # the D-06b floor is satisfied by any sibling intervention that does
+          # have rows.
+          unasserted_ids <- c(unasserted_ids, id)
           cat(sprintf("Info: %s has no target rows in trans_rates.csv for this region\n", id))
           next
         }
         # D-06a: count the maps this intervention actually asserted on, so the
         # per-map INFO downgrade above cannot become a blanket escape hatch.
         n_checked_id <- 0L
-        # D-04 (CR-01): the Outside non-degeneracy check runs once per
-        # intervention, not once per map — every probability map in a region is
-        # built from the same `anterior` raster, so the cropped `m0` is
-        # identical for every k.
-        degeneracy_checked <- FALSE
         for (k in rows) {
           id_trans <- tr[["id_trans"]][k]
           tif <- file.path(prob_map_dir, sprintf("%03d_id_trans_%d.tif", k, id_trans))
@@ -360,26 +437,6 @@ if (length(abs0) > 0L) {
           }
           m0 <- terra::ifel(is.na(m), 0, m)
           sel <- if (identical(zone, "Inside")) (m0 == 1) else (m0 != 1)
-          # D-04 (CR-01): for zone Outside the asserted zone is the COMPLEMENT
-          # of the mask, so "prob is 0 over the complement" is satisfied
-          # trivially across the whole region by an all-zero or wrongly-coded
-          # mask — with a large, non-vacuous n_zone. The n_zone guard below
-          # only ever proved the complement is non-empty; it never proved the
-          # mask holds a single cell equal to 1. Prove that separately, or the
-          # evidence cannot distinguish a correctly 1-coded mask from an empty
-          # one. Only the Outside branch needs this: for zone Inside `sel` IS
-          # (m0 == 1), so a degenerate mask already yields n_zone == 0 on every
-          # map and is reported by the per-intervention D-06a check.
-          if (identical(zone, "Outside") && !degeneracy_checked) {
-            degeneracy_checked <- TRUE
-            n_ones <- terra::global(m0 == 1, "sum", na.rm = TRUE)[[1]][1]
-            if (!is.finite(n_ones) || n_ones == 0) {
-              fail(sprintf(
-                "%s: mask %s has 0 cells equal to 1 over this region but Prob_adjust_zone=Outside (degenerate mask: the Outside zone is then the whole region, so the assertion cannot distinguish a correct mask from an empty one)",
-                id, basename(mask_path)
-              ))
-            }
-          }
           # WR-04: `r` is a PER-TRANSITION probability map — allocation builds
           # it as setValues(anterior, NA_real_) and then writes dt_j$prob at
           # dt_j$cell_id (src/allocation.r:3196-3200), so it is non-NA only on
@@ -394,6 +451,44 @@ if (length(abs0) > 0L) {
           # empty selection is the same "nothing to assert on" state.
           n_zone <- terra::global(sel & !is.na(r), "sum", na.rm = TRUE)[[1]][1]
           if (!is.finite(n_zone) || n_zone == 0) {
+            # R51-WR-04: the INFO above is only correct for a map that HAS
+            # probability somewhere in the region and simply does not carry it
+            # in this zone. A map with no non-NA cell ANYWHERE is a different
+            # shape, and it was being swallowed by the same downgrade.
+            #
+            # The review asked for an unconditional fail on that shape. That
+            # would plant a false FAIL: src/allocation.r writes an all-NA TIF
+            # on purpose for an active transition with no predictions, to keep
+            # the %03d sequence Dinamica binds to gap-free, and logs
+            # "WARN id_trans=<id> row=<k> has no predictions; wrote empty TIF".
+            # Failing on every all-NA map would therefore reject a correct run
+            # — the same over-firing D-05 was created to remove. Discriminate
+            # on the engine's own WARN instead: explained empty map is INFO,
+            # unexplained empty map is a FAIL.
+            #
+            # Degenerate case: when section (b) found no summary line,
+            # judged_log_lines is empty and every empty map reads as
+            # unexplained. That is acceptable — the run has already failed
+            # section (b).
+            n_r <- terra::global(!is.na(r), "sum", na.rm = TRUE)[[1]][1]
+            if (!is.finite(n_r) || n_r == 0) {
+              warn_marker <- sprintf(
+                "WARN id_trans=%d row=%d has no predictions",
+                as.integer(id_trans), as.integer(k)
+              )
+              if (any(grepl(warn_marker, judged_log_lines, fixed = TRUE))) {
+                cat(sprintf(
+                  "  Info: %s %s is an all-NA probability map and the engine logged no predictions for id_trans=%d row=%d; not counted\n",
+                  id, basename(tif), as.integer(id_trans), as.integer(k)
+                ))
+              } else {
+                fail(sprintf(
+                  "%s: %s has no non-NA probability cell anywhere in this region and no engine \"has no predictions\" WARN line explains it",
+                  id, basename(tif)
+                ))
+              }
+              next
+            }
             cat(sprintf(
               "  Info: %s %s has no non-NA cells in zone=%s (mask does not intersect this transition's from-class); not counted\n",
               id, basename(tif), zone
@@ -427,13 +522,28 @@ if (length(abs0) > 0L) {
         # proved, and the run must not report PASS on it. The
         # `length(rows) == 0L` branch above `next`s before the map loop, so
         # this check is correctly unreachable for "this region has no target
-        # rows in trans_rates.csv" (that case is caught run-level by D-06b).
+        # rows in trans_rates.csv"; that case is caught by the `unasserted_ids`
+        # ledger below (GAP-1). D-06b remains only the floor for "not a single
+        # map was asserted on anywhere in this region".
         if (n_checked_id == 0L) {
           fail(sprintf(
             "%s: no probability map could be asserted on (0 of %d target map(s) had a non-NA probability cell in zone=%s for mask %s)",
             id, length(rows), zone, basename(mask_path)
           ))
         }
+      }
+      # GAP-1: run-level ledger. An intervention skipped for want of target
+      # rows never reaches D-06a, and a sibling intervention that does have
+      # rows keeps the D-06b floor satisfied — which is how a green banner came
+      # to be read as evidence for an intervention nothing was asserted about.
+      # Note this deliberately does NOT also collect the D-06a ids: D-06a
+      # already calls fail() naming them, and double-reporting would inflate
+      # errors=N (the defect R51-IN-01 describes).
+      if (length(unasserted_ids) > 0L) {
+        fail(sprintf(
+          "no probability map could be asserted on for active Absolute-0 intervention(s) %s (no target rows in trans_rates.csv for this region); this run is not evidence for them",
+          paste(unasserted_ids, collapse = ", ")
+        ))
       }
       # D-06b: run-level floor. This block is already inside
       # `if (length(abs0) > 0L)`, so reaching it with maps_checked == 0 means
@@ -626,6 +736,19 @@ forbidden <- c(
   # No success line anywhere in the engine emits either substring.
   "outside {0,1,NA}",
   "is categorical/non-numeric",
+  # All-zero mask rejection (plans 05.1-05 and 05.1-06, gap GAP-2). A mask that
+  # carries values but none equal to 1 leaves the Inside zone empty and makes
+  # the Outside zone the whole region — the exact CR-01 impact. Both the
+  # .mask_inside_lut() runtime stop ("intervention mask <path> has no cell
+  # equal to 1 ...", no colon) and the Stage 7 pre-flight rejection
+  # ("intervention mask: <path> has no cell equal to 1 ...") emit this
+  # substring, so it is kept prefix-free to catch both wordings. Frozen
+  # contract with plans 05.1-05 and 05.1-06; do not paraphrase.
+  # Deliberately NOT added: "values could not be read". The Stage 7 pre-flight
+  # is its only emitter and that wording already carries the
+  # "intervention mask: " marker above, so a second entry would only
+  # double-report the same line.
+  "has no cell equal to 1",
   # Telemetry degradation (plan 05-13). The success line is
   # "intervention telemetry: wrote N rows to ...", so only the WARN form and
   # the pre-flight form are forbidden.
@@ -649,9 +772,19 @@ for (p in names(scan_sets)) {
   is_benign <- Reduce(`|`, lapply(benign, function(b) grepl(b, lines_p, fixed = TRUE)),
                       logical(length(lines_p)))
   lines_p <- lines_p[!is_benign]
+  # R51-IN-01: one offending line yields one error. The Stage 7 pre-flight
+  # wording carries BOTH "intervention mask: " and "outside {0,1,NA}", so a
+  # single mis-coded mask used to produce two entries and inflate the
+  # errors=N in the FAIL banner. Report each offending line once, under the
+  # first marker that matches it. The outer loop still reports at most one
+  # error per marker, so the count stays bounded by length(forbidden) and does
+  # not explode on a repetitive log.
+  reported <- character(0)
   for (f in forbidden) {
     hits <- grep(f, lines_p, fixed = TRUE, value = TRUE)
+    hits <- hits[!(hits %in% reported)]
     if (length(hits) > 0L) {
+      reported <- c(reported, hits[[1]])
       fail(sprintf("forbidden marker '%s' in %s: %s", f, p, hits[[1]]))
     }
   }
