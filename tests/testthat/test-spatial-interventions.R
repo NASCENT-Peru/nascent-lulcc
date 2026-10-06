@@ -51,6 +51,10 @@ source(file.path(.repo_root, "src", "implement_spatial_interventions.R"))
 # `value` is the burn value written at `cells`; it defaults to 1 so every
 # pre-existing call site is byte-identical. Passing value = 255 is how the CR-01
 # out-of-domain fixture is built (the gdal_rasterize / QGIS 8-bit default).
+# `value` may also be a vector aligned element for element with `cells` (the
+# `v[keep] <- value` below already supports it), which is how the GAP-2
+# multiple-distinct-bad-values fixture is built. Cells not listed stay NA, so
+# `cells = integer(0)` yields an entirely NA mask.
 .write_mask_on <- function(dir, template, name = "mask_a.tif", cells = .mask_cells,
                            value = 1) {
   r <- terra::rast(template)
@@ -466,6 +470,147 @@ test_that("CR-01: a correctly 1-coded mask still yields the same LUT", {
     path, .cell_index(), new.env(parent = emptyenv()), ref_grid = ref
   )
   expect_identical(lut, c(TRUE, FALSE, TRUE, FALSE, TRUE, FALSE))
+})
+
+# --------------------------------------------------------------------------
+# R51 gap-closure: engine mask guard (GAP-2, R51-IN-02, R51-IN-03)
+#
+# Every fixture above is either a 0/1 mask with at least one 1 inside the
+# region, or a 255/categorical mask, which is exactly why an all-zero mask
+# shipped: it is in domain, so it passed the CR-01 guard and produced an
+# all-FALSE LUT in silence.
+
+test_that("GAP-2: an all-zero mask is rejected by the engine, with the colon-free wording", {
+  scratch <- withr::local_tempdir()
+  path <- .write_mask(scratch, name = "mask_zero.tif", cells = .mask_cells, value = 0)
+  ref <- terra::rast(.write_ref_grid(scratch))
+  expect_error(
+    .mask_inside_lut(
+      path, .cell_index(), new.env(parent = emptyenv()), ref_grid = ref
+    ),
+    "has no cell equal to 1",
+    fixed = TRUE
+  )
+  msg <- tryCatch(
+    .mask_inside_lut(
+      path, .cell_index(), new.env(parent = emptyenv()), ref_grid = ref
+    ),
+    error = function(e) conditionMessage(e)
+  )
+  # The engine emits the COLON-FREE form; the Stage 7 pre-flight is the emitter
+  # that carries the colon. The two wordings are deliberate, not a drift.
+  expect_true(grepl("intervention mask ", msg, fixed = TRUE))
+  expect_false(grepl("intervention mask: ", msg, fixed = TRUE))
+  # An all-zero mask is IN domain, so the value-domain stop must not be what
+  # fired here.
+  expect_false(grepl("outside {0,1,NA}", msg, fixed = TRUE))
+})
+
+test_that("GAP-2: a mask whose only values lie outside the region is still rejected", {
+  # National cells 1 and 4 are not in .ref_cells, so every value this region
+  # samples is NA while the mask itself is not all-NA. A guard decided on the
+  # region sample alone would pass this; the national value table catches it.
+  scratch <- withr::local_tempdir()
+  path <- .write_mask(scratch, name = "mask_zero_out.tif", cells = c(1L, 4L), value = 0)
+  ref <- terra::rast(.write_ref_grid(scratch))
+  msg <- tryCatch(
+    .mask_inside_lut(
+      path, .cell_index(), new.env(parent = emptyenv()), ref_grid = ref
+    ),
+    error = function(e) conditionMessage(e)
+  )
+  expect_true(grepl("has no cell equal to 1", msg, fixed = TRUE))
+  expect_false(grepl("intervention mask: ", msg, fixed = TRUE))
+  expect_false(grepl("outside {0,1,NA}", msg, fixed = TRUE))
+})
+
+test_that("GAP-2: an all-NA mask is tolerated by the engine guard", {
+  # An empty national value table means "no data anywhere", which is tolerated
+  # here exactly as the Stage 7 pre-flight tolerates it: judging a degenerate
+  # mask is the smoke verifier's Outside-zone proof's job, not this function's.
+  # This also pins the branch ORDER: any(logical(0)) is FALSE, so if the no-1
+  # test ran before the empty-table test this block would go red.
+  scratch <- withr::local_tempdir()
+  path <- .write_mask(scratch, name = "mask_na.tif", cells = integer(0))
+  ref <- terra::rast(.write_ref_grid(scratch))
+  expect_no_error(
+    lut <- .mask_inside_lut(
+      path, .cell_index(), new.env(parent = emptyenv()), ref_grid = ref
+    )
+  )
+  expect_identical(lut, rep(FALSE, 6L))
+})
+
+test_that("GAP-2: a validly 1-coded mask that misses the region is not an error", {
+  # The false-reject guard. A national mask is applied region by region, so a
+  # region its polygons do not reach is routine; stopping here would FAIL every
+  # such region. The 1s sit on national cells 1 and 4, outside .ref_cells.
+  scratch <- withr::local_tempdir()
+  path <- .write_mask(scratch, name = "mask_elsewhere.tif", cells = c(1L, 4L), value = 1)
+  ref <- terra::rast(.write_ref_grid(scratch))
+  expect_no_error(
+    lut <- .mask_inside_lut(
+      path, .cell_index(), new.env(parent = emptyenv()), ref_grid = ref
+    )
+  )
+  expect_identical(lut, rep(FALSE, 6L))
+})
+
+test_that("R51-IN-02: categorical is asserted with is.factor, not inferred from the extract() return type", {
+  # terra::extract() returning a factor for a categorical raster is an
+  # undocumented implementation detail. Mock it to return plain numeric 1s -- a
+  # value set that is in domain AND contains a 1, so every other guard passes --
+  # and the stop must still fire, which it can only do via terra::is.factor(m).
+  scratch <- withr::local_tempdir()
+  path <- .write_categorical_mask(scratch)
+  ref <- terra::rast(.write_ref_grid(scratch))
+  # MOCK-BITE GUARD: terra::extract is an S4 generic, so interception is not
+  # guaranteed. Count the calls and assert the mock actually ran; without this
+  # the block would pass on the real factor-returning extract() and prove
+  # nothing about is.factor().
+  hits <- new.env(parent = emptyenv())
+  hits$n <- 0L
+  testthat::local_mocked_bindings(
+    extract = function(x, y, ...) {
+      hits$n <- hits$n + 1L
+      data.frame(lyr1 = rep(1, length(y)))
+    },
+    .package = "terra"
+  )
+  expect_error(
+    .mask_inside_lut(
+      path, .cell_index(), new.env(parent = emptyenv()), ref_grid = ref
+    ),
+    "is categorical/non-numeric",
+    fixed = TRUE
+  )
+  expect_gte(hits$n, 1L)
+})
+
+test_that("R51-IN-03: the bad-value list reports its true size and says when it is truncated", {
+  scratch <- withr::local_tempdir()
+  ref <- terra::rast(.write_ref_grid(scratch))
+  many <- .write_mask(
+    scratch, name = "mask_six_bad.tif", cells = .ref_cells, value = c(2, 3, 4, 5, 6, 7)
+  )
+  msg_many <- tryCatch(
+    .mask_inside_lut(
+      many, .cell_index(), new.env(parent = emptyenv()), ref_grid = ref
+    ),
+    error = function(e) conditionMessage(e)
+  )
+  expect_true(grepl("6 distinct bad value(s)", msg_many, fixed = TRUE))
+  expect_true(grepl("showing the first 5", msg_many, fixed = TRUE))
+
+  one <- .write_mask(scratch, name = "mask_one_bad.tif", value = 255)
+  msg_one <- tryCatch(
+    .mask_inside_lut(
+      one, .cell_index(), new.env(parent = emptyenv()), ref_grid = ref
+    ),
+    error = function(e) conditionMessage(e)
+  )
+  expect_true(grepl("1 distinct bad value(s)", msg_one, fixed = TRUE))
+  expect_false(grepl("showing the first", msg_one, fixed = TRUE))
 })
 
 # --------------------------------------------------------------------------
@@ -964,6 +1109,73 @@ test_that("CR-02: an unreadable reference grid stops the engine", {
   before <- copy(dt)
   expect_error(.run_engine(fx, dt), "intervention ref grid unreadable")
   expect_equal(as.data.frame(dt), as.data.frame(before))
+})
+
+# --------------------------------------------------------------------------
+# R51 gap-closure: engine WARN and abort (GAP-2)
+
+.zone_warn_lines <- function(log_file) {
+  grep("WARN intervention zone:", .log_lines(log_file), fixed = TRUE, value = TRUE)
+}
+
+test_that("GAP-2: the engine aborts on an all-zero mask without editing probabilities", {
+  fx <- .engine_fixture(list(.abs_entry()), scenario = "ZEROMASK", write_mask = FALSE)
+  .write_mask(fx$mask_dir, cells = .mask_cells, value = 0)
+  dt <- .norm()
+  before <- copy(dt)
+  # Pre-fix this ran to completion against an all-FALSE LUT.
+  expect_error(.run_engine(fx, dt), "has no cell equal to 1")
+  expect_equal(as.data.frame(dt), as.data.frame(before))
+  expect_length(
+    grep("AUDIT stage=intervention region=", .log_lines(fx$log_file), fixed = TRUE),
+    0L
+  )
+})
+
+test_that("GAP-2: a validly 1-coded mask that misses the region logs the WARN and proceeds (zone Inside)", {
+  fx <- .engine_fixture(
+    list(.abs_entry(zone = "Inside")), scenario = "MISSIN", write_mask = FALSE
+  )
+  .write_mask(fx$mask_dir, cells = c(1L, 4L), value = 1)
+  expect_no_error(.run_engine(fx, .norm()))
+  warns <- .zone_warn_lines(fx$log_file)
+  expect_length(
+    grep(
+      "WARN intervention zone: iv_abs mask mask_a.tif does not intersect region R1; Prob_adjust_zone=Inside therefore applies to none of the region",
+      warns, fixed = TRUE
+    ),
+    1L
+  )
+  # The WARN must not trip any marker the smoke verifier treats as fatal.
+  expect_false(any(grepl("has no cell equal to 1", warns, fixed = TRUE)))
+  expect_false(any(grepl("intervention mask: ", warns, fixed = TRUE)))
+})
+
+test_that("GAP-2: a validly 1-coded mask that misses the region logs the WARN and proceeds (zone Outside)", {
+  # `all` is the honest statement here: the complement of an empty Inside zone
+  # is the whole region, which is the impact this phase exists to surface.
+  fx <- .engine_fixture(
+    list(.abs_entry(zone = "Outside")), scenario = "MISSOUT", write_mask = FALSE
+  )
+  .write_mask(fx$mask_dir, cells = c(1L, 4L), value = 1)
+  expect_no_error(.run_engine(fx, .norm()))
+  warns <- .zone_warn_lines(fx$log_file)
+  expect_length(
+    grep(
+      "WARN intervention zone: iv_abs mask mask_a.tif does not intersect region R1; Prob_adjust_zone=Outside therefore applies to all of the region",
+      warns, fixed = TRUE
+    ),
+    1L
+  )
+  expect_false(any(grepl("has no cell equal to 1", warns, fixed = TRUE)))
+  expect_false(any(grepl("intervention mask: ", warns, fixed = TRUE)))
+})
+
+test_that("GAP-2: an intersecting mask logs no non-intersection WARN", {
+  # The over-firing guard: a normal run must stay quiet.
+  fx <- .engine_fixture(list(.abs_entry()), scenario = "INTERSECT")
+  expect_no_error(.run_engine(fx, .norm()))
+  expect_length(.zone_warn_lines(fx$log_file), 0L)
 })
 
 # --------------------------------------------------------------------------

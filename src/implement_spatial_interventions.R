@@ -245,7 +245,23 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
 #' allocation and a `cell_id` of 0 silently mis-selects rows downstream (WR-10).
 #' The mask's value domain `{0, 1, NA}` is enforced as well: a categorical or
 #' otherwise non-1-coded mask is a hard stop rather than a vector that reads as
-#' entirely "outside" (CR-01).
+#' entirely "outside" (CR-01). "Categorical" is asserted with
+#' `terra::is.factor()`, the same predicate the Stage 7 pre-flight uses, rather
+#' than inferred from the return type of `terra::extract()` (R51-IN-02), and the
+#' out-of-domain message states how many distinct bad values were found and
+#' whether the printed list was truncated (R51-IN-03).
+#'
+#' A mask that CARRIES values but has no cell equal to 1 anywhere is a hard stop
+#' too (GAP-2): such a mask yields an all-FALSE LUT, which leaves an `Inside`
+#' zone empty and puts an `Outside` zone over the whole region. The decision is
+#' made on the mask's national value table (`terra::freq()`), not on this
+#' region's sample, so it cannot be fooled by a mask whose only values lie
+#' outside the region. Two cases are deliberately NOT errors: an entirely NA
+#' mask is tolerated (its degeneracy is the smoke verifier's to judge), and a
+#' validly 1-coded mask whose polygons miss this region returns an all-FALSE LUT
+#' and is reported by the CALLER, `implement_spatial_interventions()`, as a
+#' non-fatal WARN — stopping here would false-FAIL every region a national mask
+#' does not cover.
 #'
 #' The cache is keyed on the normalised path, the mask's modification time
 #' (sub-second), its size in bytes and `length(cell_index$cell_id)` — not on the
@@ -335,18 +351,58 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
   # region. `v` is already materialised, so the check costs nothing.
   # Order matters: the `!=` comparisons below are meaningless on a factor, so the
   # non-numeric guard must come first.
-  if (!is.numeric(v)) {
+  # R51-IN-02: the proposition "this mask is categorical" is asserted directly,
+  # with the same predicate the Stage 7 pre-flight uses, instead of being
+  # inferred from the undocumented return type of terra::extract(). A terra that
+  # returned bare integer level codes would make is.numeric(v) TRUE and the
+  # level codes would then be compared against {0,1} in silence. `m` is
+  # single-layer here (the nlyr check above), so terra::is.factor(m) is length
+  # 1; `!is.numeric(v)` stays as the belt behind it.
+  if (isTRUE(terra::is.factor(m)) || !is.numeric(v)) {
     stop(sprintf(
       "intervention mask %s is categorical/non-numeric; expected numeric {0,1,NA}",
       mask_path
     ), call. = FALSE)
   }
-  bad <- unique(v[!is.na(v) & v != 0 & v != 1])
+  # R51-IN-03: name the truncation width instead of a bare literal, sort before
+  # truncating so the reported sample is deterministic, and state how many
+  # distinct bad values there are and whether the list was cut short. The
+  # previous message truncated silently, so "255" could stand for one stray cell
+  # or for a wholly mis-coded raster.
+  max_show <- 5L
+  bad <- sort(unique(v[!is.na(v) & v != 0 & v != 1]))
   if (length(bad) > 0L) {
     stop(sprintf(
-      "intervention mask %s has value(s) outside {0,1,NA}: %s",
-      mask_path, paste(utils::head(bad, 5L), collapse = ", ")
+      "intervention mask %s has value(s) outside {0,1,NA}: %s (%d distinct bad value(s)%s)",
+      mask_path, paste(utils::head(bad, max_show), collapse = ", "), length(bad),
+      if (length(bad) > max_show) sprintf("; showing the first %d", max_show) else ""
     ), call. = FALSE)
+  }
+  # GAP-2: an in-domain mask whose values are all 0 passed every check above and
+  # produced an all-FALSE LUT in silence, which for `Prob_adjust_zone: Outside`
+  # puts the zone over the whole region. `v` is this REGION's sample, though, so
+  # "no 1 in v" cannot by itself tell a broken mask from a validly 1-coded
+  # national mask whose polygons simply miss this region. Decide that on the
+  # NATIONAL value table, and only when the cheap region test gives no 1 (when
+  # it does, the mask provably has a 1 and the scan is skipped entirely).
+  if (!any(v == 1, na.rm = TRUE)) {
+    # digits = 12 is mandatory: freq()'s default digits = 0 ROUNDS, so an
+    # all-0.5 raster reports the value 1 and would walk straight through this
+    # guard.
+    fq <- terra::freq(m, digits = 12)
+    vals <- fq$value[!is.na(fq$value) & fq$count > 0]
+    if (length(vals) == 0L) {
+      # An empty value table means the mask is entirely NA. Tolerated here, the
+      # same tolerance the Stage 7 pre-flight extends: a degenerate mask is the
+      # smoke verifier's Outside-zone proof to judge, not this function's. This
+      # branch is deliberately ordered FIRST because any(logical(0)) is FALSE,
+      # so the no-1 test below would otherwise fire on an all-NA mask.
+    } else if (!any(vals == 1)) {
+      stop(sprintf("intervention mask %s has no cell equal to 1 (observed value(s): %s); the Inside zone is empty and the Outside zone would be the whole region", mask_path, paste(utils::head(sort(vals), max_show), collapse = ", ")), call. = FALSE)
+    }
+    # Otherwise some cell equals 1 elsewhere in the country: the mask is validly
+    # 1-coded and merely does not intersect this region. That is not an error;
+    # implement_spatial_interventions() logs it as a WARN and carries on.
   }
   lut <- logical(max(cid))
   lut[cid[!is.na(v) & v == 1]] <- TRUE
@@ -518,6 +574,13 @@ resolve_intervention_masks <- function(interventions_dir, mask_dir, scenario, ye
 #' AUDIT line to `log_file` (D-15). Probabilities
 #' are NOT renormalised; the number of cells whose summed probability exceeds 1
 #' is only logged (`cells_sum_gt1`).
+#'
+#' Two non-fatal WARN lines can appear in `log_file`: a `WARN intervention
+#' zone:` line per intervention whose (validly 1-coded) mask does not intersect
+#' this region, naming the id, mask, region, zone and whether the zone therefore
+#' covers `none` or `all` of the region (GAP-2); and the `WARN intervention
+#' telemetry` line described under the telemetry CSV section below. Neither
+#' stops the call.
 #'
 #' @section Intervention AUDIT line contract:
 #' The per-intervention line is
@@ -749,6 +812,31 @@ implement_spatial_interventions <- function(
     inside_lut <- .mask_inside_lut(
       mask_path, cell_index, cache, ref_grid = ref_grid
     )
+
+    # GAP-2, non-fatal half. .mask_inside_lut() has already proven this mask is
+    # either validly 1-coded somewhere or entirely NA (a mask that carries
+    # values but has no 1 anywhere stopped inside it), so an LUT with no TRUE
+    # over this region's cells means the mask legitimately misses the region --
+    # a national mask applied region by region. That is not an error. It was,
+    # however, completely silent: an `Inside` intervention did nothing and an
+    # `Outside` intervention applied to the entire region, and the smoke
+    # verifier had no way to tell "this mask misses this region" from "this mask
+    # is broken". With this line the verifier's Outside proof can stay a FAIL
+    # for a degenerate mask while this stays a logged non-event. `all` is the
+    # honest statement for zone `Outside`: the complement of an empty zone is
+    # the whole region. `inside_lut` is indexed by region cell_id and has length
+    # max(cell_index$cell_id), so the index is in range.
+    zone <- intervention[["Prob_adjust_zone"]]
+    if (!any(inside_lut[cell_index$cell_id], na.rm = TRUE)) {
+      log_msg(
+        sprintf(
+          "WARN intervention zone: %s mask %s does not intersect region %s; Prob_adjust_zone=%s therefore applies to %s of the region",
+          iv_id, mask_name, region_label, zone,
+          if (identical(zone, "Inside")) "none" else "all"
+        ),
+        log_file
+      )
+    }
 
     # If the Intervention requires filtering by LULC classes then translate
     # the From_lulc_filter class names to integer from_val values, to be
