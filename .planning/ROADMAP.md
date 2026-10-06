@@ -347,7 +347,7 @@ Plans:
 **Requirements**: none mapped in REQUIREMENTS.md. Traceability is via the source findings CR-01 and WR-04 in `05-REVIEW-2.md` and the locked decisions D-01..D-07 recorded in each plan's `requirements` / `must_haves`.
 **Depends on:** Phase 5
 **Scope guard (D-07):** only CR-01 and WR-04. WR-01, WR-02, WR-03 and IN-01..IN-08 from `05-REVIEW-2.md` are explicitly out of scope.
-**Plans:** 3/7 plans complete (01-03 executed; 04-07 are gap closure, not yet executed)
+**Plans:** 6/7 plans executed
 
 Plans:
 
@@ -361,9 +361,9 @@ Plans:
 **Gap closure** *(added 2026-10-05 from `05.1-VERIFICATION.md` status `gaps_found`; findings prefixed `R51-` are from `05.1-REVIEW.md`, NOT the original `05-REVIEW-2.md` CR-01/WR-04 which are closed)*
 
 **Wave 1** *(parallel - no files_modified overlap; the frozen substring `has no cell equal to 1` is pinned verbatim in all three plans so they can run concurrently)*
-- [ ] 05.1-04-PLAN.md - **BLOCKER GAP-1 / R51-CR-01**: the verifier can print PASS with an entire `Absolute`/`0` intervention never asserted on. Hoists the D-04 degeneracy proof above the no-target-rows `next`, adds a run-level `unasserted_ids` ledger, discriminates a genuinely empty probability map from a from-class miss (R51-WR-04), and de-duplicates the forbidden scan (R51-IN-01).
-- [ ] 05.1-05-PLAN.md - **GAP-2 / GAP-3 / R51-WR-03**: replaces the range-only `minmax` pre-flight test with one `terra::freq(m, digits = 12)` scan, so an all-zero and an all-`0.5` mask are both rejected at Stage 7 before any region work; separates "all NA" (tolerated by design) from "values could not be read" (now fatal); stops `next`ing between independent checks (R51-IN-04); updates both operator docs.
-- [ ] 05.1-06-PLAN.md - **GAP-2 engine half**: adds the colon-free no-cell-equal-to-1 stop to `.mask_inside_lut()`, emits the legitimate non-intersection WARN that keeps a valid 1-coded mask from false-FAILing, asserts categorical with `terra::is.factor` rather than inferring it from `extract()`'s return type (R51-IN-02), and makes bad-value truncation visible (R51-IN-03).
+- [x] 05.1-04-PLAN.md - **BLOCKER GAP-1 / R51-CR-01**: the verifier can print PASS with an entire `Absolute`/`0` intervention never asserted on. Hoists the D-04 degeneracy proof above the no-target-rows `next`, adds a run-level `unasserted_ids` ledger, discriminates a genuinely empty probability map from a from-class miss (R51-WR-04), and de-duplicates the forbidden scan (R51-IN-01).
+- [x] 05.1-05-PLAN.md - **GAP-2 / GAP-3 / R51-WR-03**: replaces the range-only `minmax` pre-flight test with one `terra::freq(m, digits = 12)` scan, so an all-zero and an all-`0.5` mask are both rejected at Stage 7 before any region work; separates "all NA" (tolerated by design) from "values could not be read" (now fatal); stops `next`ing between independent checks (R51-IN-04); updates both operator docs.
+- [x] 05.1-06-PLAN.md - **GAP-2 engine half**: adds the colon-free no-cell-equal-to-1 stop to `.mask_inside_lut()`, emits the legitimate non-intersection WARN that keeps a valid 1-coded mask from false-FAILing, asserts categorical with `terra::is.factor` rather than inferring it from `extract()`'s return type (R51-IN-02), and makes bad-value truncation visible (R51-IN-03).
 
 **Wave 2** *(blocked on Wave 1 - asserts over wording all three introduce)*
 - [ ] 05.1-07-PLAN.md - **R51-IN-05**: makes the D-03 cross-file wording contract self-enforcing. Today the contract test passes on a mere comment occurrence; this parses the `forbidden` vector with `eval(parse())` and checks string-literal tokens via `getParseData`, then proves the test can actually fail.
