@@ -21,7 +21,11 @@
 #'           NOT counted in maps_checked. `r` is a PER-TRANSITION map, non-NA
 #'           only on that transition's from-class cells, so a mask that does
 #'           not intersect that from-class in this region is an ordinary,
-#'           correct-engine outcome, not a defect (WR-04);
+#'           correct-engine outcome, not a defect (WR-04). A map holding no
+#'           non-NA cell ANYWHERE in the region is a different shape and is
+#'           only excused when the judged worker log carries the engine's own
+#'           "has no predictions; wrote empty TIF" WARN for that id_trans and
+#'           row; otherwise it is a FAIL (R51-WR-04);
 #'         - per intervention: zero checked maps is a FAIL. That is the real
 #'           WR-07 condition -- a mask that does not intersect this region at
 #'           all. An intervention that is skipped earlier, because this
@@ -41,7 +45,9 @@
 #'       never on what this region's trans_rates.csv happens to contain
 #'       (GAP-1).
 #'   (d) No forbidden marker appears in any log under the region dir (or in
-#'       --extra-log, e.g. the SLURM stdout file).
+#'       --extra-log, e.g. the SLURM stdout file). An offending line is
+#'       reported once, under the first marker it matches, so a wording that
+#'       carries two markers does not inflate errors=N (R51-IN-01).
 #'   (e) The plan 05-13 telemetry CSV
 #'       <region_dir>/intervention_prob_deltas_<scenario>_<region>_<year>.csv
 #'       exists, carries the 25-column contract in order, covers exactly the
@@ -244,8 +250,11 @@ is_iv <- function(l) {
     grepl(year_pat, l, fixed = TRUE) & grepl(scen_pat, l, fixed = TRUE)
 }
 # Declared before the branch so section (e) can consume the AUDIT lines rather
-# than re-parse the logs, even on the "no summary line" path.
+# than re-parse the logs, even on the "no summary line" path. Same rationale
+# for judged_log_lines: section (c) must judge the SAME log that section (b)
+# judged (R51-WR-04), not re-derive one of its own.
 iv_lines <- character(0)
+judged_log_lines <- character(0)
 with_summary <- log_files[vapply(log_lines, function(l) any(is_summary(l)), logical(1))]
 if (length(with_summary) == 0L) {
   fail(sprintf(
@@ -262,6 +271,7 @@ if (length(with_summary) == 0L) {
   }
   l <- log_lines[[newest]]
   iv_lines <- l[is_iv(l)]
+  judged_log_lines <- l
   sum_lines <- l[is_summary(l)]
   cat(sprintf("AUDIT lines from %s:\n", newest))
   for (x in c(iv_lines, sum_lines)) cat("  ", x, "\n", sep = "")
@@ -441,6 +451,44 @@ if (length(abs0) > 0L) {
           # empty selection is the same "nothing to assert on" state.
           n_zone <- terra::global(sel & !is.na(r), "sum", na.rm = TRUE)[[1]][1]
           if (!is.finite(n_zone) || n_zone == 0) {
+            # R51-WR-04: the INFO above is only correct for a map that HAS
+            # probability somewhere in the region and simply does not carry it
+            # in this zone. A map with no non-NA cell ANYWHERE is a different
+            # shape, and it was being swallowed by the same downgrade.
+            #
+            # The review asked for an unconditional fail on that shape. That
+            # would plant a false FAIL: src/allocation.r writes an all-NA TIF
+            # on purpose for an active transition with no predictions, to keep
+            # the %03d sequence Dinamica binds to gap-free, and logs
+            # "WARN id_trans=<id> row=<k> has no predictions; wrote empty TIF".
+            # Failing on every all-NA map would therefore reject a correct run
+            # — the same over-firing D-05 was created to remove. Discriminate
+            # on the engine's own WARN instead: explained empty map is INFO,
+            # unexplained empty map is a FAIL.
+            #
+            # Degenerate case: when section (b) found no summary line,
+            # judged_log_lines is empty and every empty map reads as
+            # unexplained. That is acceptable — the run has already failed
+            # section (b).
+            n_r <- terra::global(!is.na(r), "sum", na.rm = TRUE)[[1]][1]
+            if (!is.finite(n_r) || n_r == 0) {
+              warn_marker <- sprintf(
+                "WARN id_trans=%d row=%d has no predictions",
+                as.integer(id_trans), as.integer(k)
+              )
+              if (any(grepl(warn_marker, judged_log_lines, fixed = TRUE))) {
+                cat(sprintf(
+                  "  Info: %s %s is an all-NA probability map and the engine logged no predictions for id_trans=%d row=%d; not counted\n",
+                  id, basename(tif), as.integer(id_trans), as.integer(k)
+                ))
+              } else {
+                fail(sprintf(
+                  "%s: %s has no non-NA probability cell anywhere in this region and no engine \"has no predictions\" WARN line explains it",
+                  id, basename(tif)
+                ))
+              }
+              next
+            }
             cat(sprintf(
               "  Info: %s %s has no non-NA cells in zone=%s (mask does not intersect this transition's from-class); not counted\n",
               id, basename(tif), zone
@@ -688,6 +736,19 @@ forbidden <- c(
   # No success line anywhere in the engine emits either substring.
   "outside {0,1,NA}",
   "is categorical/non-numeric",
+  # All-zero mask rejection (plans 05.1-05 and 05.1-06, gap GAP-2). A mask that
+  # carries values but none equal to 1 leaves the Inside zone empty and makes
+  # the Outside zone the whole region — the exact CR-01 impact. Both the
+  # .mask_inside_lut() runtime stop ("intervention mask <path> has no cell
+  # equal to 1 ...", no colon) and the Stage 7 pre-flight rejection
+  # ("intervention mask: <path> has no cell equal to 1 ...") emit this
+  # substring, so it is kept prefix-free to catch both wordings. Frozen
+  # contract with plans 05.1-05 and 05.1-06; do not paraphrase.
+  # Deliberately NOT added: "values could not be read". The Stage 7 pre-flight
+  # is its only emitter and that wording already carries the
+  # "intervention mask: " marker above, so a second entry would only
+  # double-report the same line.
+  "has no cell equal to 1",
   # Telemetry degradation (plan 05-13). The success line is
   # "intervention telemetry: wrote N rows to ...", so only the WARN form and
   # the pre-flight form are forbidden.
@@ -711,9 +772,19 @@ for (p in names(scan_sets)) {
   is_benign <- Reduce(`|`, lapply(benign, function(b) grepl(b, lines_p, fixed = TRUE)),
                       logical(length(lines_p)))
   lines_p <- lines_p[!is_benign]
+  # R51-IN-01: one offending line yields one error. The Stage 7 pre-flight
+  # wording carries BOTH "intervention mask: " and "outside {0,1,NA}", so a
+  # single mis-coded mask used to produce two entries and inflate the
+  # errors=N in the FAIL banner. Report each offending line once, under the
+  # first marker that matches it. The outer loop still reports at most one
+  # error per marker, so the count stays bounded by length(forbidden) and does
+  # not explode on a repetitive log.
+  reported <- character(0)
   for (f in forbidden) {
     hits <- grep(f, lines_p, fixed = TRUE, value = TRUE)
+    hits <- hits[!(hits %in% reported)]
     if (length(hits) > 0L) {
+      reported <- c(reported, hits[[1]])
       fail(sprintf("forbidden marker '%s' in %s: %s", f, p, hits[[1]]))
     }
   }
