@@ -26,7 +26,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 4: End-to-End Correctness & Performance** - Block-wise predict, lazy parquet, atomic resumability, terra migration, CVXR port; parallelise the full scenario sweep across Rundeck nodes (S2 multi-scenario packing)
 - [x] **Phase 5: Integrate spatial_interventions branch and stage intervention masks** *(completed 2026-09-28)* - Port the colleague's `spatial_interventions` branch onto the much-advanced `main`; check the `spat_prob_perturb` masks against the intervention configs and plan where they go on HPC | GAP CLOSURE COMPLETE 2026-09-28: all 21 review findings closed, delta telemetry added, both operator actions done. PR #2 merged as f54ccc2; verification 24/24 must-haves passed; HPC job 841577 PASS maps_checked=16 telemetry_rows=9.
  (mainline 6/6 complete 2026-09-23; reopened for gap closure 2026-09-23 - 21 review findings + new delta telemetry + 2 operator actions)
-- [ ] **Phase 05.1: Fix mask value-domain guard and over-firing non-vacuity guard** *(INSERTED 2026-09-29)* - Close CR-01 (`.mask_inside_lut()` has no mask value-domain guard, so a non-1-coded mask silently turns `Prob_adjust_zone: Outside` into the whole region while the smoke verifier still PASSes) and WR-04 (the WR-07 non-vacuity guard FAILs a correct run whenever a mask legitimately does not intersect a transition's from-class in a region). Source: 05-REVIEW-2.md. (plans 3/7 done; 4 gap-closure plans added 2026-10-05 to close GAP-1 blocker + GAP-2/GAP-3 + R51-WR-03/WR-04 + R51-IN-01..05, see 05.1-VERIFICATION.md)
+- [ ] **Phase 05.1: Fix mask value-domain guard and over-firing non-vacuity guard** *(INSERTED 2026-09-29)* - Close CR-01 (`.mask_inside_lut()` has no mask value-domain guard, so a non-1-coded mask silently turns `Prob_adjust_zone: Outside` into the whole region while the smoke verifier still PASSes) and WR-04 (the WR-07 non-vacuity guard FAILs a correct run whenever a mask legitimately does not intersect a transition's from-class in a region). Source: 05-REVIEW-2.md. (plans 7/7 done; 4 gap-closure plans added 2026-10-05 to close GAP-1 blocker + GAP-2/GAP-3 + R51-WR-03/WR-04 + R51-IN-01..05, see 05.1-VERIFICATION.md)
 
 ## Phase Details
 
@@ -347,7 +347,7 @@ Plans:
 **Requirements**: none mapped in REQUIREMENTS.md. Traceability is via the source findings CR-01 and WR-04 in `05-REVIEW-2.md` and the locked decisions D-01..D-07 recorded in each plan's `requirements` / `must_haves`.
 **Depends on:** Phase 5
 **Scope guard (D-07):** only CR-01 and WR-04. WR-01, WR-02, WR-03 and IN-01..IN-08 from `05-REVIEW-2.md` are explicitly out of scope.
-**Plans:** 6/7 plans executed
+**Plans:** 7/7 plans complete
 
 Plans:
 
@@ -366,7 +366,7 @@ Plans:
 - [x] 05.1-06-PLAN.md - **GAP-2 engine half**: adds the colon-free no-cell-equal-to-1 stop to `.mask_inside_lut()`, emits the legitimate non-intersection WARN that keeps a valid 1-coded mask from false-FAILing, asserts categorical with `terra::is.factor` rather than inferring it from `extract()`'s return type (R51-IN-02), and makes bad-value truncation visible (R51-IN-03).
 
 **Wave 2** *(blocked on Wave 1 - asserts over wording all three introduce)*
-- [ ] 05.1-07-PLAN.md - **R51-IN-05**: makes the D-03 cross-file wording contract self-enforcing. Today the contract test passes on a mere comment occurrence; this parses the `forbidden` vector with `eval(parse())` and checks string-literal tokens via `getParseData`, then proves the test can actually fail.
+- [x] 05.1-07-PLAN.md - **R51-IN-05**: makes the D-03 cross-file wording contract self-enforcing. Today the contract test passes on a mere comment occurrence; this parses the `forbidden` vector with `eval(parse())` and checks string-literal tokens via `getParseData`, then proves the test can actually fail.
 
 **Cross-cutting constraints:**
 - The frozen substring `has no cell equal to 1` is prefix-free and pinned in three plans: with a colon in the pre-flight (05.1-05), without one in the engine (05.1-06), and as exactly one entry in the verifier's `forbidden` vector (05.1-04).
