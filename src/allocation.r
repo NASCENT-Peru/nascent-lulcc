@@ -585,12 +585,17 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
         # rejected before any region work starts.
         #
         # D-13: terra::rast() reads the header only, and the value-domain check
-        # added below (CR-01) adds exactly one streaming min/max scan per UNIQUE
+        # added below (CR-01) adds exactly one streaming freq scan per UNIQUE
         # mask — once per run, not once per region (~20M cells for the national
-        # masks, sub-second each against multi-hour region work). D-13 still
-        # holds in the sense that matters: nothing is ever resampled or
-        # reprojected, and no mask is ever repaired. A grid mismatch, a bad
-        # layer count and a bad value domain are all hard failures.
+        # masks, sub-second each against multi-hour region work). A conforming
+        # mask holds two distinct values, so its frequency table is two rows and
+        # the scan costs what the min/max scan it replaces cost; a
+        # continuous-valued mask costs one table row per distinct value, which
+        # is acceptable because such a mask is exactly what this gate rejects
+        # and the scan runs once per run, not once per region. D-13 still holds
+        # in the sense that matters: nothing is ever resampled or reprojected,
+        # and no mask is ever repaired. A grid mismatch, a bad layer count and a
+        # bad value domain are all hard failures.
         existing_masks <- unique(existing_masks)
         if (length(existing_masks) > 0L) {
           ref_grid_path <- config[["ref_grid_path"]]
@@ -631,80 +636,161 @@ validate_allocation_runtime <- function(config = NULL, fixture = NULL) {
                 )
                 next
               }
+              # R51-IN-04: the pre-flight exists to surface every defect before
+              # a multi-hour run, so the independent checks below accumulate
+              # into one per-mask vector instead of `next`ing on the first hit.
+              # A mask that is both 255-coded and mis-gridded therefore reports
+              # both lines in one pass. Emission order within one mask is the
+              # D-02 order: layers, then categorical-or-value, then geometry.
+              mask_errors <- character(0)
               # nlyr BEFORE compareGeom: compareGeom() ignores layer count, so
               # a 2-band mask on the correct grid passes it (see 05-09).
+              # A multi-layer mask still gets its geometry check, but not the
+              # value scan: terra::freq() over several layers is ill-defined
+              # here.
               n_layers <- as.integer(terra::nlyr(m))
-              if (!identical(n_layers, 1L)) {
-                intervention_errors <- c(
-                  intervention_errors,
+              scan_values <- identical(n_layers, 1L)
+              if (!scan_values) {
+                mask_errors <- c(
+                  mask_errors,
                   sprintf(
                     "intervention mask: %s has %d layers (expected 1)",
                     mask_path, n_layers
                   )
                 )
-                next
               }
-              # CR-01 (pre-flight half). D-02b: a categorical GeoTIFF's minmax
-              # reads 0..1, so the range test below cannot see it; without this
-              # branch the categorical case is only caught by .mask_inside_lut()
-              # at the first intervention of the first region. terra::is.factor()
-              # returns a length-nlyr logical, and the nlyr == 1 branch above has
-              # already guaranteed length 1.
-              is_cat <- suppressWarnings(tryCatch(
-                isTRUE(terra::is.factor(m)), error = function(e) FALSE
-              ))
-              if (is_cat) {
-                intervention_errors <- c(
-                  intervention_errors,
-                  sprintf(
-                    "intervention mask: %s is categorical/non-numeric; expected numeric {0,1,NA}",
-                    mask_path
-                  )
-                )
-                next
-              }
-              # D-02: reject a mask whose observed value range escapes [0, 1]
-              # (255 from an 8-bit gdal_rasterize/QGIS burn, a 0/100 scaled
-              # mask, ...). Reading such a mask as "outside" inverts every
-              # Prob_adjust_zone: Outside intervention onto the whole region.
+              # CR-01 (pre-flight half). D-02b: a categorical GeoTIFF carries
+              # labels rather than numbers, so the value scan below cannot
+              # judge it and is simply skipped for it; without this branch the
+              # categorical case is only caught by .mask_inside_lut() at the
+              # first intervention of the first region. terra::is.factor()
+              # returns a length-nlyr logical, and the probe runs only when the
+              # nlyr == 1 branch above was satisfied.
               #
-              # all(is.finite(mm)) is MANDATORY, not defensive decoration:
-              # terra::minmax(compute = TRUE) returns NaN NaN for an all-NA
-              # raster, and a bare mm[1] >= 0 && mm[2] <= 1 on NaN throws
-              # "missing value where TRUE/FALSE needed" — itself a forbidden
-              # marker in the smoke verifier, i.e. the guard would manufacture
-              # the crash it exists to prevent. An all-NA mask is therefore
-              # deliberately NOT rejected here: its value-domain claim is
-              # vacuously true, and its degeneracy is caught by the verifier's
-              # D-04 assertion instead.
-              mm <- suppressWarnings(tryCatch(
-                as.vector(terra::minmax(m, compute = TRUE)),
-                error = function(e) c(NaN, NaN)
-              ))
-              if (length(mm) == 2L && all(is.finite(mm)) &&
-                  !(mm[1] >= 0 && mm[2] <= 1)) {
-                intervention_errors <- c(
-                  intervention_errors,
-                  sprintf(
-                    "intervention mask: %s has value(s) outside {0,1,NA} (observed min %s, max %s)",
-                    mask_path, format(mm[1]), format(mm[2])
+              # R51-WR-03: a FAILURE of the probe is not "not categorical". The
+              # handler returns the condition message so "could not be read"
+              # stays distinguishable from FALSE — the old
+              # error = function(e) FALSE let a mask whose header reads but
+              # whose value blocks do not (truncated upload, beegfs read error)
+              # pass the value gate silently.
+              if (scan_values) {
+                is_cat <- suppressWarnings(tryCatch(
+                  isTRUE(terra::is.factor(m)),
+                  error = function(e) conditionMessage(e)
+                ))
+                if (is.character(is_cat)) {
+                  mask_errors <- c(
+                    mask_errors,
+                    sprintf(
+                      "intervention mask: %s values could not be read (%s)",
+                      mask_path, is_cat
+                    )
                   )
-                )
-                next
+                  scan_values <- FALSE
+                } else if (isTRUE(is_cat)) {
+                  mask_errors <- c(
+                    mask_errors,
+                    sprintf(
+                      "intervention mask: %s is categorical/non-numeric; expected numeric {0,1,NA}",
+                      mask_path
+                    )
+                  )
+                  scan_values <- FALSE
+                }
+              }
+              # D-02 / GAP-3 (= R51-WR-02): one frequency scan per unique mask,
+              # testing the real {0,1,NA} predicate. The min/max envelope this
+              # replaces proved only that the OBSERVED RANGE sat inside [0, 1],
+              # so an all-0.5 mask passed Stage 7 and hard-stopped hours later
+              # inside the first region, defeating the stated purpose of this
+              # block. GAP-2 (= R51-WR-01) falls out of the same scan: an
+              # all-zero mask has range (0, 0) and passed too, and with
+              # Prob_adjust_zone: Outside its all-FALSE lookup makes the zone
+              # the whole region — the exact impact this phase exists to
+              # prevent. A 255 burn from an 8-bit gdal_rasterize/QGIS export and
+              # a 0/100 scaled mask are rejected by the same test.
+              #
+              # digits = 12 is MANDATORY, not decoration: terra::freq() rounds
+              # to digits = 0 by default, which reports an all-0.5 raster as
+              # value 1 and would silently re-open GAP-3 while looking fixed.
+              if (scan_values) {
+                fq <- suppressWarnings(tryCatch(
+                  terra::freq(m, digits = 12),
+                  error = function(e) e
+                ))
+                if (inherits(fq, "error") || !is.data.frame(fq) ||
+                    !all(c("value", "count") %in% names(fq))) {
+                  # R51-WR-03: an unreadable value block is a HARD stop, behind
+                  # the existing "intervention mask: " marker. It used to
+                  # degrade to c(NaN, NaN), i.e. to "nothing to report".
+                  why <- if (inherits(fq, "error")) {
+                    conditionMessage(fq)
+                  } else {
+                    "unexpected freq shape"
+                  }
+                  mask_errors <- c(
+                    mask_errors,
+                    sprintf(
+                      "intervention mask: %s values could not be read (%s)",
+                      mask_path, why
+                    )
+                  )
+                } else {
+                  vals <- fq$value[!is.na(fq$value) & fq$count > 0]
+                  if (length(vals) == 0L) {
+                    # An NA cell never appears as a freq row, so an empty table
+                    # means every cell is NA. That is deliberately tolerated
+                    # here: the value-domain claim is vacuously true and the
+                    # degeneracy is the smoke verifier's D-04 assertion to make,
+                    # not this gate's. This branch MUST stay ABOVE the no-1 test
+                    # below, because any(logical(0)) is FALSE and an all-NA mask
+                    # would otherwise be rejected for having no cell equal to 1.
+                    # It also replaces the old all(is.finite(mm)) guard, which
+                    # existed so an all-NA mask never reached a comparison
+                    # against NaN and threw "missing value where TRUE/FALSE
+                    # needed" — itself a forbidden marker in the smoke verifier.
+                    # With min/max gone that crash path is gone, but the
+                    # property it protected is kept.
+                    NULL
+                  } else {
+                    bad <- vals[!(vals %in% c(0, 1))]
+                    if (length(bad) > 0L) {
+                      mask_errors <- c(
+                        mask_errors,
+                        sprintf(
+                          "intervention mask: %s has value(s) outside {0,1,NA} (observed min %s, max %s; %d distinct bad value(s))",
+                          mask_path, format(min(vals)), format(max(vals)),
+                          length(bad)
+                        )
+                      )
+                    } else if (!any(vals == 1)) {
+                      # GAP-2 / R51-WR-01: vals is a subset of {0, 1} here, so
+                      # this mask holds only zeros.
+                      mask_errors <- c(
+                        mask_errors,
+                        sprintf(
+                          "intervention mask: %s has no cell equal to 1 (every non-NA cell is 0); the Inside zone is empty and the Outside zone is the whole region",
+                          mask_path
+                        )
+                      )
+                    }
+                  }
+                }
               }
               geom_ok <- suppressWarnings(tryCatch(
                 isTRUE(terra::compareGeom(m, ref_grid, stopOnError = FALSE)),
                 error = function(e) FALSE
               ))
               if (!geom_ok) {
-                intervention_errors <- c(
-                  intervention_errors,
+                mask_errors <- c(
+                  mask_errors,
                   sprintf(
                     "intervention mask: %s is not on the reference grid (crs/res/extent mismatch)",
                     mask_path
                   )
                 )
               }
+              intervention_errors <- c(intervention_errors, mask_errors)
             }
           }
         }
