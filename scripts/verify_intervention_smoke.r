@@ -24,14 +24,22 @@
 #'           correct-engine outcome, not a defect (WR-04);
 #'         - per intervention: zero checked maps is a FAIL. That is the real
 #'           WR-07 condition -- a mask that does not intersect this region at
-#'           all;
+#'           all. An intervention that is skipped earlier, because this
+#'           region's trans_rates.csv holds none of its target rows, never
+#'           reaches that check; it is recorded in an unasserted-id ledger and
+#'           FAILs at run level instead, because the run asserted nothing about
+#'           it and is therefore not evidence for it (GAP-1);
 #'         - per run: maps_checked == 0 while at least one active Absolute-0
 #'           intervention is configured is a FAIL, because the run then
 #'           asserted nothing at all.
 #'       For zone Outside the mask itself must additionally hold at least one
 #'       cell equal to 1 over this region: the Outside zone is the complement
 #'       of the mask, so an empty or wrongly-coded mask would satisfy the
-#'       assertion trivially across the whole region (CR-01).
+#'       assertion trivially across the whole region (CR-01). That proof runs
+#'       once per intervention against the region grid and BEFORE the
+#'       target-row lookup, because it depends only on the mask and the grid --
+#'       never on what this region's trans_rates.csv happens to contain
+#'       (GAP-1).
 #'   (d) No forbidden marker appears in any log under the region dir (or in
 #'       --extra-log, e.g. the SLURM stdout file).
 #'   (e) The plan 05-13 telemetry CSV
@@ -313,6 +321,31 @@ if (length(abs0) > 0L) {
       fail(sprintf("trans_rates.csv lacks From*/To*/id_trans columns: %s",
                    paste(names(tr), collapse = ", ")))
     } else {
+      # GAP-1: the Outside non-degeneracy proof (D-04) needs a reference grid
+      # for this region, and ANY probability map in the directory is a valid
+      # one: allocation builds every per-transition map as
+      # terra::setValues(anterior, ...), so all of them share one geometry. The
+      # previous code relied on exactly this already when it latched D-04 on
+      # the first map it happened to visit. Taking the reference from the
+      # directory instead decouples the proof from trans_rates.csv content.
+      region_ref_paths <- list.files(prob_map_dir, pattern = "[.]tif$", full.names = TRUE)
+      region_ref <- if (length(region_ref_paths) > 0L) {
+        terra::rast(region_ref_paths[[1]])
+      } else {
+        NULL
+      }
+      if (is.null(region_ref)) {
+        fail(sprintf(
+          "probability_map_dir %s holds no .tif, so the region grid for the Outside non-degeneracy proof cannot be established",
+          prob_map_dir
+        ))
+      }
+      # GAP-1 ledger: every active Absolute-0 intervention that this run could
+      # not assert anything about because the region's trans_rates.csv holds
+      # none of its target rows. Checked at run level below — a sibling
+      # intervention with rows keeps maps_checked > 0, so the D-06b floor alone
+      # would let the whole intervention pass unasserted.
+      unasserted_ids <- character(0)
       for (x in abs0) {
         id <- as.character(x[["Intervention_ID"]])
         zone <- as.character(x[["Prob_adjust_zone"]])
@@ -330,20 +363,54 @@ if (length(abs0) > 0L) {
           next
         }
         m_nat <- terra::rast(mask_path)
+        # D-04 (CR-01): for zone Outside the asserted zone is the COMPLEMENT of
+        # the mask, so "prob is 0 over the complement" is satisfied trivially
+        # across the whole region by an all-zero or wrongly-coded mask — with a
+        # large, non-vacuous n_zone. The per-map n_zone guard below only ever
+        # proved the complement is non-empty; it never proved the mask holds a
+        # single cell equal to 1. Prove that separately, or the evidence cannot
+        # distinguish a correctly 1-coded mask from an empty one. Only the
+        # Outside branch needs it: for zone Inside `sel` IS (m0 == 1), so a
+        # degenerate mask already yields n_zone == 0 on every map and is
+        # reported by the per-intervention D-06a check.
+        #
+        # GAP-1: this proof is a property of the mask and the region grid
+        # ALONE, so it runs here — once per intervention, before the target-row
+        # lookup. Sited below that lookup (as it was) it was skipped entirely
+        # whenever this region's trans_rates.csv held none of the
+        # intervention's target rows, which is the normal case for a
+        # mining-only Outside intervention.
+        if (identical(zone, "Outside") && !is.null(region_ref)) {
+          m_reg <- terra::crop(m_nat, region_ref)
+          if (!isTRUE(terra::compareGeom(region_ref, m_reg, stopOnError = FALSE))) {
+            fail(sprintf("mask %s does not align with %s after crop (no resampling allowed)",
+                         basename(mask_path), basename(region_ref_paths[[1]])))
+          } else {
+            m0r <- terra::ifel(is.na(m_reg), 0, m_reg)
+            n_ones <- terra::global(m0r == 1, "sum", na.rm = TRUE)[[1]][1]
+            if (!is.finite(n_ones) || n_ones == 0) {
+              fail(sprintf(
+                "%s: mask %s has 0 cells equal to 1 over this region but Prob_adjust_zone=Outside (degenerate mask: the Outside zone is then the whole region, so the assertion cannot distinguish a correct mask from an empty one)",
+                id, basename(mask_path)
+              ))
+            }
+          }
+        }
         rows <- which(tr[[to_col]] %in% targets &
                         (is.null(from_vals) | tr[[from_col]] %in% from_vals))
         if (length(rows) == 0L) {
+          # GAP-1: this intervention asserted nothing in this region, so the
+          # run is not evidence for it. Record it; the ledger is checked at run
+          # level after this loop. D-06a below is unreachable from here, and
+          # the D-06b floor is satisfied by any sibling intervention that does
+          # have rows.
+          unasserted_ids <- c(unasserted_ids, id)
           cat(sprintf("Info: %s has no target rows in trans_rates.csv for this region\n", id))
           next
         }
         # D-06a: count the maps this intervention actually asserted on, so the
         # per-map INFO downgrade above cannot become a blanket escape hatch.
         n_checked_id <- 0L
-        # D-04 (CR-01): the Outside non-degeneracy check runs once per
-        # intervention, not once per map — every probability map in a region is
-        # built from the same `anterior` raster, so the cropped `m0` is
-        # identical for every k.
-        degeneracy_checked <- FALSE
         for (k in rows) {
           id_trans <- tr[["id_trans"]][k]
           tif <- file.path(prob_map_dir, sprintf("%03d_id_trans_%d.tif", k, id_trans))
@@ -360,26 +427,6 @@ if (length(abs0) > 0L) {
           }
           m0 <- terra::ifel(is.na(m), 0, m)
           sel <- if (identical(zone, "Inside")) (m0 == 1) else (m0 != 1)
-          # D-04 (CR-01): for zone Outside the asserted zone is the COMPLEMENT
-          # of the mask, so "prob is 0 over the complement" is satisfied
-          # trivially across the whole region by an all-zero or wrongly-coded
-          # mask — with a large, non-vacuous n_zone. The n_zone guard below
-          # only ever proved the complement is non-empty; it never proved the
-          # mask holds a single cell equal to 1. Prove that separately, or the
-          # evidence cannot distinguish a correctly 1-coded mask from an empty
-          # one. Only the Outside branch needs this: for zone Inside `sel` IS
-          # (m0 == 1), so a degenerate mask already yields n_zone == 0 on every
-          # map and is reported by the per-intervention D-06a check.
-          if (identical(zone, "Outside") && !degeneracy_checked) {
-            degeneracy_checked <- TRUE
-            n_ones <- terra::global(m0 == 1, "sum", na.rm = TRUE)[[1]][1]
-            if (!is.finite(n_ones) || n_ones == 0) {
-              fail(sprintf(
-                "%s: mask %s has 0 cells equal to 1 over this region but Prob_adjust_zone=Outside (degenerate mask: the Outside zone is then the whole region, so the assertion cannot distinguish a correct mask from an empty one)",
-                id, basename(mask_path)
-              ))
-            }
-          }
           # WR-04: `r` is a PER-TRANSITION probability map — allocation builds
           # it as setValues(anterior, NA_real_) and then writes dt_j$prob at
           # dt_j$cell_id (src/allocation.r:3196-3200), so it is non-NA only on
@@ -427,13 +474,28 @@ if (length(abs0) > 0L) {
         # proved, and the run must not report PASS on it. The
         # `length(rows) == 0L` branch above `next`s before the map loop, so
         # this check is correctly unreachable for "this region has no target
-        # rows in trans_rates.csv" (that case is caught run-level by D-06b).
+        # rows in trans_rates.csv"; that case is caught by the `unasserted_ids`
+        # ledger below (GAP-1). D-06b remains only the floor for "not a single
+        # map was asserted on anywhere in this region".
         if (n_checked_id == 0L) {
           fail(sprintf(
             "%s: no probability map could be asserted on (0 of %d target map(s) had a non-NA probability cell in zone=%s for mask %s)",
             id, length(rows), zone, basename(mask_path)
           ))
         }
+      }
+      # GAP-1: run-level ledger. An intervention skipped for want of target
+      # rows never reaches D-06a, and a sibling intervention that does have
+      # rows keeps the D-06b floor satisfied — which is how a green banner came
+      # to be read as evidence for an intervention nothing was asserted about.
+      # Note this deliberately does NOT also collect the D-06a ids: D-06a
+      # already calls fail() naming them, and double-reporting would inflate
+      # errors=N (the defect R51-IN-01 describes).
+      if (length(unasserted_ids) > 0L) {
+        fail(sprintf(
+          "no probability map could be asserted on for active Absolute-0 intervention(s) %s (no target rows in trans_rates.csv for this region); this run is not evidence for them",
+          paste(unasserted_ids, collapse = ", ")
+        ))
       }
       # D-06b: run-level floor. This block is already inside
       # `if (length(abs0) > 0L)`, so reaching it with maps_checked == 0 means
