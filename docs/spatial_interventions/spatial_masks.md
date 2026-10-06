@@ -12,12 +12,25 @@ Naming convention for finished masks: <intent>_<extent>.tif at the project's
 intervention area, NA = outside.
 
 Since phase 05.1 (CR-01) that value domain is **enforced at runtime**, not only
-checked offline. Three places assert it: the Stage 7 pre-flight in
-`src/allocation.r` rejects, before any region work begins, a mask whose observed
-value range escapes [0, 1] or which is categorical; `.mask_inside_lut()` in
+checked offline. Three places assert it. The Stage 7 pre-flight in
+`src/allocation.r` scans each unique mask once, before any region work begins,
+and rejects a mask holding any value other than 0, 1 or NA (so an all-`0.5`
+mask is stopped at Stage 7 rather than hours later inside the first region), a
+mask with no cell equal to 1, a categorical mask, and a mask whose values
+cannot be read at all. `.mask_inside_lut()` in
 `src/implement_spatial_interventions.R` aborts the run on any extracted value
-outside `{0, 1, NA}` or on a non-numeric (categorical) layer; and
-`scripts/validate_intervention_masks.r` makes the same assertion offline. The
+outside `{0, 1, NA}`, on a non-numeric (categorical) layer, and — when the mask
+carries values but none of them equal 1 — with
+`intervention mask <path> has no cell equal to 1 ...` (no colon, unlike the
+pre-flight's line). A mask that is validly 1-coded but simply does not intersect
+the region being run is **not** an error: the engine logs
+
+```text
+WARN intervention zone: <id> mask <mask> does not intersect region <region>; Prob_adjust_zone=<zone> therefore applies to <none|all> of the region
+```
+
+and continues. Finally, `scripts/validate_intervention_masks.r` makes the same
+assertion offline. The
 motivating failure: a mask re-burned with 255 — the `gdal_rasterize` / QGIS
 8-bit default — used to read as *entirely outside*, which for a
 `Prob_adjust_zone: Outside` intervention silently applied the policy to the

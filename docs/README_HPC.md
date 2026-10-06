@@ -282,17 +282,40 @@ Allocation applies the Allocation-stage interventions from
 the mask rasters must be on scratch before any Stage 7 job. The Stage 7
 pre-flight stops with `intervention mask: missing ...` if a referenced mask is
 absent. Since phase 05.1 (CR-01) it also stops on a mask that is present but
-mis-coded, with one of:
+unusable, with one of:
 
 ```text
-intervention mask: <path> has value(s) outside {0,1,NA} (observed min ..., max ...)
+intervention mask: <path> has value(s) outside {0,1,NA} (observed min ..., max ...; N distinct bad value(s))
 intervention mask: <path> is categorical/non-numeric; expected numeric {0,1,NA}
+intervention mask: <path> has no cell equal to 1 (every non-NA cell is 0); the Inside zone is empty and the Outside zone is the whole region
+intervention mask: <path> values could not be read (<reason>)
 ```
 
-Both run once per unique mask, before any region work, so a mis-staged mask
-costs seconds instead of surfacing hours into a job — or not at all. The fix is
-always an offline re-export of the mask with burn value 1 on the workstation,
-never a conversion or rescale on HPC.
+All four checks run once per unique mask, before any region work, so a
+mis-staged mask costs seconds instead of surfacing hours into a job — or not at
+all. You submit Stage 7 from login02; the checks themselves run inside the
+Stage 7 job on the compute node. What each line means:
+
+- `has value(s) outside {0,1,NA}` — the mask holds numbers other than 0, 1 or
+  NA. The usual cause is a 255 burn, the `gdal_rasterize` / QGIS 8-bit default.
+- `is categorical/non-numeric` — the GeoTIFF carries a category table, so its
+  cells are labels rather than the numbers 0 and 1.
+- `has no cell equal to 1` — the mask was burned empty, or clipped to an area
+  that does not overlap the intended one, so nothing at all is inside it. An
+  `Inside` intervention would then apply to nothing and an `Outside` one to the
+  whole region.
+- `values could not be read` — the file header is fine but its pixel data could
+  not be read, i.e. a truncated or partial upload. Re-copy the file from the
+  workstation and compare it against `docs/spatial_interventions/masks.sha256`.
+
+A mask whose cells are **all NA** is deliberately not rejected by Stage 7: its
+value-domain claim is vacuously true, and whether such a mask is degenerate is
+judged later by `scripts/verify_intervention_smoke.r` (its Outside
+non-degeneracy check), not here. Silence from the pre-flight on an all-NA mask
+is expected, not a missed check.
+
+The fix is always an offline re-export of the mask with burn value 1 on the
+workstation, never a conversion or rescale on HPC.
 
 **Placement.** Masks live in `${HPC_SCRATCH_ROOT}/inputs/spat_prob_perturb/`
 (currently `/beegfs/black/nascent-lulcc/inputs/spat_prob_perturb/`). The path is
@@ -366,9 +389,24 @@ and a given transition's from-class may simply be absent underneath it.
 Consequently `maps_checked` counts only the assertions that actually had cells
 to assert on, so it may be **lower** than the number of matching `trans_rates.csv`
 rows and lower than a previous region's figure without anything being wrong; but
-a run in which some active Absolute-0 intervention contributes zero checked maps,
-or in which `maps_checked` reaches 0 overall, is a hard FAIL — the verifier then
-proved nothing and must not be read as a pass.
+a run in which `maps_checked` reaches 0 overall is a hard FAIL — the verifier
+then proved nothing and must not be read as a pass.
+
+Two further hard-FAIL cases were added in phase 05.1:
+
+- The verifier keeps a per-intervention ledger and FAILs, naming the
+  intervention, for any active `Absolute` / `0` intervention that was
+  **never asserted on** — even when a sibling intervention kept the run-level
+  `maps_checked` above 0. The run-level floor alone could be satisfied by one
+  intervention while another was silently skipped. In plain language: a green
+  banner now means every active Absolute-0 intervention was actually checked,
+  not merely that some intervention was.
+- A probability map holding no non-NA cell anywhere in the region is a FAIL,
+  because that is an engine or write defect rather than a from-class that
+  simply does not sit under the mask. The single exception is a map for which
+  the judged worker log carries the engine's own
+  `has no predictions; wrote empty TIF` WARN for that exact row: that one stays
+  an `Info:` line and does not count toward `maps_checked`.
 
 Notes:
 

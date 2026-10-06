@@ -204,19 +204,22 @@ sys.source(file.path(.repo_root, "src", "allocation.r"), envir = .wenv_noengine)
 # single-layer, so they reach the new value-domain block with the nlyr and
 # compareGeom branches satisfied.
 
-# Every cell burned with `value` (255 = the gdal_rasterize / QGIS 8-bit default).
-.write_wiring_valued_mask <- function(dir, name, value) {
-  r <- .wiring_ref_grid()
+# Every cell burned with `value` (255 = the gdal_rasterize / QGIS 8-bit default,
+# 0 = an empty burn, 0.5 = a value the old range test could not see).
+.write_wiring_valued_mask <- function(dir, name, value,
+                                      template = .wiring_ref_grid()) {
+  r <- terra::rast(template)
   terra::values(r) <- rep(value, terra::ncell(r))
   path <- file.path(dir, name)
   terra::writeRaster(r, path, overwrite = TRUE)
   path
 }
 
-# A true categorical GeoTIFF: minmax() reads 0..1, so only terra::is.factor()
-# catches it at pre-flight.
-.write_wiring_categorical_mask <- function(dir, name) {
-  r <- .wiring_ref_grid()
+# A true categorical GeoTIFF: its cells carry labels rather than numbers, so
+# only terra::is.factor() catches it at pre-flight.
+.write_wiring_categorical_mask <- function(dir, name,
+                                           template = .wiring_ref_grid()) {
+  r <- terra::rast(template)
   v <- rep(0L, terra::ncell(r))
   v[c(2L, 7L, 13L)] <- 1L
   terra::values(r) <- v
@@ -226,8 +229,8 @@ sys.source(file.path(.repo_root, "src", "allocation.r"), envir = .wenv_noengine)
   path
 }
 
-# All NA: terra::minmax(compute = TRUE) returns NaN NaN here, which is why the
-# pre-flight's finiteness guard is mandatory.
+# All NA: terra::freq() returns a zero-row table here, which is the branch the
+# pre-flight uses to tolerate an all-NA mask (see the CR-01 block below).
 .write_wiring_all_na_mask <- function(dir, name) {
   r <- .wiring_ref_grid()
   terra::values(r) <- rep(NA_real_, terra::ncell(r))
@@ -553,10 +556,15 @@ test_that("CR-01: pre-flight rejects a categorical mask", {
 })
 
 test_that("CR-01: an all-NA mask does not crash the pre-flight", {
-  # terra::minmax(compute = TRUE) returns NaN NaN on an all-NA raster, so a bare
-  # `mm[1] >= 0 && mm[2] <= 1` throws "missing value where TRUE/FALSE needed" -
-  # itself a forbidden marker in the smoke verifier. An all-NA mask is degenerate
-  # but its value-domain claim is vacuously true, so it must pass this gate.
+  # History: terra::minmax(compute = TRUE) returned NaN NaN on an all-NA raster,
+  # so the bare `mm[1] >= 0 && mm[2] <= 1` the pre-flight used to run threw
+  # "missing value where TRUE/FALSE needed" - itself a forbidden marker in the
+  # smoke verifier - and `all(is.finite(mm))` was the guard against it. There is
+  # no min/max call left, so the guard is now the empty-`vals` branch of the freq
+  # scan: an NA cell never produces a freq row, so an all-NA mask yields a
+  # zero-row table and is passed over in silence. An all-NA mask is degenerate
+  # but its value-domain claim is vacuously true, so it must pass this gate; the
+  # degeneracy is the smoke verifier's D-04 assertion to make.
   withr::local_envvar(ALLOCATION_YEAR_POST_FILTER = NA)
   dir <- withr::local_tempdir()
   .write_nat_yaml(dir)
@@ -569,6 +577,9 @@ test_that("CR-01: an all-NA mask does not crash the pre-flight", {
     "missing value where TRUE/FALSE needed", res, fixed = TRUE
   )))
   expect_false(any(grepl("outside {0,1,NA}", res, fixed = TRUE)))
+  expect_length(.intervention_lines(res), 0L)
+  expect_false(any(grepl("has no cell equal to 1", res, fixed = TRUE)))
+  expect_false(any(grepl("values could not be read", res, fixed = TRUE)))
 })
 
 test_that("CR-01: a valid 1-coded mask adds no intervention line", {
@@ -579,6 +590,202 @@ test_that("CR-01: a valid 1-coded mask adds no intervention line", {
   .write_wiring_masks(dir, c("nat_mask_2028.tif", "nat_mask_2032.tif"))
   res <- .wenv$validate_allocation_runtime(config = .wiring_config(dir))
   expect_length(.intervention_lines(res), 0L)
+})
+
+# --- R51 gap-closure pre-flight fixtures (GAP-2, GAP-3, R51-WR-03, R51-IN-04) ---
+#
+# The blocks above pin in-range, single-defect masks, which is exactly why the
+# gaps below shipped: a guard that is only ever shown conforming inputs and one
+# obviously-broken input proves its envelope, not its predicate.
+
+test_that("GAP-2: pre-flight rejects an all-zero mask (no cell equal to 1)", {
+  # minmax() returned (0, 0) for this mask, so the old range test passed it, and
+  # the engine's own bad-value set `v[!is.na(v) & v != 0 & v != 1]` is empty for
+  # it too. With Prob_adjust_zone: Outside the all-FALSE lookup then made the
+  # zone the whole region - the exact impact this phase exists to prevent.
+  withr::local_envvar(ALLOCATION_YEAR_POST_FILTER = NA)
+  dir <- withr::local_tempdir()
+  .write_nat_yaml(dir)
+  .write_wiring_masks(dir, c("nat_mask_2028.tif", "nat_mask_2032.tif"))
+  .write_wiring_valued_mask(dir, "nat_mask_2032.tif", value = 0)
+  res <- .wenv$validate_allocation_runtime(config = .wiring_config(dir))
+  lines <- .intervention_lines(res)
+  expect_length(lines, 1L)
+  expect_true(startsWith(lines, "intervention mask: "))
+  expect_true(grepl("has no cell equal to 1", lines, fixed = TRUE))
+  expect_match(lines, "nat_mask_2032.tif", fixed = TRUE)
+  # An all-zero mask is in-domain, so it must NOT be reported as out-of-domain.
+  expect_false(any(grepl("outside {0,1,NA}", lines, fixed = TRUE)))
+  # The conforming sibling is silent.
+  expect_false(any(grepl("nat_mask_2028.tif", lines, fixed = TRUE)))
+})
+
+test_that("GAP-3: pre-flight rejects an in-range fractional mask that a min/max test cannot see", {
+  # 0.5 sits inside [0, 1], so `!(mm[1] >= 0 && mm[2] <= 1)` was FALSE and this
+  # mask reached .mask_inside_lut() hours later, in the first region. It is also
+  # the fixture that pins `digits = 12`: under terra::freq()'s default
+  # digits = 0 this raster reports value 1 and reads as a valid all-1 mask.
+  withr::local_envvar(ALLOCATION_YEAR_POST_FILTER = NA)
+  dir <- withr::local_tempdir()
+  .write_nat_yaml(dir)
+  .write_wiring_masks(dir, c("nat_mask_2028.tif", "nat_mask_2032.tif"))
+  .write_wiring_valued_mask(dir, "nat_mask_2032.tif", value = 0.5)
+  res <- .wenv$validate_allocation_runtime(config = .wiring_config(dir))
+  lines <- .intervention_lines(res)
+  expect_length(lines, 1L)
+  expect_true(startsWith(lines, "intervention mask: "))
+  expect_true(grepl("outside {0,1,NA}", lines, fixed = TRUE))
+  expect_match(lines, "0.5", fixed = TRUE)
+  expect_match(lines, "nat_mask_2032.tif", fixed = TRUE)
+})
+
+test_that("R51-WR-03: an unreadable value scan is a hard stop while an all-NA mask is still tolerated", {
+  # Why a mock and not a corrupted file: corrupting the payload bytes of a
+  # GeoTIFF does not reliably make freq() raise - the garbage reads back as
+  # values or as zeros - so a genuinely unreadable value block cannot be
+  # fabricated deterministically. local_mocked_bindings() replaces the binding
+  # that `terra::freq(...)` resolves inside the baseenv()-parented .wenv and is
+  # restored on block exit.
+  #
+  # Both directions of WR-03 in ONE run: 2028 is genuinely all NA (tolerated,
+  # silent) and 2032 raises (hard stop). A fix that makes unreadable fatal by
+  # also rejecting all-NA has not closed WR-03, it has re-broken D-02.
+  withr::local_envvar(ALLOCATION_YEAR_POST_FILTER = NA)
+  dir <- withr::local_tempdir()
+  .write_nat_yaml(dir)
+  .write_wiring_masks(dir, c("nat_mask_2028.tif", "nat_mask_2032.tif"))
+  .write_wiring_all_na_mask(dir, "nat_mask_2028.tif")
+  # Captured BEFORE the mock is installed: calling terra::freq() from inside the
+  # mock would resolve to the mock and recurse.
+  orig_freq <- terra::freq
+  testthat::local_mocked_bindings(
+    freq = function(x, ...) {
+      if (any(grepl("nat_mask_2032", terra::sources(x), fixed = TRUE))) {
+        stop("mocked truncated value block")
+      }
+      orig_freq(x, ...)
+    },
+    .package = "terra"
+  )
+  res <- .wenv$validate_allocation_runtime(config = .wiring_config(dir))
+  lines <- .intervention_lines(res)
+  expect_length(lines, 1L)
+  expect_true(startsWith(lines, "intervention mask: "))
+  expect_match(lines, "nat_mask_2032.tif", fixed = TRUE)
+  expect_true(grepl("values could not be read", lines, fixed = TRUE))
+  expect_match(lines, "mocked truncated value block", fixed = TRUE)
+  # The all-NA mask is still tolerated: no line, no crash, and in particular not
+  # rejected for having no cell equal to 1.
+  expect_false(any(grepl("nat_mask_2028.tif", lines, fixed = TRUE)))
+  expect_false(any(grepl("has no cell equal to 1", res, fixed = TRUE)))
+  expect_false(any(grepl(
+    "missing value where TRUE/FALSE needed", res, fixed = TRUE
+  )))
+})
+
+test_that("R51-WR-03: an unexpected freq shape is reported as unreadable, not accepted", {
+  # The old code's `length(mm) == 2L` term degraded any unexpected shape to
+  # "accept". Both staged masks are valid, so the only reason a line appears is
+  # that the scan could not be interpreted.
+  withr::local_envvar(ALLOCATION_YEAR_POST_FILTER = NA)
+  dir <- withr::local_tempdir()
+  .write_nat_yaml(dir)
+  .write_wiring_masks(dir, c("nat_mask_2028.tif", "nat_mask_2032.tif"))
+  testthat::local_mocked_bindings(
+    freq = function(x, ...) list(),
+    .package = "terra"
+  )
+  res <- .wenv$validate_allocation_runtime(config = .wiring_config(dir))
+  lines <- .intervention_lines(res)
+  expect_length(lines, 2L)
+  expect_true(all(startsWith(lines, "intervention mask: ")))
+  expect_true(all(grepl("values could not be read", lines, fixed = TRUE)))
+  expect_true(all(grepl("unexpected freq shape", lines, fixed = TRUE)))
+})
+
+test_that("REVIEW WR-03 (is.factor half): a raised categorical probe is reported as unreadable, not as 'not categorical'", {
+  # The companion of the block above, for the other swallowed tryCatch: the old
+  # handler returned FALSE, i.e. "not categorical", for a probe that never
+  # answered. When the probe itself raises, the categorical verdict is UNKNOWN,
+  # not false, and the mask must be reported as unreadable.
+  withr::local_envvar(ALLOCATION_YEAR_POST_FILTER = NA)
+  dir <- withr::local_tempdir()
+  .write_nat_yaml(dir)
+  .write_wiring_masks(dir, c("nat_mask_2028.tif", "nat_mask_2032.tif"))
+  # Scoped to the staged masks: terra calls is.factor() internally on plain
+  # vectors, so an unconditional mock raises inside terra itself rather than at
+  # the pre-flight's probe. Everything that is not one of our mask rasters is
+  # delegated to the binding captured before the mock was installed.
+  #
+  # freq() is stubbed to a well-formed all-1 table in the same breath, and that
+  # is what makes this block isolate the is.factor branch: terra::freq() calls
+  # is.factor() on the SpatRaster internally, so with a live freq() this mask
+  # would be reported as unreadable through the FREQ handler even if the
+  # is.factor handler still swallowed its failure. With freq() stubbed, the only
+  # path to a line is the is.factor handler.
+  orig_is_factor <- terra::is.factor
+  testthat::local_mocked_bindings(
+    is.factor = function(x, ...) {
+      if (inherits(x, "SpatRaster") &&
+          any(grepl("nat_mask_", terra::sources(x), fixed = TRUE))) {
+        stop("mocked is.factor failure")
+      }
+      orig_is_factor(x, ...)
+    },
+    freq = function(x, ...) data.frame(layer = 1L, value = 1, count = 20L),
+    .package = "terra"
+  )
+  res <- .wenv$validate_allocation_runtime(config = .wiring_config(dir))
+  lines <- .intervention_lines(res)
+  expect_length(lines, 2L)
+  expect_true(all(startsWith(lines, "intervention mask: ")))
+  expect_true(all(grepl("values could not be read", lines, fixed = TRUE)))
+  expect_true(all(grepl("mocked is.factor failure", lines, fixed = TRUE)))
+  expect_false(any(grepl("is categorical/non-numeric", lines, fixed = TRUE)))
+})
+
+test_that("R51-IN-04: a mask that is both mis-coded and mis-gridded reports both defects", {
+  # The pre-flight exists to surface everything before a multi-hour run. It used
+  # to `next` on the first defect, so the operator fixed the burn value, re-ran
+  # Stage 7, and only then learned the grid was wrong too.
+  withr::local_envvar(ALLOCATION_YEAR_POST_FILTER = NA)
+  shifted <- terra::rast(nrows = 4, ncols = 5, xmin = 100, xmax = 105, ymin = 0, ymax = 4)
+
+  dir <- withr::local_tempdir()
+  .write_nat_yaml(dir)
+  .write_wiring_masks(dir, c("nat_mask_2028.tif", "nat_mask_2032.tif"))
+  .write_wiring_valued_mask(dir, "nat_mask_2032.tif", value = 255, template = shifted)
+  res <- .wenv$validate_allocation_runtime(config = .wiring_config(dir))
+  lines <- .intervention_lines(res)
+  expect_length(lines, 2L)
+  expect_true(all(grepl("nat_mask_2032.tif", lines, fixed = TRUE)))
+  expect_true(any(grepl("outside {0,1,NA}", lines, fixed = TRUE)))
+  expect_true(any(grepl("is not on the reference grid", lines, fixed = TRUE)))
+
+  # Same for the categorical/geometry pair: the categorical verdict skips the
+  # value scan but no longer hides the geometry check.
+  dir2 <- withr::local_tempdir()
+  .write_nat_yaml(dir2)
+  .write_wiring_masks(dir2, c("nat_mask_2028.tif", "nat_mask_2032.tif"))
+  .write_wiring_categorical_mask(dir2, "nat_mask_2032.tif", template = shifted)
+  res2 <- .wenv$validate_allocation_runtime(config = .wiring_config(dir2))
+  lines2 <- .intervention_lines(res2)
+  expect_length(lines2, 2L)
+  expect_true(all(grepl("nat_mask_2032.tif", lines2, fixed = TRUE)))
+  expect_true(any(grepl("is categorical/non-numeric", lines2, fixed = TRUE)))
+  expect_true(any(grepl("is not on the reference grid", lines2, fixed = TRUE)))
+})
+
+test_that("GAP-3: the pre-flight value scan is a freq scan with explicit digits and no minmax", {
+  loop_pos <- regexpr(
+    "for (mask_path in existing_masks)", allocation_text, fixed = TRUE
+  )[[1L]]
+  expect_gt(loop_pos, 0L)
+  block <- substr(allocation_text, loop_pos, loop_pos + 8000L)
+  expect_match(block, "terra::freq(m, digits = 12)", fixed = TRUE)
+  code <- readLines(file.path(.repo_root, "src", "allocation.r"), warn = FALSE)
+  code <- code[!grepl("^[[:space:]]*#", code)]
+  expect_false(any(grepl("minmax", code, fixed = TRUE)))
 })
 
 # --- D-07: repo YAMLs agree with the posterior-year schedule ----------------
