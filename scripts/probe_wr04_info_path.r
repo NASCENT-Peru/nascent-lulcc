@@ -99,7 +99,18 @@ for (src_file in c("src/setup.r", "src/utils.r", "src/implement_spatial_interven
 }
 
 suppressPackageStartupMessages(library(terra))
-terra::terraOptions(progress = 0)
+# memfrac caps what terra will hold in RAM before spilling to disk. The default
+# (0.6) let a single crop on a big region blow a 32GB job; 0.25 keeps terra's
+# own allocations well inside a modest --mem request, and the counting pass
+# below is bounded separately by CHUNK_CELLS.
+terra::terraOptions(progress = 0, memfrac = 0.25)
+
+# Per-run scratch for the cropped masks. Inside tempdir(), which R unlinks on
+# exit, so nothing is left behind on a normal finish; if the job is killed,
+# SLURM's TMPDIR cleanup takes it.
+scratch_dir <- file.path(tempdir(), "wr04_probe")
+dir.create(scratch_dir, recursive = TRUE, showWarnings = FALSE)
+
 config <- get_config()
 
 opt_or <- function(key, default) {
@@ -196,6 +207,69 @@ entries <- yaml::yaml.load_file(file.path(interventions_dir, paste0(scenario, "_
 # so a phase2 mask shared by 2036-2060 is scanned once.
 n_zone_cache <- new.env(parent = emptyenv())
 
+# Rows of cells held in memory at once. The first version of this script used
+# terra::ifel() plus chained boolean algebra (`sel & !is.na(r)`), which
+# materialises several full-extent logical rasters simultaneously and was
+# OOM-killed at 32GB on andes. Reading a fixed-size window of both rasters and
+# reducing it to two integers bounds peak memory by CHUNK_CELLS regardless of
+# region size, so the probe costs the same on andes as on costa_peruana.
+CHUNK_CELLS <- 4e6
+
+# Every per-transition map in a region is setValues(anterior, ...), so they all
+# share one grid. Crop each national mask to that grid ONCE, to a temp file, and
+# reuse the disk-backed result across all of the region's maps. Re-cropping per
+# map was re-materialising a region-sized raster 16 times over.
+mask_crop_cache <- new.env(parent = emptyenv())
+
+cropped_mask <- function(mask_path) {
+  key <- mask_path
+  if (!is.null(mask_crop_cache[[key]])) return(mask_crop_cache[[key]])
+  out <- file.path(scratch_dir, paste0("maskcrop_", tools::file_path_sans_ext(basename(mask_path)), ".tif"))
+  m <- tryCatch(
+    terra::crop(terra::rast(mask_path), region_ref, filename = out, overwrite = TRUE),
+    error = function(e) {
+      cat(sprintf("Info: crop of %s failed: %s\n", basename(mask_path), conditionMessage(e)))
+      NULL
+    }
+  )
+  mask_crop_cache[[key]] <- m
+  m
+}
+
+#' Count, in one streaming pass over the two aligned rasters:
+#'   n_r  — cells where the probability map is non-NA (the from-class footprint)
+#'   n_in — cells where additionally the mask equals 1
+#'
+#' NA mask cells count as 0, matching the verifier's ifel(is.na(m), 0, m).
+count_blockwise <- function(r, m) {
+  nc <- terra::ncol(r)
+  nr <- terra::nrow(r)
+  rows_per <- max(1L, as.integer(floor(CHUNK_CELLS / max(1L, nc))))
+  n_r <- 0
+  n_in <- 0
+  # terra::readValues() on a disk-backed raster needs the file opened first;
+  # without readStart() it raises "the file is not open for reading". readStop()
+  # must run even on error, or the handles leak across the 16-map loop.
+  terra::readStart(r)
+  terra::readStart(m)
+  on.exit({
+    try(terra::readStop(r), silent = TRUE)
+    try(terra::readStop(m), silent = TRUE)
+  }, add = TRUE)
+  start <- 1L
+  while (start <= nr) {
+    n_this <- min(rows_per, nr - start + 1L)
+    rv <- terra::readValues(r, row = start, nrows = n_this, col = 1L, ncols = nc, mat = FALSE)
+    mv <- terra::readValues(m, row = start, nrows = n_this, col = 1L, ncols = nc, mat = FALSE)
+    ok <- !is.na(rv)
+    n_r <- n_r + sum(ok)
+    n_in <- n_in + sum(ok & !is.na(mv) & mv == 1)
+    rm(rv, mv, ok)
+    start <- start + n_this
+  }
+  list(n_r = n_r, n_in = n_in)
+}
+
 n_zone_for <- function(mask_path, zone, k, id_trans) {
   key <- paste(mask_path, zone, k, sep = "|")
   if (!is.null(n_zone_cache[[key]])) return(n_zone_cache[[key]])
@@ -206,17 +280,31 @@ n_zone_for <- function(mask_path, zone, k, id_trans) {
     return(res)
   }
   r <- terra::rast(tif)
-  m <- terra::crop(terra::rast(mask_path), r)
+  m <- cropped_mask(mask_path)
+  if (is.null(m)) {
+    res <- list(n_zone = NA_real_, n_r = NA_real_, note = "mask crop failed")
+    n_zone_cache[[key]] <- res
+    return(res)
+  }
   if (!isTRUE(terra::compareGeom(r, m, stopOnError = FALSE))) {
     res <- list(n_zone = NA_real_, n_r = NA_real_, note = "mask does not align after crop")
     n_zone_cache[[key]] <- res
     return(res)
   }
-  m0 <- terra::ifel(is.na(m), 0, m)
-  sel <- if (identical(zone, "Inside")) (m0 == 1) else (m0 != 1)
+  # Progress on stdout: if a future run is killed mid-pass, the log names the
+  # exact mask and map it died on instead of just stopping.
+  cat(sprintf("  scan %s x row %d (id_trans %s) ... ", basename(mask_path), k,
+              as.character(id_trans)))
+  utils::flush.console()
+  cnt <- count_blockwise(r, m)
+  cat(sprintf("n_r=%.0f n_in=%.0f\n", cnt$n_r, cnt$n_in))
+  # The verifier maps NA -> 0 before selecting, so zone Outside (`m0 != 1`)
+  # INCLUDES every NA mask cell. The Outside count is therefore the complement
+  # of the Inside count within the from-class footprint, which means one
+  # blockwise pass serves both zones.
   res <- list(
-    n_zone = terra::global(sel & !is.na(r), "sum", na.rm = TRUE)[[1]][1],
-    n_r    = terra::global(!is.na(r), "sum", na.rm = TRUE)[[1]][1],
+    n_zone = if (identical(zone, "Inside")) cnt$n_in else cnt$n_r - cnt$n_in,
+    n_r    = cnt$n_r,
     note   = NA_character_
   )
   n_zone_cache[[key]] <- res

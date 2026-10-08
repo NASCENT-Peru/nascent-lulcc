@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=wr04-probe
-#SBATCH --time=00:30:00
+#SBATCH --time=01:30:00
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=32G
+#SBATCH --mem=48G
 #SBATCH --output=logs/wr04-probe-%j.out
 #SBATCH --error=logs/wr04-probe-%j.err
 
@@ -22,9 +22,16 @@
 # Every argument after the script name is forwarded verbatim to the R script,
 # so `--help` and all of its flags work unchanged.
 #
-# No --partition: the defaults above (32G, 2 cpus, 30 min) fit the ordinary
-# `compute` partition comfortably. Unlike the allocation smoke run this job has
-# no 80GB predictor preload, so it does NOT need highmem or fat.
+# No --partition: the defaults above (48G, 2 cpus, 90 min) fit the ordinary
+# `compute` partition (93GB). Unlike the allocation smoke run this job has no
+# 80GB predictor preload, so it does NOT need highmem or fat.
+#
+# Sizing history: the first version of the probe used terra::ifel() and chained
+# boolean raster algebra, which materialises several full-extent logical rasters
+# at once; it was OOM-killed at 32G on andes. The probe now crops each mask once
+# to a temp file and counts through a fixed-size row window, so peak memory no
+# longer scales with region size. 48G is headroom, not a requirement, and the
+# walltime is raised because streaming trades memory for I/O.
 #
 # `source .env` is still required before submitting: setup_common_env() gates on
 # the Stage 7 path contract (HPC_SCRATCH_ROOT, TERRA_TEMP, HPC_TMP_ROOT, ...)
