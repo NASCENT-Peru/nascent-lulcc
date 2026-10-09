@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=wr04-probe
-#SBATCH --time=01:30:00
+#SBATCH --time=06:00:00
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=48G
 #SBATCH --output=logs/wr04-probe-%j.out
@@ -8,23 +8,35 @@
 
 # Batch wrapper for scripts/probe_wr04_info_path.r (phase 05.1 UAT item 1).
 #
-# The probe is read-only — it opens one donor run's per-transition probability
-# maps plus the national intervention masks and does a handful of terra::global()
-# reductions. That is small next to an allocation run, but it is still real I/O
-# and real compute, so it belongs in a batch job and not on login02.
+# The probe is read-only — it streams existing per-transition probability maps
+# against the national intervention masks and reduces each pair to two counts.
+# That is small next to an allocation run, but it is still real I/O and real
+# compute, so it belongs in a batch job and never on login02.
 #
 # Standard launch, from the repo root on login02:
 #
 #   source .env
-#   sbatch scripts/submit_probe_wr04.sh --donor-region andes --donor-year 2032 \
-#     --probe-years 2024,2028,2032,2036
+#   # cheapest region, every scenario and year it has, stop at the first hit:
+#   sbatch scripts/submit_probe_wr04.sh --donor-region costa_peruana
+#
+#   # widen to everything (hours; ordered cheapest region first, early exit):
+#   sbatch scripts/submit_probe_wr04.sh
+#
+#   # bound the cost explicitly:
+#   sbatch scripts/submit_probe_wr04.sh --max-donors 12
 #
 # Every argument after the script name is forwarded verbatim to the R script,
 # so `--help` and all of its flags work unchanged.
 #
-# No --partition: the defaults above (48G, 2 cpus, 90 min) fit the ordinary
+# No --partition: the defaults above (48G, 2 cpus, 6h) fit the ordinary
 # `compute` partition (93GB). Unlike the allocation smoke run this job has no
-# 80GB predictor preload, so it does NOT need highmem or fat.
+# 80GB predictor preload, so it does NOT need highmem or fat — not even to
+# sweep andes or cuenca_del_amazonas, because memory is bounded by chunk size
+# rather than by region extent.
+#
+# Walltime is the real budget here. The sweep orders donors cheapest region
+# first and stops at the first firing combination, so a hit in costa_peruana
+# costs minutes; a full --census over every donor is what fills 6 hours.
 #
 # Sizing history: the first version of the probe used terra::ifel() and chained
 # boolean raster algebra, which materialises several full-extent logical rasters
