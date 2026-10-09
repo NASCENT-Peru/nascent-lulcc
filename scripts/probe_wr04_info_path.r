@@ -38,7 +38,7 @@
 #' Usage:
 #'   Rscript scripts/probe_wr04_info_path.r \
 #'     --donor-region andes --donor-year 2032 \
-#'     [--donor-scenario NAT] [--scenario NAT] \
+#'     [--donor-scenario NAT] [--scenario NAT,SOC,CUL] \
 #'     [--probe-years 2024,2028,2032,2036] \
 #'     [--output-root <path>] [--mask-dir <path>] [--interventions-dir <path>]
 #'
@@ -56,7 +56,7 @@ setwd(project_root)
 
 usage <- paste(
   "Usage: Rscript scripts/probe_wr04_info_path.r --donor-region <region> --donor-year <year>",
-  "[--donor-scenario NAT] [--scenario NAT] [--probe-years 2024,2028,2032,2036]",
+  "[--donor-scenario NAT] [--scenario NAT,SOC,CUL] [--probe-years 2024,2028,2032,2036]",
   "[--output-root <path>] [--mask-dir <path>] [--interventions-dir <path>]"
 )
 
@@ -129,20 +129,43 @@ if (is.null(opts[["donor-year"]]) || !grepl("^[0-9]{4}$", opts[["donor-year"]]))
 }
 donor_year <- as.integer(opts[["donor-year"]])
 donor_scenario <- opt_or("donor-scenario", "NAT")
-scenario <- opt_or("scenario", donor_scenario)
+# --scenario takes a comma-separated LIST. The donor supplies from-class
+# footprints only, and those are scenario-independent under
+# ALLOCATION_YEAR_POST_FILTER (the anterior map is the initial 2022 LULC map
+# whatever the scenario), so one donor run can be probed against every
+# scenario's masks and target classes without re-running allocation. This is
+# what makes the other scenarios' masks — low_es_value_mask.tif,
+# indigenous_lands_mask.tif, CUL's own PA phases — testable for free.
+scenarios <- trimws(strsplit(opt_or("scenario", donor_scenario), ",", fixed = TRUE)[[1]])
+scenarios <- scenarios[nzchar(scenarios)]
+if (length(scenarios) == 0L) {
+  cat(sprintf("ERROR: --scenario resolved to nothing\n%s\n", usage), file = stderr())
+  quit(status = 2)
+}
 output_root <- opt_or("output-root", config[["simulation_output_dir"]])
 mask_dir <- opt_or("mask-dir", config[["spat_prob_perturb_dir"]])
 interventions_dir <- opt_or("interventions-dir", config[["interventions_dir"]])
 
-probe_years <- opt_or("probe-years", "")
-probe_years <- if (nzchar(probe_years)) {
-  as.integer(trimws(strsplit(probe_years, ",", fixed = TRUE)[[1]]))
-} else {
-  # Every posterior year the scenario YAML mentions.
-  e <- yaml::yaml.load_file(file.path(interventions_dir, paste0(scenario, "_interventions.yml")))
-  sort(unique(as.integer(unlist(lapply(e, function(x) x[["Time_steps_implemented"]])))))
+yaml_for <- function(s) file.path(interventions_dir, paste0(s, "_interventions.yml"))
+for (s in scenarios) {
+  if (!file.exists(yaml_for(s))) {
+    cat(sprintf("ERROR: no interventions YAML for scenario %s at %s\n", s, yaml_for(s)),
+        file = stderr())
+    quit(status = 2)
+  }
 }
-if (any(is.na(probe_years))) {
+
+probe_years_opt <- opt_or("probe-years", "")
+probe_years_for <- function(s) {
+  if (nzchar(probe_years_opt)) {
+    as.integer(trimws(strsplit(probe_years_opt, ",", fixed = TRUE)[[1]]))
+  } else {
+    # Every posterior year this scenario's YAML mentions.
+    e <- yaml::yaml.load_file(yaml_for(s))
+    sort(unique(as.integer(unlist(lapply(e, function(x) x[["Time_steps_implemented"]])))))
+  }
+}
+if (nzchar(probe_years_opt) && any(is.na(probe_years_for(scenarios[[1]])))) {
   cat(sprintf("ERROR: --probe-years must be a comma-separated list of 4-digit years\n%s\n", usage),
       file = stderr())
   quit(status = 2)
@@ -155,8 +178,9 @@ trans_rates_path <- file.path(donor_dir, "trans_rates.csv")
 
 cat("WR-04 INFO-path probe (read-only)\n")
 cat(sprintf("donor run:         %s\n", donor_dir))
-cat(sprintf("probe scenario:    %s\n", scenario))
-cat(sprintf("probe years:       %s\n", paste(probe_years, collapse = ", ")))
+cat(sprintf("probe scenarios:   %s\n", paste(scenarios, collapse = ", ")))
+cat(sprintf("probe years:       %s\n",
+            if (nzchar(probe_years_opt)) probe_years_opt else "<all years in each scenario YAML>"))
 cat(sprintf("mask_dir:          %s\n", mask_dir))
 cat(sprintf("interventions_dir: %s\n\n", interventions_dir))
 
@@ -201,7 +225,6 @@ to_vals_of <- function(names_vec) {
   as.integer(v[!is.na(v)])
 }
 
-entries <- yaml::yaml.load_file(file.path(interventions_dir, paste0(scenario, "_interventions.yml")))
 
 # Cache the per-(mask, zone, row) n_zone: the same mask is reused across years,
 # so a phase2 mask shared by 2036-2060 is scanned once.
@@ -313,6 +336,13 @@ n_zone_for <- function(mask_path, zone, k, id_trans) {
 
 rows_out <- list()
 
+for (scenario in scenarios) {
+  entries <- yaml::yaml.load_file(yaml_for(scenario))
+  probe_years <- probe_years_for(scenario)
+  cat(sprintf("
+--- scenario %s, years %s ---
+", scenario,
+              paste(probe_years, collapse = ", ")))
 for (py in probe_years) {
   resolved <- tryCatch(
     resolve_intervention_masks(interventions_dir, mask_dir, scenario, py),
@@ -358,6 +388,7 @@ for (py in probe_years) {
     for (k in rows) {
       z <- n_zone_for(mask_path, zone, k, tr[["id_trans"]][k])
       rows_out[[length(rows_out) + 1L]] <- data.frame(
+        scenario = scenario,
         year = py, intervention = id, zone = zone, mask = basename(mask_path),
         row = k, id_trans = tr[["id_trans"]][k],
         from = label_of(tr[[from_col]][k]),
@@ -368,6 +399,7 @@ for (py in probe_years) {
     }
   }
 }
+}
 
 if (length(rows_out) == 0L) {
   cat("\nNo Absolute-0 target rows to probe. Nothing to report.\n")
@@ -375,27 +407,40 @@ if (length(rows_out) == 0L) {
 }
 
 res <- do.call(rbind, rows_out)
+res$mask_short <- sub("^protected_areas_mask_", "PA_", sub("[.]tif$", "", res$mask))
 
-cat("\n== per-row n_zone (0 = the WR-04 INFO path fires) ==\n")
-print(res[order(res$year, res$intervention, res$row),
-          c("year", "intervention", "zone", "mask", "row", "id_trans",
-            "from", "to", "n_zone", "n_r", "note")],
-      row.names = FALSE)
+# The per-row dump is wide and repeats itself: n_zone depends only on
+# (mask, zone, from-class), never on the To class, so the three rows sharing a
+# from-class always carry the same number. Collapse to the distinct scans.
+cat("\n== distinct (scenario, mask, zone, from-class) scans ==\n")
+cat("   n_zone = cells of the from-class inside the asserted zone; 0 fires the INFO path\n")
+cat("   pct    = n_zone as a share of the from-class footprint (how far from firing)\n\n")
+d <- res[!duplicated(res[c("scenario", "mask_short", "zone", "from")]), ]
+d$pct <- ifelse(is.na(d$n_r) | d$n_r == 0, NA_real_, 100 * d$n_zone / d$n_r)
+print(d[order(d$scenario, d$mask_short, d$pct),
+        c("scenario", "mask_short", "zone", "from", "n_zone", "n_r", "pct")],
+      row.names = FALSE, digits = 3)
 
-cat("\n== per (year, intervention) summary ==\n")
-key <- paste(res$year, res$intervention, sep = " | ")
-summ <- do.call(rbind, lapply(split(res, key), function(d) data.frame(
-  year = d$year[1], intervention = d$intervention[1], zone = d$zone[1],
-  rows = nrow(d),
-  info_rows = sum(!is.na(d$n_zone) & d$n_zone == 0),
-  asserted_rows = sum(!is.na(d$n_zone) & d$n_zone > 0),
+if (any(!is.na(res$note))) {
+  cat("\n== rows that could not be scanned ==\n")
+  print(unique(res[!is.na(res$note), c("scenario", "mask_short", "row", "note")]),
+        row.names = FALSE)
+}
+
+cat("\n== per (scenario, year, intervention) summary ==\n")
+key <- paste(res$scenario, res$year, res$intervention, sep = " | ")
+summ <- do.call(rbind, lapply(split(res, key), function(x) data.frame(
+  scenario = x$scenario[1], year = x$year[1], intervention = x$intervention[1],
+  zone = x$zone[1], rows = nrow(x),
+  info_rows = sum(!is.na(x$n_zone) & x$n_zone == 0),
+  asserted_rows = sum(!is.na(x$n_zone) & x$n_zone > 0),
   stringsAsFactors = FALSE
 )))
 summ$verdict <- ifelse(
   summ$info_rows > 0 & summ$asserted_rows > 0, "FIRES INFO + still asserts (what item 1 wants)",
   ifelse(summ$info_rows > 0 & summ$asserted_rows == 0, "all rows INFO -> D-06a FAIL, not a PASS",
          "no INFO rows (every map intersects)"))
-print(summ[order(-summ$info_rows, summ$year), ], row.names = FALSE)
+print(summ[order(-summ$info_rows, summ$scenario, summ$year), ], row.names = FALSE)
 
 want <- summ[summ$info_rows > 0 & summ$asserted_rows > 0, ]
 cat("\n")
@@ -403,15 +448,31 @@ if (nrow(want) > 0L) {
   cat("CANDIDATE RUN COMBINATION(S) for phase 05.1 human item 1:\n")
   for (j in seq_len(nrow(want))) {
     cat(sprintf("  %s x %s x %d  (%s: %d INFO row(s), %d asserted row(s))\n",
-                scenario, donor_region, want$year[j], want$intervention[j],
+                want$scenario[j], donor_region, want$year[j], want$intervention[j],
                 want$info_rows[j], want$asserted_rows[j]))
   }
-  cat(sprintf("\nExpect maps_checked to land near %d, BELOW the %d matching trans_rates.csv row(s).\n",
-              sum(summ$asserted_rows), sum(summ$rows)))
-  cat("Caveat: row counts come from the DONOR trans_rates.csv. The probe year's own\n")
+  cat("\nCaveat: row counts come from the DONOR trans_rates.csv. The probe year's own\n")
   cat("trans_rates.csv is written by the run itself and may carry a different row set.\n")
   quit(status = 0)
 }
-cat("No combination fires the INFO path while still asserting on at least one map.\n")
-cat("Widen --probe-years, or try another --donor-region.\n")
+
+# Nothing fired. Report HOW FAR from firing, so the decision to keep hunting or
+# to accept the fixture-only proof rests on a number rather than a hunch.
+cat("No combination fires the INFO path while still asserting on at least one map.\n\n")
+ok <- d[!is.na(d$pct), ]
+if (nrow(ok) > 0L) {
+  closest <- ok[order(ok$pct), ][1, ]
+  cat(sprintf("Closest approach: %s / %s / zone %s / from %s\n",
+              closest$scenario, closest$mask_short, closest$zone, closest$from))
+  cat(sprintf("  n_zone = %.0f of %.0f footprint cells (%.3f%%)\n",
+              closest$n_zone, closest$n_r, closest$pct))
+  cat(sprintf("  smallest from-class footprint scanned: %.0f cells\n", min(ok$n_r)))
+  cat("\nEvery mask overlaps every from-class by a wide margin in this donor region.\n")
+  cat("Firing the path needs a from-class whose footprint is small enough that this\n")
+  cat("overlap rounds to zero cells - a different region, not a different year.\n")
+}
+cat("\nNext options, cheapest first:\n")
+cat("  1. another --scenario (other masks, same donor, no new allocation run)\n")
+cat("  2. another --donor-region that has already been run\n")
+cat("  3. accept the fixture-only proof, citing this probe output as the evidence\n")
 quit(status = 1)
