@@ -362,6 +362,31 @@ Rscript scripts/validate_intervention_masks.r --out logs/intervention_mask_valid
 # of the mask, never by resampling on HPC.
 ```
 
+**Archiving outputs before a fresh sweep.** The scenario launcher skips any
+region whose posteriors all exist, and the driver resumes a region from its
+existing posteriors, using the last one as the next starting map. Outputs
+written by older code (for example before interventions were wired in) must
+therefore be moved out of `$SIM_OUT/<scenario>` before a sweep that should
+start again from the initial LULC. `scripts/archive_allocation_outputs.sh`
+renames each existing `$SIM_OUT/<scenario>` tree to
+`$SIM_OUT/_archive_<tag>/<scenario>` (same filesystem, rename only: no copy,
+no delete, no raster reads) and records every move in
+`ARCHIVE_MANIFEST.tsv` inside the archive dir. It resolves `$SIM_OUT` with the
+same `get_config()` probe as the launcher. Run it on login02 from the code
+tree after `source .env`; it is not an sbatch job:
+
+```bash
+bash scripts/archive_allocation_outputs.sh --tag pre_interventions_phase5          # dry run (default)
+bash scripts/archive_allocation_outputs.sh --tag pre_interventions_phase5 --apply  # perform the moves
+bash scripts/archive_allocation_outputs.sh --scenarios "NAT CUL" --tag my_tag --apply
+```
+
+`--apply` refuses while allocation, mosaic or verifier jobs are queued or
+running, when an archive target already exists, or when `HPC_SCRATCH_ROOT`
+does not end in `/nascent-lulcc`. Undo one move by renaming it back, for
+example NAT from the `pre_interventions_phase5` archive:
+`mv -T /beegfs/black/nascent-lulcc/outputs/simulations/_archive_pre_interventions_phase5/NAT /beegfs/black/nascent-lulcc/outputs/simulations/NAT`.
+
 **Intervention smoke.** One scenario, region and posterior year, then the
 assertion script:
 
